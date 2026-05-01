@@ -85,9 +85,15 @@ export default function LoginScreen() {
     }
   }
 
+  const handleEnterDemo = () => {
+    setUser(getMockUser(role))
+    setProfile(getMockProfile(role))
+    navigate(getMockDashboardPath(role))
+  }
+
   return (
     <>
-      {demoMode && <DemoMode onClose={() => setDemoMode(false)} />}
+      {!DEV_BYPASS_AUTH && demoMode && <DemoMode onClose={() => setDemoMode(false)} />}
       <div
         className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-12"
         style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}
@@ -152,22 +158,22 @@ export default function LoginScreen() {
               boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
             }}
           >
-            {/* TEMP DEV BYPASS banner - remove before production */}
+            {/* Demo mode banner */}
             {DEV_BYPASS_AUTH && (
               <div
                 className="mb-4 flex items-center gap-2 rounded-xl px-3 py-2"
-                style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.3)' }}
+                style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.25)' }}
               >
-                <span style={{ fontSize: 13 }}>⚡</span>
-                <p style={{ fontSize: 11, color: 'rgba(250,204,21,0.9)', fontWeight: 600 }}>
-                  DEV MODE — tap a role to enter dashboard directly
+                <span style={{ fontSize: 13 }}>♻️</span>
+                <p style={{ fontSize: 11, color: 'rgba(0,200,255,0.85)', fontWeight: 600 }}>
+                  Demo Mode — Sample data only
                 </p>
               </div>
             )}
 
             {/* Card heading */}
             <h2 className="mb-5 text-base font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Sign in to{' '}
+              {DEV_BYPASS_AUTH ? 'Enter as' : 'Sign in to'}{' '}
               <span style={{ color: '#ffffff', fontWeight: 600 }}>{roleLabel}</span>
             </h2>
 
@@ -179,15 +185,7 @@ export default function LoginScreen() {
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => {
-                      setRole(r.id)
-                      // TEMP DEV BYPASS - remove before production
-                      if (DEV_BYPASS_AUTH) {
-                        setUser(getMockUser(r.id))
-                        setProfile(getMockProfile(r.id))
-                        navigate(getMockDashboardPath(r.id))
-                      }
-                    }}
+                    onClick={() => setRole(r.id)}
                     className="flex shrink-0 flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 text-center transition-all duration-150"
                     style={{
                       background: active ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)',
@@ -204,7 +202,25 @@ export default function LoginScreen() {
               })}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {DEV_BYPASS_AUTH && (
+              <button
+                type="button"
+                onClick={handleEnterDemo}
+                className="mt-2 flex w-full items-center justify-center gap-2 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                style={{
+                  background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
+                  borderRadius: 14,
+                  boxShadow: '0 4px 24px rgba(0,190,255,0.35)',
+                }}
+              >
+                Enter Demo
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+
+            {!DEV_BYPASS_AUTH && <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email */}
               <div className="space-y-1.5">
                 <label className="section-label block">Email</label>
@@ -292,33 +308,36 @@ export default function LoginScreen() {
                   </>
                 )}
               </button>
-            </form>
+            </form>}
+
           </div>
 
-          {/* Create account */}
-          <p className="mt-7 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            New to Cyan's Brooklynn?{' '}
-            <Link
-              to="/signup"
-              className="font-medium transition-opacity hover:opacity-80"
-              style={{ color: '#00c8ff' }}
-            >
-              Create account
-            </Link>
-          </p>
-
-          {/* Demo mode trigger */}
-          <button
-            type="button"
-            onClick={() => setDemoMode(true)}
-            className="mt-5 flex items-center gap-2 text-sm font-medium transition-opacity hover:opacity-80"
-            style={{ color: 'rgba(56,189,248,0.6)' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            Run Demo
-          </button>
+          {/* Create account + Run Demo — hidden in demo mode */}
+          {!DEV_BYPASS_AUTH && (
+            <>
+              <p className="mt-7 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                New to Cyan's Brooklynn?{' '}
+                <Link
+                  to="/signup"
+                  className="font-medium transition-opacity hover:opacity-80"
+                  style={{ color: '#00c8ff' }}
+                >
+                  Create account
+                </Link>
+              </p>
+              <button
+                type="button"
+                onClick={() => setDemoMode(true)}
+                className="mt-5 flex items-center gap-2 text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ color: 'rgba(56,189,248,0.6)' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Run Demo
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>

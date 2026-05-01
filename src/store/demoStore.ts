@@ -73,12 +73,53 @@ interface DemoStore {
 }
 
 const INIT_STATS: DemoStats = {
-  totalEarnings: 0,
-  unpaidEarnings: 0,
-  poundsRecycled: 0,
-  co2Reduced: 0,
-  bagsCompleted: 0,
+  totalEarnings: 142.50,
+  unpaidEarnings: 32.50,
+  poundsRecycled: 340,
+  co2Reduced: 170,
+  bagsCompleted: 28,
 }
+
+const INIT_BAGS: DemoBag[] = [
+  {
+    id: 'seed-1', bagCode: 'CBR-A001', consumerName: 'J. Williams',
+    address: '114 S 11th St', notes: 'Green bin at front door',
+    status: 'pending_pickup',
+    requestedAt: new Date(Date.now() - 28 * 60 * 1000).toISOString(), driverName: '',
+  },
+  {
+    id: 'seed-2', bagCode: 'CBR-A002', consumerName: 'M. Thompson',
+    address: '832 Chicamauga Ave', notes: '',
+    status: 'pending_pickup',
+    requestedAt: new Date(Date.now() - 52 * 60 * 1000).toISOString(), driverName: '',
+  },
+  {
+    id: 'seed-3', bagCode: 'CBR-A003', consumerName: 'T. Harris',
+    address: '1409 McGavock Pike', notes: 'Call on arrival',
+    status: 'driver_accepted',
+    requestedAt: new Date(Date.now() - 110 * 60 * 1000).toISOString(), driverName: 'Dev Driver',
+  },
+  {
+    id: 'seed-4', bagCode: 'CBR-A004', consumerName: 'R. Davis',
+    address: '407 S 14th St', notes: '',
+    status: 'at_warehouse',
+    requestedAt: new Date(Date.now() - 240 * 60 * 1000).toISOString(), driverName: 'Dev Driver',
+  },
+  {
+    id: 'seed-5', bagCode: 'CBR-A005', consumerName: 'A. Johnson',
+    address: '918 Glenrose Ave', notes: '',
+    status: 'completed',
+    requestedAt: new Date(Date.now() - 1440 * 60 * 1000).toISOString(), driverName: 'Dev Driver',
+    completedAt: new Date(Date.now() - 1380 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'seed-6', bagCode: 'CBR-A006', consumerName: 'D. Torres',
+    address: '2201 Nolensville Pike', notes: '',
+    status: 'completed',
+    requestedAt: new Date(Date.now() - 2880 * 60 * 1000).toISOString(), driverName: 'Dev Driver',
+    completedAt: new Date(Date.now() - 2820 * 60 * 1000).toISOString(),
+  },
+]
 
 function parseAddr(addr: string): { base: string; unit: string } {
   const m = addr.match(/\s+(?:Apt|Unit|Suite|#)\s*(\S+)\s*$/i)
@@ -88,7 +129,7 @@ function parseAddr(addr: string): { base: string; unit: string } {
 export const useDemoStore = create<DemoStore>()(
   persist(
     (set, get) => ({
-      bags: [],
+      bags: INIT_BAGS,
       stats: INIT_STATS,
       activeRoute: null,
 
@@ -257,6 +298,10 @@ export const useDemoStore = create<DemoStore>()(
       // expose get for selectors
       ...({} as { _get: typeof get }),
     }),
-    { name: 'baykid-demo' }
+    {
+      name: 'baykid-demo',
+      version: 1,
+      migrate: () => ({ bags: INIT_BAGS, stats: INIT_STATS, activeRoute: null }),
+    }
   )
 )

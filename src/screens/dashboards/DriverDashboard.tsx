@@ -427,26 +427,23 @@ export default function DriverDashboard() {
   }
 
   const handleCreateDemo = async () => {
-    console.log('[CreateDemo] clicked — DEV_BYPASS_AUTH:', DEV_BYPASS_AUTH)
     if (DEV_BYPASS_AUTH) {
       const now = Date.now()
-      const demoRoute = {
-        id: 'demo-route-001',
-        stops: [
-          { id: `stop-${now}-0`, address: '114 S 11th St',     units: [] as string[], bagCount: 3, status: 'active'  as const, scannedBags: [] },
-          { id: `stop-${now}-1`, address: '832 Chicamauga Ave', units: [] as string[], bagCount: 2, status: 'pending' as const, scannedBags: [] },
-          { id: `stop-${now}-2`, address: '1409 McGavock Pike', units: [] as string[], bagCount: 2, status: 'pending' as const, scannedBags: [] },
-          { id: `stop-${now}-3`, address: '407 S 14th St',      units: [] as string[], bagCount: 3, status: 'pending' as const, scannedBags: [] },
-        ],
-        routeStatus: 'active' as const,
-        warehouseCode: null,
-        checkedInBags: [],
-        createdAt: new Date().toISOString(),
-      }
-      console.log('[CreateDemo] setting route:', demoRoute.id, 'stops:', demoRoute.stops.length)
-      useDemoStore.setState({ activeRoute: demoRoute })
-      console.log('[CreateDemo] store after set — activeRoute id:', useDemoStore.getState().activeRoute?.id)
-      console.log('[CreateDemo] navigating to /dashboard/driver/route-map')
+      useDemoStore.setState({
+        activeRoute: {
+          id: 'demo-route-001',
+          stops: [
+            { id: `stop-${now}-0`, address: '114 S 11th St',     units: [] as string[], bagCount: 3, status: 'active'  as const, scannedBags: [] },
+            { id: `stop-${now}-1`, address: '832 Chicamauga Ave', units: [] as string[], bagCount: 2, status: 'pending' as const, scannedBags: [] },
+            { id: `stop-${now}-2`, address: '1409 McGavock Pike', units: [] as string[], bagCount: 2, status: 'pending' as const, scannedBags: [] },
+            { id: `stop-${now}-3`, address: '407 S 14th St',      units: [] as string[], bagCount: 3, status: 'pending' as const, scannedBags: [] },
+          ],
+          routeStatus: 'active' as const,
+          warehouseCode: null,
+          checkedInBags: [],
+          createdAt: new Date().toISOString(),
+        },
+      })
       navigate('/dashboard/driver/route-map')
       return
     }

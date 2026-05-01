@@ -22,6 +22,7 @@ import DriverRoutePage from './screens/driver/DriverRoutePage'
 import RouteStopPage from './screens/driver/RouteStopPage'
 import WarehouseCheckinPage from './screens/driver/WarehouseCheckinPage'
 import DriverScanScreen from './screens/driver/DriverScanScreen'
+import DemoSimulationPage from './screens/DemoSimulationPage'
 
 function HomeRedirect() {
   const { user, role, approvalStatus, isLoading } = useAuthStore()
@@ -65,6 +66,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
+        <Route path="/demo-simulation" element={<DemoSimulationPage />} />
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/signup" element={<SignupScreen />} />
         <Route

@@ -5,6 +5,7 @@ import DemoMode from '../components/DemoMode'
 // TEMP DEV BYPASS - remove before production
 import { DEV_BYPASS_AUTH, getMockProfile, getMockUser, getMockDashboardPath } from '../lib/devBypass'
 import { useAuthStore } from '../store/authStore'
+import { useDemoFlowStore } from '../store/demoFlowStore'
 
 // ── Role selector (UI only — does not affect signIn) ──────────────────────────
 type RoleTab = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin'
@@ -89,6 +90,11 @@ export default function LoginScreen() {
     setUser(getMockUser(role))
     setProfile(getMockProfile(role))
     navigate(getMockDashboardPath(role))
+  }
+
+  const handleRunFullDemo = () => {
+    useDemoFlowStore.getState().startDemo()
+    // navigation is handled by FullDemoHUD's useEffect once isRunning becomes true
   }
 
   return (
@@ -203,21 +209,40 @@ export default function LoginScreen() {
             </div>
 
             {DEV_BYPASS_AUTH && (
-              <button
-                type="button"
-                onClick={handleEnterDemo}
-                className="mt-2 flex w-full items-center justify-center gap-2 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
-                style={{
-                  background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
-                  borderRadius: 14,
-                  boxShadow: '0 4px 24px rgba(0,190,255,0.35)',
-                }}
-              >
-                Enter Demo
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
+              <div className="mt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleEnterDemo}
+                  className="flex w-full items-center justify-center gap-2 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                  style={{
+                    background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
+                    borderRadius: 14,
+                    boxShadow: '0 4px 24px rgba(0,190,255,0.35)',
+                  }}
+                >
+                  Enter Demo
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRunFullDemo}
+                  className="flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                  style={{
+                    background: 'rgba(0,200,255,0.08)',
+                    border: '1px solid rgba(0,200,255,0.35)',
+                    borderRadius: 14,
+                    color: '#00c8ff',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  Run Full Demo
+                </button>
+              </div>
             )}
 
             {!DEV_BYPASS_AUTH && <form onSubmit={handleSubmit} className="space-y-4">

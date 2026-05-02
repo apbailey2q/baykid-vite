@@ -23,6 +23,7 @@ import RouteStopPage from './screens/driver/RouteStopPage'
 import WarehouseCheckinPage from './screens/driver/WarehouseCheckinPage'
 import DriverScanScreen from './screens/driver/DriverScanScreen'
 import DemoSimulationPage from './screens/DemoSimulationPage'
+import FullDemoHUD from './components/FullDemoHUD'
 
 function HomeRedirect() {
   const { user, role, approvalStatus, isLoading } = useAuthStore()
@@ -99,6 +100,7 @@ function App() {
         <Route path="/bag/:bagId" element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
       </Routes>
+      <FullDemoHUD />
     </BrowserRouter>
       </ToastProvider>
     </ErrorBoundary>

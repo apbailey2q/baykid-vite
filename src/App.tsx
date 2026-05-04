@@ -24,6 +24,10 @@ import WarehouseCheckinPage from './screens/driver/WarehouseCheckinPage'
 import DriverScanScreen from './screens/driver/DriverScanScreen'
 import DemoSimulationPage from './screens/DemoSimulationPage'
 import FullDemoHUD from './components/FullDemoHUD'
+import FundraisersPage from './screens/fundraisers/FundraisersPage'
+import FundraiserDetailPage from './screens/fundraisers/FundraiserDetailPage'
+import MyFundraiserPage from './screens/fundraisers/MyFundraiserPage'
+import ScanResultPage from './screens/fundraisers/ScanResultPage'
 
 function HomeRedirect() {
   const { user, role, approvalStatus, isLoading } = useAuthStore()
@@ -99,6 +103,12 @@ function App() {
         <Route path="/scan" element={<ProtectedRoute requireApproved><ScannerScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId" element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
+
+        {/* Fundraisers — no auth required */}
+        <Route path="/fundraisers" element={<FundraisersPage />} />
+        <Route path="/fundraisers/:id" element={<FundraiserDetailPage />} />
+        <Route path="/my-fundraiser" element={<MyFundraiserPage />} />
+        <Route path="/scan-result" element={<ScanResultPage />} />
       </Routes>
       <FullDemoHUD />
     </BrowserRouter>

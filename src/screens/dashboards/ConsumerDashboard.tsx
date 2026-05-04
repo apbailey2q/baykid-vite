@@ -530,6 +530,71 @@ export default function ConsumerDashboard() {
               </div>
             </div>
 
+            {/* ── Community Fundraisers ──────────────────────────────────────── */}
+            <div className="px-5 mb-5">
+              <div
+                className="rounded-2xl overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
+              >
+                {/* Banner header */}
+                <div
+                  className="flex items-center justify-between px-4 py-3"
+                  style={{ background: 'rgba(0,87,231,0.18)', borderBottom: '1px solid rgba(0,190,255,0.12)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: 18 }}>🌱</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#ffffff' }}>Community Fundraisers</span>
+                  </div>
+                  <button
+                    onClick={() => navigate('/fundraisers')}
+                    style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    See all →
+                  </button>
+                </div>
+                {/* Featured fundraiser row */}
+                <div className="px-4 py-3 flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(0,87,231,0.2)', border: '1px solid rgba(0,190,255,0.2)', fontSize: 20 }}
+                  >
+                    🏀
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 2 }}>
+                      East Nashville High Basketball
+                    </p>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <div className="h-full rounded-full" style={{ width: '43%', background: 'linear-gradient(90deg, #0057e7, #00c8ff)' }} />
+                    </div>
+                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>43% funded · 48 supporters</p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/fundraisers/fund-001')}
+                    style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', borderRadius: 10, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    View
+                  </button>
+                </div>
+                {/* My Fundraiser Impact row */}
+                <div
+                  className="px-4 py-3 flex items-center justify-between"
+                  style={{ borderTop: '1px solid rgba(0,190,255,0.08)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: 14 }}>🏆</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>My Fundraiser Impact</span>
+                  </div>
+                  <button
+                    onClick={() => navigate('/my-fundraiser')}
+                    style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    View →
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* ── For You — horizontal scroll row ────────────────────────────── */}
             <div className="mb-5">
               <div className="px-5 flex items-center justify-between mb-2.5">

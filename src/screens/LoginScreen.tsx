@@ -8,14 +8,15 @@ import { useAuthStore } from '../store/authStore'
 import { useDemoFlowStore } from '../store/demoFlowStore'
 
 // ── Role selector (UI only — does not affect signIn) ──────────────────────────
-type RoleTab = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin'
+type RoleTab = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
 
 const ROLES: { id: RoleTab; label: string; icon: string }[] = [
-  { id: 'consumer',  label: 'Consumer',  icon: '♻️' },
-  { id: 'driver',    label: 'Driver',    icon: '🚐' },
-  { id: 'warehouse', label: 'Warehouse', icon: '🏭' },
-  { id: 'partner',   label: 'Partners',  icon: '🤝' },
-  { id: 'admin',     label: 'Admin',     icon: '⚙️' },
+  { id: 'consumer',   label: 'Consumer',    icon: '♻️' },
+  { id: 'driver',     label: 'Driver',      icon: '🚐' },
+  { id: 'warehouse',  label: 'Warehouse',   icon: '🏭' },
+  { id: 'partner',    label: 'Partners',    icon: '🤝' },
+  { id: 'admin',      label: 'Admin',       icon: '⚙️' },
+  { id: 'fundraiser', label: 'Fundraisers', icon: '🌱' },
 ]
 
 // ── Recycling SVG logo ────────────────────────────────────────────────────────
@@ -87,6 +88,10 @@ export default function LoginScreen() {
   }
 
   const handleEnterDemo = () => {
+    if (role === 'fundraiser') {
+      navigate('/fundraisers')
+      return
+    }
     setUser(getMockUser(role))
     setProfile(getMockProfile(role))
     navigate(getMockDashboardPath(role))

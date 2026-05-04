@@ -15,8 +15,8 @@ const ROLES: { id: RoleTab; label: string; icon: string }[] = [
   { id: 'driver',     label: 'Driver',      icon: '🚐' },
   { id: 'warehouse',  label: 'Warehouse',   icon: '🏭' },
   { id: 'partner',    label: 'Partners',    icon: '🤝' },
-  { id: 'admin',      label: 'Admin',       icon: '⚙️' },
   { id: 'fundraiser', label: 'Fundraisers', icon: '🌱' },
+  { id: 'admin',      label: 'Admin',       icon: '⚙️' },
 ]
 
 // ── Recycling SVG logo ────────────────────────────────────────────────────────
@@ -189,7 +189,10 @@ export default function LoginScreen() {
             </h2>
 
             {/* Role selector */}
-            <div className="mb-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <div
+              className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory"
+              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', marginBottom: 4 }}
+            >
               {ROLES.map((r) => {
                 const active = role === r.id
                 return (
@@ -197,13 +200,13 @@ export default function LoginScreen() {
                     key={r.id}
                     type="button"
                     onClick={() => setRole(r.id)}
-                    className="flex shrink-0 flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 text-center transition-all duration-150"
+                    className="flex shrink-0 snap-start flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 text-center transition-all duration-150"
                     style={{
                       background: active ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)',
                       border: active ? '1px solid rgba(0,200,255,0.5)' : '1px solid rgba(255,255,255,0.08)',
                       color: active ? '#00c8ff' : 'rgba(255,255,255,0.5)',
                       boxShadow: active ? '0 0 16px rgba(0,200,255,0.15)' : 'none',
-                      minWidth: '68px',
+                      minWidth: '72px',
                     }}
                   >
                     <span className="text-lg leading-none">{r.icon}</span>
@@ -212,6 +215,9 @@ export default function LoginScreen() {
                 )
               })}
             </div>
+            <p className="mb-4 text-center text-[10px]" style={{ color: 'rgba(255,255,255,0.22)' }}>
+              Slide to see more roles
+            </p>
 
             {DEV_BYPASS_AUTH && (
               <div className="mt-2 flex flex-col gap-2">
@@ -246,6 +252,21 @@ export default function LoginScreen() {
                     <polygon points="5 3 19 12 5 21 5 3" />
                   </svg>
                   Run Full Demo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/fundraisers')}
+                  className="flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                  style={{
+                    background: 'rgba(20,184,166,0.08)',
+                    border: '1px solid rgba(20,184,166,0.3)',
+                    borderRadius: 14,
+                    color: '#5eead4',
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>🌱</span>
+                  View Fundraisers
                 </button>
               </div>
             )}

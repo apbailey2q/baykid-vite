@@ -16,12 +16,13 @@ const ROLES: Role[] = [
 ]
 
 const ROLE_LABELS: Record<Role, string> = {
-  consumer: 'Consumer',
-  driver: 'Driver',
-  warehouse_employee: 'Warehouse',
-  warehouse_supervisor: 'Supervisor',
-  partner: 'Partner',
-  admin: 'Admin',
+  consumer: "Consumer",
+  driver: "Driver",
+  warehouse_employee: "Warehouse",
+  warehouse_supervisor: "Warehouse Supervisor",
+  partner: "Partner",
+  admin: "Admin",
+  fundraiser: "Fundraiser",
 }
 
 const APPROVAL_BADGE: Record<ApprovalStatus, { bg: string; color: string; label: string }> = {

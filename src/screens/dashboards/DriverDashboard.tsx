@@ -14,7 +14,6 @@ import {
   pauseRoute,
   resumeRoute,
   completeRoute,
-  createDemoRoute,
   touchLastActive,
   startRoute,
 } from '../../lib/driver'
@@ -25,8 +24,6 @@ import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { DriverRouteView } from '../driver/DriverRouteView'
 import { signOut } from '../../lib/auth'
 import { DriverHeader } from '../../components/driver/DriverHeader'
-import { DriverCard } from '../../components/driver/DriverCard'
-import { useToast } from '../../components/ui/Toast'
 import { SectionLabel } from '../../components/ui/dashboard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -257,20 +254,19 @@ export default function DriverDashboard() {
 
   useDriverInactivity()
 
-  const { bags: demoBags, createRoute, activeRoute: demoActiveRoute } = useDemoStore()
+  const { bags: demoBags, createRoute } = useDemoStore()
 
   const [driverTab, setDriverTab] = useState<DriverTab>((location.state as { tab?: DriverTab } | null)?.tab ?? 'home')
 
   const [toggling, setToggling]           = useState(false)
   const [offlineWarning, setLocalOfflineWarning] = useState(false)
-  const [creatingDemo, setCreatingDemo]   = useState(false)
   const [completingRoute, setCompletingRoute] = useState(false)
   const [msgBanner, setMsgBanner]         = useState<string | null>(null)
   const [selectedPickupCount, setSelectedPickupCount] = useState(0)
   const [selectedPickupInputs, setSelectedPickupInputs] = useState<import('../../store/demoStore').PickupInput[]>([])
   const [pickupsResetKey, setPickupsResetKey] = useState(0)
   // dev-bypass online state (replaces driverStatus.is_online in demo mode)
-  const [devIsOnline, setDevIsOnline]     = useState(() => localStorage.getItem('driverOnline') === 'true')
+  const [devIsOnline, setDevIsOnline]     = useState(() => localStorage.getItem('isOnline') === 'true')
   // earnings payout
   const [showPayoutModal, setShowPayoutModal] = useState(false)
   const [payoutDone, setPayoutDone]       = useState(false)
@@ -321,7 +317,7 @@ export default function DriverDashboard() {
     if (DEV_BYPASS_AUTH) {
       setDevIsOnline((prev) => {
         const next = !prev
-        localStorage.setItem('driverOnline', String(next))
+        localStorage.setItem('isOnline', String(next))
         return next
       })
       return
@@ -342,7 +338,7 @@ export default function DriverDashboard() {
   }
 
   const handleGoOnlineOnly = async () => {
-    if (DEV_BYPASS_AUTH) { setDevIsOnline(true); localStorage.setItem('driverOnline', 'true'); return }
+    if (DEV_BYPASS_AUTH) { setDevIsOnline(true); localStorage.setItem('isOnline', 'true'); return }
     if (!user || !driverStatus) return
     setToggling(true)
     try {
@@ -390,42 +386,6 @@ export default function DriverDashboard() {
       setDriverStatus(driverStatus ? { ...driverStatus, active_route_id: null } : null)
     } finally {
       setCompletingRoute(false)
-    }
-  }
-
-  const handleCreateDemo = async () => {
-    if (DEV_BYPASS_AUTH) {
-      const now = Date.now()
-      useDemoStore.setState({
-        activeRoute: {
-          id: 'demo-route-001',
-          stops: [
-            { id: `stop-${now}-0`, address: '114 S 11th St',     units: [] as string[], bagCount: 3, status: 'active'  as const, scannedBags: [] },
-            { id: `stop-${now}-1`, address: '832 Chicamauga Ave', units: [] as string[], bagCount: 2, status: 'pending' as const, scannedBags: [] },
-            { id: `stop-${now}-2`, address: '1409 McGavock Pike', units: [] as string[], bagCount: 2, status: 'pending' as const, scannedBags: [] },
-            { id: `stop-${now}-3`, address: '407 S 14th St',      units: [] as string[], bagCount: 3, status: 'pending' as const, scannedBags: [] },
-          ],
-          routeStatus: 'active' as const,
-          warehouseCode: null,
-          checkedInBags: [],
-          createdAt: new Date().toISOString(),
-        },
-      })
-      navigate('/dashboard/driver/route-map')
-      return
-    }
-    if (!user) return
-    setCreatingDemo(true)
-    try {
-      const route = await createDemoRoute(user.id)
-      const stops = await getRouteStops(route.id)
-      setActiveRoute(route)
-      setActiveRouteStops(stops)
-      const status = await getOrCreateDriverStatus(user.id)
-      setDriverStatus({ ...status, is_online: true, active_route_id: route.id })
-      recordActivity()
-    } finally {
-      setCreatingDemo(false)
     }
   }
 
@@ -1057,7 +1017,7 @@ export default function DriverDashboard() {
                     const inputs = ZIP_ZONES
                       .flatMap(z => z.locations)
                       .filter(l => selectedPickupIds.has(l.id))
-                      .map(l => ({ address: l.address, bagCount: l.bags, units: [] as string[] }))
+                      .map(l => ({ id: l.id, address: l.address, bags: l.bags }))
                     createRoute(inputs)
                     setSelectedPickupIds(new Set())
                     setExpandedZip(null)
@@ -1379,21 +1339,21 @@ export default function DriverDashboard() {
                 <div className="flex items-center gap-2.5">
                   <div style={{
                     width: 10, height: 10, borderRadius: '50%',
-                    background: driverOnline ? '#4ade80' : 'rgba(255,255,255,0.2)',
-                    boxShadow: driverOnline ? '0 0 8px rgba(74,222,128,0.7)' : 'none',
+                    background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)',
+                    boxShadow: isOnline ? '0 0 8px rgba(74,222,128,0.7)' : 'none',
                   }} />
                   <p style={{ fontSize: 14, color: '#ffffff', fontWeight: 600 }}>
-                    {driverOnline ? 'Online' : 'Offline'}
+                    {isOnline ? 'Online' : 'Offline'}
                   </p>
                 </div>
                 <span
                   className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider"
                   style={{
-                    background: driverOnline ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.06)',
-                    color: driverOnline ? '#4ade80' : 'rgba(255,255,255,0.35)',
+                    background: isOnline ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.06)',
+                    color: isOnline ? '#4ade80' : 'rgba(255,255,255,0.35)',
                   }}
                 >
-                  {driverOnline ? 'Active Shift' : 'Not On Shift'}
+                  {isOnline ? 'Active Shift' : 'Not On Shift'}
                 </span>
               </div>
 

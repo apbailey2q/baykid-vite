@@ -52,18 +52,6 @@ const FOR_YOU_CATEGORIES: { icon: string; label: string; page: QuickPage }[] = [
   { icon: '📦', label: 'Supplies',    page: 'supplies'  },
 ]
 
-const DEEDS_STEPS = [
-  { key: 'pending',      label: 'Requested',     activeLabel: 'Creating request...' },
-  { key: 'assigned',     label: 'Assigned',       activeLabel: 'Driver assigned...' },
-  { key: 'picked_up',    label: 'Picked Up',      activeLabel: 'Driver en route...' },
-  { key: 'at_warehouse', label: 'At Warehouse',   activeLabel: 'In progress...' },
-  { key: 'completed',    label: 'Reward Issued',  activeLabel: 'Processing reward...' },
-]
-
-const DEEDS_STEP_IDX: Record<string, number> = {
-  pending: 0, assigned: 1, picked_up: 2, at_warehouse: 3, inspected: 3, completed: 4,
-}
-
 const BAG_STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   pending:      { label: 'Pending',      bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
   assigned:     { label: 'Assigned',     bg: 'rgba(139,92,246,0.18)', color: '#a78bfa' },
@@ -957,7 +945,6 @@ export default function ConsumerDashboard() {
               const tier: 1 | 2 | 3 = wLbs >= 17 ? 3 : wLbs >= 10 ? 2 : 1
 
               const tierColor    = tier === 3 ? '#00D9FF'                   : tier === 2 ? '#3DFFD4'                   : '#5BFFB0'
-              const tierBorder   = tier === 3 ? 'rgba(0,217,255,0.28)'     : tier === 2 ? 'rgba(61,255,212,0.22)'    : 'rgba(91,255,176,0.25)'
               const tierGlow     = tier === 3 ? 'rgba(0,217,255,0.18)'     : tier === 2 ? 'rgba(61,255,212,0.12)'    : 'rgba(91,255,176,0.13)'
               const tierMsg      = tier === 3 ? 'Great job! You reached the goal!' : tier === 2 ? 'Making progress! Keep it up!' : 'More effort needed'
               const tierSub      = tier === 3 ? 'The planet thanks you! 🌍'        : tier === 2 ? 'Almost there, keep recycling!'  : 'Every bag makes a difference!'

@@ -13,7 +13,7 @@ export default function PartnerDashboard() {
       {/* Tabs */}
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"
-        style={{ borderBottom: '1px solid rgba(0,188,212,0.15)' }}
+        style={{ borderBottom: '1px solid rgba(0,188,212,0.15)', scrollbarWidth: 'none' }}
       >
         {([['overview', 'Overview'], ['reports', 'Reports']] as [Tab, string][]).map(([t, label]) => (
           <button
@@ -22,7 +22,7 @@ export default function PartnerDashboard() {
             className="shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors"
             style={
               tab === t
-                ? { borderBottomColor: '#00BCD4', color: '#00BCD4' }
+                ? { borderBottomColor: '#a855f7', color: '#a855f7' }
                 : { borderBottomColor: 'transparent', color: '#7B909C' }
             }
           >
@@ -31,8 +31,8 @@ export default function PartnerDashboard() {
         ))}
       </div>
 
-      {tab === 'overview' && <PartnerStats />}
-      {tab === 'reports' && <PartnerReports />}
+      {tab === 'overview' && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><PartnerStats /></div>}
+      {tab === 'reports'  && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><PartnerReports /></div>}
     </DashboardShell>
   )
 }

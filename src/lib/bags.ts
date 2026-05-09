@@ -3,6 +3,16 @@ import type { Bag, BagStatus, InspectionStatus, Inspection, InspectionPhoto } fr
 
 export type InspectionWithPhotos = Inspection & { inspection_photos: InspectionPhoto[] }
 
+export async function getAllBags(limit = 100): Promise<Bag[]> {
+  const { data, error } = await supabase
+    .from('bags')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as Bag[]
+}
+
 export async function lookupOrCreateBag(rawCode: string): Promise<Bag> {
   const code = rawCode.trim().toUpperCase()
 

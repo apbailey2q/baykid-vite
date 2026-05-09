@@ -121,9 +121,6 @@ export function PickupsNearYou({
   }, [resetKey])
 
   const totalSelected = selectedPickups.size
-  const totalPickups  = ZONES.reduce((s, z) => s + z.pickupCount, 0)
-  const totalBags     = ZONES.reduce((s, z) => s + z.bagTotal, 0)
-  const totalZips     = ZONES.length
 
   const getPickupInputs = (ids: Set<string>): PickupInput[] => {
     const result: PickupInput[] = []
@@ -181,7 +178,7 @@ export function PickupsNearYou({
               <p className="text-lg font-bold" style={{ color: '#ffffff' }}>
                 Active Route
               </p>
-              <span className="text-green-400 text-xs font-semibold">
+              <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>
                 ● Active
               </span>
             </div>
@@ -200,32 +197,6 @@ export function PickupsNearYou({
           </button>
         )
       })()}
-
-      {/* ── Summary strip ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        {[
-          { value: String(totalPickups),  label: 'PICKUPS'    },
-          { value: String(totalBags),     label: 'BAGS'       },
-          { value: String(totalSelected), label: 'SELECTED',   hl: totalSelected > 0 },
-          { value: String(totalZips),     label: 'ZIP ZONES'  },
-        ].map((card) => (
-          <div
-            key={card.label}
-            className="rounded-2xl p-2.5 flex flex-col gap-0.5"
-            style={{
-              background: card.hl ? 'rgba(0,188,212,0.1)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${card.hl ? 'rgba(0,188,212,0.4)' : 'rgba(255,255,255,0.08)'}`,
-            }}
-          >
-            <p style={{ fontSize: 17, color: card.hl ? '#00BCD4' : '#ffffff', fontWeight: 700, lineHeight: 1.15 }}>
-              {card.value}
-            </p>
-            <p style={{ fontSize: 9, color: card.hl ? '#00BCD4' : 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1.2 }}>
-              {card.label}
-            </p>
-          </div>
-        ))}
-      </div>
 
       {/* ── Offline pill / online info bar ───────────────────────────────── */}
       {!isOnline ? (

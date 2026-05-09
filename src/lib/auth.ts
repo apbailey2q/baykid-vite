@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import type { Role } from '../types'
 
-export const AUTO_APPROVED_ROLES: Role[] = ['consumer', 'admin']
+export const AUTO_APPROVED_ROLES: Role[] = ['consumer']
 
 const ROLE_DASHBOARD: Record<Role, string> = {
   consumer: '/dashboard/consumer',
@@ -10,6 +10,7 @@ const ROLE_DASHBOARD: Record<Role, string> = {
   warehouse_supervisor: '/dashboard/warehouse-supervisor',
   partner: '/dashboard/partner',
   admin: '/dashboard/admin',
+  fundraiser: '/dashboard/fundraiser',
 }
 
 export function getRoleDashboardPath(role: Role): string {

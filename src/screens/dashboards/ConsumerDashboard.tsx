@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { signOut } from '../../lib/auth'
@@ -14,6 +14,7 @@ import { useBroadcastAlerts } from '../../hooks/useBroadcastAlerts'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
+import { SectionLabel } from '../../components/ui/dashboard'
 import { useDemoStore } from '../../store/demoStore'
 import ScanModal from '../../components/demo/ScanModal'
 import QuickActionPage, { type QuickPage } from '../../components/demo/QuickActionPage'
@@ -74,6 +75,30 @@ const BAG_STATUS_BADGE: Record<string, { label: string; bg: string; color: strin
 
 const CONFETTI_COLORS = ['#00c8ff', '#00E676', '#FFD600', '#FF6D00', '#E040FB', '#FF4081']
 const CELEBRATE_MSGS  = ['Way to go', 'You rock', 'Keep it up', 'Amazing work', "You're crushing it"]
+
+const WEEKLY_EARNINGS: { label: string; amount: number | null }[] = [
+  { label: 'Current Week',       amount: null  },
+  { label: 'May 4–10, 2026',     amount: 25.50 },
+  { label: 'Apr 27–May 3, 2026', amount: 18.75 },
+  { label: 'Apr 20–26, 2026',    amount: 32.10 },
+  { label: 'Apr 13–19, 2026',    amount: 21.00 },
+  { label: 'Apr 6–12, 2026',     amount: 14.80 },
+  { label: 'Mar 30–Apr 5, 2026', amount: 17.37 },
+  { label: 'Mar 23–29, 2026',    amount: 12.25 },
+  { label: 'Mar 15–21, 2026',    amount: 19.60 },
+]
+
+const WEEKLY_RECYCLED: { label: string; lbs: number | null }[] = [
+  { label: 'Current Week',       lbs: null },
+  { label: 'May 4–10, 2026',     lbs: 340  },
+  { label: 'Apr 27–May 3, 2026', lbs: 285  },
+  { label: 'Apr 20–26, 2026',    lbs: 310  },
+  { label: 'Apr 13–19, 2026',    lbs: 225  },
+  { label: 'Apr 6–12, 2026',     lbs: 190  },
+  { label: 'Mar 30–Apr 5, 2026', lbs: 240  },
+  { label: 'Mar 23–29, 2026',    lbs: 175  },
+  { label: 'Mar 15–21, 2026',    lbs: 205  },
+]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -184,6 +209,7 @@ export default function ConsumerDashboard() {
   const { user, profile, clearAuth } = useAuthStore()
   const navigate = useNavigate()
   const toast = useToast()
+  const ACCENT = '#00c8ff'
   const firstName = profile?.full_name?.split(' ')[0] ?? 'Friend'
   const initials  = profile?.full_name ? getInitials(profile.full_name) : '??'
 
@@ -194,14 +220,19 @@ export default function ConsumerDashboard() {
   const [signingOut, setSigningOut] = useState(false)
   const [newMsgBanner, setNewMsgBanner] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('Eco Tips')
-  const [bagTab, setBagTab]           = useState<'active' | 'history' | 'all'>('active')
+  const [bagTab, setBagTab]           = useState<'active' | 'history'>('active')
   const [showManual, setShowManual]   = useState(false)
-  const [earningsTab, setEarningsTab] = useState<'daily' | 'weekly' | 'monthly'>('weekly')
-  const [recycledTab, setRecycledTab] = useState<'daily' | 'weekly' | 'monthly'>('weekly')
+
   const [activePage, setActivePage]   = useState<QuickPage | null>(null)
   const [showScan, setShowScan]       = useState(false)
   const [showPaidOut, setShowPaidOut] = useState(false)
   const [scanInitialCode, setScanInitialCode] = useState<string | null>(null)
+  const [earningsWeekIdx, setEarningsWeekIdx] = useState(0)
+  const [recycledWeekIdx, setRecycledWeekIdx]  = useState(0)
+
+  const [demoProgress, setDemoProgress] = useState(0)
+  const [demoPlaying, setDemoPlaying]   = useState(false)
+  const demoRafRef = useRef<number | null>(null)
 
   const { bags: demoBags, stats: demoStats, processPayout } = useDemoStore()
 
@@ -253,41 +284,13 @@ export default function ConsumerDashboard() {
   const lbsDiverted   = Math.round(completedBags * 2.5)
   const co2Saved      = Math.round(completedBags * 1.2)
   const earnings      = (completedBags * 3.75).toFixed(2)
-  const treesPlanted  = completedBags
   const unreadMsgCount = broadcasts.length
 
   const filteredBags =
-    bagTab === 'active'  ? myBags.filter((b) => b.status !== 'completed') :
     bagTab === 'history' ? myBags.filter((b) => b.status === 'completed') :
-    myBags
+    myBags.filter((b) => b.status !== 'completed')
 
-  const todayBags = weeklyData[weeklyData.length - 1]?.bags ?? 0
   const weekBags  = weeklyData.reduce((s, d) => s + d.bags, 0)
-  const avgPerDay = weekBags / 7
-
-  const earningsValue =
-    earningsTab === 'daily'  ? `$${(todayBags * 3.75).toFixed(2)}` :
-    earningsTab === 'weekly' ? `$${(weekBags  * 3.75).toFixed(2)}` :
-                               `$${earnings}`
-
-  const recycledValue =
-    recycledTab === 'daily'  ? `${Math.round(todayBags * 2.5)} lbs` :
-    recycledTab === 'weekly' ? `${Math.round(weekBags  * 2.5)} lbs` :
-                               `${lbsDiverted} lbs`
-
-  const earningsMiniCards = [
-    { label: 'Today',   value: `$${(todayBags * 3.75).toFixed(2)}` },
-    { label: 'Avg/day', value: `$${(avgPerDay * 3.75).toFixed(2)}` },
-    { label: 'Pickups', value: String(weekBags) },
-  ]
-  const recycledMiniCards = [
-    { label: 'Today',   value: `${Math.round(todayBags * 2.5)} lbs` },
-    { label: 'Avg/wk',  value: `${Math.round(weekBags  * 2.5)} lbs` },
-    { label: 'Bags',    value: String(myBags.length) },
-  ]
-
-  const currentProgressBag = myBags.find((b) => b.status !== 'completed') ?? myBags[0] ?? null
-  const completedBagsList  = myBags.filter((b) => b.status === 'completed').slice(0, 5)
 
   const newsItems = broadcasts.length > 0
     ? broadcasts.slice(0, 2).map((b) => ({ title: 'Admin Update', desc: b.message }))
@@ -316,6 +319,63 @@ export default function ConsumerDashboard() {
     return () => clearInterval(id)
   }, [celebBadge])
 
+  // ── Logo demo animation ────────────────────────────────────────────────────
+  const cancelDemoAnimation = useCallback(() => {
+    if (demoRafRef.current !== null) {
+      cancelAnimationFrame(demoRafRef.current)
+      demoRafRef.current = null
+    }
+    setDemoPlaying(false)
+  }, [])
+
+  const startDemoAnimation = useCallback(() => {
+    cancelDemoAnimation()
+    setDemoProgress(0)
+    setDemoPlaying(true)
+    const startTime = performance.now()
+    // [endMs, fromPct, toPct] — linear interpolation between waypoints
+    const segs: [number, number, number][] = [
+      [2500,   0,  25],  // 0→25 over 2.5s
+      [3500,  25,  25],  // hold 25 for 1s
+      [7500,  25,  65],  // 25→65 over 4s
+      [8500,  65,  65],  // hold 65 for 1s
+      [11500, 65,  99],  // 65→99 over 3s
+      [12500, 99,  99],  // hold 99 for 1s
+      [13500, 99, 100],  // 99→100 over 1s
+    ]
+    function animate(now: number) {
+      const elapsed = now - startTime
+      if (elapsed >= 13500) {
+        setDemoProgress(100)
+        setDemoPlaying(false)
+        demoRafRef.current = null
+        return
+      }
+      let progress = 0
+      let prevMs = 0
+      for (const [endMs, fromPct, toPct] of segs) {
+        if (elapsed < endMs) {
+          const dur = endMs - prevMs
+          const t = dur > 0 ? (elapsed - prevMs) / dur : 1
+          progress = fromPct + (toPct - fromPct) * t
+          break
+        }
+        prevMs = endMs
+        progress = toPct
+      }
+      setDemoProgress(Math.round(progress))
+      demoRafRef.current = requestAnimationFrame(animate)
+    }
+    demoRafRef.current = requestAnimationFrame(animate)
+  }, [cancelDemoAnimation])
+
+  useEffect(() => {
+    if (tab !== 'deeds') return
+    startDemoAnimation()
+  }, [tab, startDemoAnimation])
+
+  useEffect(() => () => cancelDemoAnimation(), [cancelDemoAnimation])
+
   // ── Manual bag request (opens ScanModal pre-seeded) ──────────────────────
   const handleManualRequest = (e: React.FormEvent) => {
     e.preventDefault()
@@ -332,7 +392,7 @@ export default function ConsumerDashboard() {
     try { await signOut() } catch { /* no real session in dev bypass — safe to ignore */ }
     clearAuth()
     localStorage.removeItem('baykid-auth')
-    navigate('/login', { replace: true })
+    navigate('/real-login', { replace: true })
   }
 
   return (
@@ -356,24 +416,9 @@ export default function ConsumerDashboard() {
           zIndex: 10,
         }}
       >
-        {/* Left: recycling icon + wordmark */}
+        {/* Left: logo + wordmark */}
         <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-            style={{
-              background: 'linear-gradient(135deg,rgba(0,188,212,0.25),rgba(0,100,255,0.15))',
-              border: '1px solid rgba(0,188,212,0.35)',
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5" />
-              <path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12" />
-              <path d="m14 16 3 3-3 3" />
-              <path d="M8.293 13.596 7.196 9.5 3.1 10.598" />
-              <path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843" />
-              <path d="m13.378 9.633 4.096 1.098 1.097-4.096" />
-            </svg>
-          </div>
+          <img src="/logo.png" alt="Cyan's Brooklynn" style={{ width: 54, height: 54, objectFit: 'contain', filter: 'drop-shadow(0 0 10px rgba(0,200,255,0.7)) drop-shadow(0 0 20px rgba(0,100,255,0.4))' }} />
           <div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>Cyan's Brooklynn</p>
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.2, letterSpacing: '0.04em' }}>Recycling Enterprise</p>
@@ -397,8 +442,8 @@ export default function ConsumerDashboard() {
         ) : (
           <div className="flex items-center gap-2.5">
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-full transition-opacity hover:opacity-80 active:scale-90"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.2)' }}
+              className="flex items-center justify-center transition-opacity hover:opacity-80 active:scale-90"
+              style={{ padding: '6px' }}
             >
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -439,56 +484,33 @@ export default function ConsumerDashboard() {
           <div style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
 
             {/* ── Welcome ────────────────────────────────────────────────────── */}
-            <div className="px-5 pt-6 pb-4">
-              <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.01em', lineHeight: 1 }}>
-                Welcome back,
-              </p>
-              <p style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', lineHeight: 1.2, marginTop: 4 }}>
-                {firstName}
-              </p>
+            <div className="px-5 pt-6 pb-4 flex items-center justify-between">
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.01em', lineHeight: 1 }}>
+                  Welcome back,
+                </p>
+                <p style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', lineHeight: 1.2, marginTop: 4 }}>
+                  {firstName}
+                </p>
+              </div>
+              <div className="text-right">
+                <p style={{ fontSize: 22, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>${earnings}</p>
+                <p style={{ fontSize: 9, color: '#00c8ff', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginTop: 3 }}>Earnings</p>
+              </div>
             </div>
 
-            {/* ── Earnings strip — 3 glass cards ─────────────────────────────── */}
-            <div className="px-5 grid grid-cols-3 gap-2.5 mb-4">
-              {[
-                { value: `$${earnings}`,          label: 'Earnings'      },
-                { value: `${lbsDiverted} lbs`,    label: 'Recycled'      },
-                { value: String(treesPlanted),    label: 'Trees Planted' },
-              ].map((card) => (
-                <div
-                  key={card.label}
-                  className="rounded-2xl px-3 py-3.5 flex flex-col gap-1.5"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(0,190,255,0.15)',
-                    backdropFilter: 'blur(12px)',
-                  }}
-                >
-                  {loadingBags ? (
-                    <Skeleton height="h-5" />
-                  ) : (
-                    <p style={{ fontSize: 16, color: '#ffffff', fontWeight: 700, lineHeight: 1.1 }}>
-                      {card.value}
-                    </p>
-                  )}
-                  <p style={{ fontSize: 9, color: '#00c8ff', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-                    {card.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* ── Scan Bag — gradient primary, full width, QR icon ───────────── */}
-            <div className="px-5 mb-5">
+            {/* ── Scan Bag ── */}
+            <div className="px-5 mb-5 mt-20">
               <button
                 onClick={() => setShowScan(true)}
-                className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-4 text-sm font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                className="w-full flex items-center justify-center gap-3 rounded-2xl py-6 text-lg font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
-                  boxShadow: '0 4px 24px rgba(0,190,255,0.35)',
+                  boxShadow: '0 6px 28px rgba(0,190,255,0.4)',
+                  letterSpacing: '0.02em',
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
                   <rect x="7" y="7" width="10" height="10" rx="1" />
                 </svg>
@@ -496,10 +518,13 @@ export default function ConsumerDashboard() {
               </button>
             </div>
 
-            {/* ── Quick Access — 3 glass tiles ───────────────────────────────── */}
-            <div className="px-5 mb-5">
-              <p className="section-label mb-3">QUICK ACCESS</p>
-              <div className="grid grid-cols-3 gap-2.5">
+
+            {/* ── Quick Access — horizontal icon-only scroll ──────────────────── */}
+            <div className="mb-5">
+              <div className="px-5">
+                <SectionLabel title="Quick Access" accent={ACCENT} />
+              </div>
+              <div className="flex gap-7 overflow-x-auto px-5 pb-1" style={{ scrollbarWidth: 'none' }}>
                 {[
                   { icon: '♻️', label: 'Recycling', badge: activeBags,    action: () => setActivePage('recycling') },
                   { icon: '🎁', label: 'Rewards',   badge: 0,              action: () => setActivePage('rewards')   },
@@ -508,27 +533,23 @@ export default function ConsumerDashboard() {
                   <button
                     key={tile.label}
                     onClick={tile.action}
-                    className="relative flex flex-col items-center gap-2 py-4 transition-all active:scale-[0.92] hover:brightness-110"
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(0,190,255,0.15)',
-                      borderRadius: 16,
-                    }}
+                    className="relative flex shrink-0 flex-col items-center gap-1.5 transition-all active:scale-[0.92] hover:brightness-110"
                   >
                     {tile.badge > 0 && (
                       <span
-                        className="absolute top-2 right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold"
+                        className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold"
                         style={{ background: '#FF1744', color: '#fff' }}
                       >
                         {tile.badge}
                       </span>
                     )}
-                    <span style={{ fontSize: 22 }}>{tile.icon}</span>
-                    <span style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>{tile.label}</span>
+                    <span style={{ fontSize: 28 }}>{tile.icon}</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{tile.label}</span>
                   </button>
                 ))}
               </div>
             </div>
+
 
             {/* ── Community Fundraisers ──────────────────────────────────────── */}
             <div className="px-5 mb-5">
@@ -542,7 +563,7 @@ export default function ConsumerDashboard() {
                   style={{ background: 'rgba(0,87,231,0.18)', borderBottom: '1px solid rgba(0,190,255,0.12)' }}
                 >
                   <div className="flex items-center gap-2">
-                    <span style={{ fontSize: 18 }}>🌱</span>
+                    <img src="/logo.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', filter: 'drop-shadow(0 0 8px rgba(0,200,255,0.7)) drop-shadow(0 0 16px rgba(0,100,255,0.45))' }} />
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#ffffff' }}>Community Fundraisers</span>
                   </div>
                   <button
@@ -554,12 +575,7 @@ export default function ConsumerDashboard() {
                 </div>
                 {/* Featured fundraiser row */}
                 <div className="px-4 py-3 flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(0,87,231,0.2)', border: '1px solid rgba(0,190,255,0.2)', fontSize: 20 }}
-                  >
-                    🏀
-                  </div>
+                  <span className="shrink-0" style={{ fontSize: 24 }}>🏀</span>
                   <div className="flex-1 min-w-0">
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 2 }}>
                       East Nashville High Basketball
@@ -597,9 +613,8 @@ export default function ConsumerDashboard() {
 
             {/* ── For You — horizontal scroll row ────────────────────────────── */}
             <div className="mb-5">
-              <div className="px-5 flex items-center justify-between mb-2.5">
-                <p className="section-label">FOR YOU</p>
-                <span style={{ fontSize: 11, color: 'rgba(0,200,255,0.5)', fontWeight: 500 }}>swipe ›</span>
+              <div className="px-5 mb-2.5">
+                <SectionLabel title="For You" accent={ACCENT} />
               </div>
               <div
                 className="flex gap-2.5 overflow-x-auto px-5 pb-2"
@@ -611,15 +626,10 @@ export default function ConsumerDashboard() {
                     <button
                       key={cat.label}
                       onClick={() => { setSelectedCategory(cat.label); setActivePage(cat.page) }}
-                      className="shrink-0 flex flex-col items-center gap-1.5 py-3.5 rounded-2xl transition-all active:scale-[0.92]"
-                      style={{
-                        width: 76,
-                        background: selected ? 'rgba(0,130,255,0.2)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${selected ? 'rgba(0,210,255,0.5)' : 'rgba(0,190,255,0.15)'}`,
-                        boxShadow: selected ? '0 0 12px rgba(0,200,255,0.12)' : 'none',
-                      }}
+                      className="shrink-0 flex flex-col items-center gap-1.5 transition-all active:scale-[0.92]"
+                      style={{ width: 64 }}
                     >
-                      <span style={{ fontSize: 22 }}>{cat.icon}</span>
+                      <span style={{ fontSize: 26, filter: selected ? 'drop-shadow(0 0 6px rgba(0,200,255,0.5))' : 'none' }}>{cat.icon}</span>
                       <span style={{ fontSize: 10, color: selected ? '#00c8ff' : 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
                         {cat.label}
                       </span>
@@ -631,7 +641,7 @@ export default function ConsumerDashboard() {
 
             {/* ── News — glass card, exactly 2 items ─────────────────────────── */}
             <div className="px-5 mb-5">
-              <p className="section-label mb-3">NEWS & UPDATES</p>
+              <SectionLabel title="News & Updates" accent={ACCENT} />
               <div
                 className="rounded-2xl overflow-hidden"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
@@ -643,12 +653,7 @@ export default function ConsumerDashboard() {
                     style={{ borderBottom: i === 0 ? '1px solid rgba(0,190,255,0.08)' : 'none' }}
                   >
                     <div className="flex items-start gap-3">
-                      <div
-                        className="mt-0.5 shrink-0 h-7 w-7 flex items-center justify-center rounded-lg text-sm"
-                        style={{ background: 'rgba(0,190,255,0.1)' }}
-                      >
-                        📢
-                      </div>
+                      <span className="mt-0.5 shrink-0" style={{ fontSize: 18 }}>📢</span>
                       <div>
                         <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 700, lineHeight: 1.3 }}>{item.title}</p>
                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.45 }}>{item.desc}</p>
@@ -728,10 +733,10 @@ export default function ConsumerDashboard() {
                 {/* Primary scan button */}
                 <button
                   onClick={() => setShowScan(true)}
-                  className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 20px rgba(0,190,255,0.35)' }}
+                  className="w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-base font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 6px 28px rgba(0,190,255,0.45)' }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
                     <rect x="7" y="7" width="10" height="10" rx="1" />
                   </svg>
@@ -776,18 +781,18 @@ export default function ConsumerDashboard() {
 
             {/* Active bags list */}
             <div className="px-5 pb-4">
-                <p className="section-label mb-3">ACTIVE BAGS</p>
+                <SectionLabel title="Active Bags" accent={ACCENT} />
 
                 {/* Tab filter pill */}
                 <div
                   className="flex mb-4 p-[3px]"
                   style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10 }}
                 >
-                  {(['active', 'history', 'all'] as const).map((t) => (
+                  {(['active', 'history'] as const).map((t) => (
                     <button
                       key={t}
                       onClick={() => setBagTab(t)}
-                      className="flex-1 py-1.5 text-xs font-semibold transition-all"
+                      className="flex-1 py-2 text-xs font-semibold transition-all"
                       style={{
                         borderRadius: 8,
                         ...(bagTab === t
@@ -795,7 +800,7 @@ export default function ConsumerDashboard() {
                           : { color: 'rgba(255,255,255,0.4)' }),
                       }}
                     >
-                      {t === 'all' ? 'All bags' : t.charAt(0).toUpperCase() + t.slice(1)}
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -822,8 +827,8 @@ export default function ConsumerDashboard() {
                       return (
                         <div
                           key={bag.id}
-                          className="rounded-2xl px-4 py-3.5 flex items-center justify-between"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.12)' }}
+                          className="px-1 py-3 flex items-center justify-between"
+                          style={{ borderBottom: '1px solid rgba(0,190,255,0.07)' }}
                         >
                           <div>
                             <p className="font-mono font-bold" style={{ fontSize: 14, color: '#ffffff' }}>{bag.bag_code}</p>
@@ -854,8 +859,8 @@ export default function ConsumerDashboard() {
                       return (
                         <div
                           key={bag.id}
-                          className="rounded-2xl px-4 py-3.5 flex items-center justify-between"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.12)' }}
+                          className="px-1 py-3 flex items-center justify-between"
+                          style={{ borderBottom: '1px solid rgba(0,190,255,0.07)' }}
                         >
                           <div>
                             <p className="font-mono font-bold" style={{ fontSize: 14, color: '#ffffff' }}>{bag.bagCode}</p>
@@ -882,248 +887,446 @@ export default function ConsumerDashboard() {
         {tab === 'deeds' && (
           <div style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
 
-            {/* Page title */}
-            <div className="px-5 pt-5 pb-4">
-              <p style={{ fontSize: 22, color: '#ffffff', fontWeight: 500 }}>Deeds</p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Track your recycling impact</p>
+            <style>{`
+              @keyframes progressShimmer {
+                0%   { background-position: 0% center; }
+                100% { background-position: 200% center; }
+              }
+              @keyframes logoSpin {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+              }
+              @keyframes ecoFloat {
+                0%, 100% { transform: translateY(0px) scale(1);   opacity: 0.75; }
+                50%       { transform: translateY(-10px) scale(1.2); opacity: 1;    }
+              }
+              @keyframes confettiFall {
+                0%   { transform: translateY(-16px) rotate(0deg);   opacity: 1; }
+                100% { transform: translateY(110px) rotate(400deg); opacity: 0; }
+              }
+              @keyframes logoBloom {
+                0%, 100% { opacity: 0.12; transform: scale(1); }
+                50%       { opacity: 0.24; transform: scale(1.08); }
+              }
+            `}</style>
+
+            {/* ── BALANCE ─────────────────────────────────────────────────── */}
+            <div className="px-5 pt-6 pb-2 text-center">
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
+                Current Balance
+              </p>
+              <p style={{ fontSize: 56, fontWeight: 800, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.02em' }}>
+                {demoStats.unpaidEarnings > 0 ? `$${demoStats.unpaidEarnings.toFixed(2)}` : `$${(weekBags * 3.75).toFixed(2)}`}
+              </p>
+              <p style={{ fontSize: 12, color: 'rgba(0,210,255,0.75)', marginTop: 10, fontWeight: 500 }}>
+                Payout scheduled for 5/11
+              </p>
             </div>
 
-            {/* ── BOX 1: EARNINGS ─────────────────────────────────────── */}
-            <div className="px-5 mb-4">
-              <div
-                className="rounded-2xl p-4 space-y-3"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
+            {/* ── PAYOUT BUTTONS ──────────────────────────────────────────── */}
+            <div className="px-5 flex gap-3 mt-5 mb-6">
+              <button
+                onClick={() => setShowPaidOut(true)}
+                className="flex-1 py-3.5 rounded-2xl font-bold text-sm text-white transition-all hover:brightness-110 active:scale-[0.97]"
+                style={{
+                  background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
+                  boxShadow: '0 4px 20px rgba(0,190,255,0.45)',
+                  letterSpacing: '0.01em',
+                }}
               >
-                <div className="flex items-center justify-between">
-                  <p className="section-label">EARNINGS</p>
-                  <button
-                    onClick={() => setShowPaidOut(true)}
-                    className="font-semibold text-white"
-                    style={{
-                      background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
-                      borderRadius: 20,
-                      fontSize: 11,
-                      padding: '5px 14px',
-                    }}
-                  >
-                    Paid Out
-                  </button>
-                </div>
-
-                <p style={{ fontSize: 32, color: '#ffffff', fontWeight: 500, lineHeight: 1 }}>
-                  {demoStats.unpaidEarnings > 0 ? `$${demoStats.unpaidEarnings.toFixed(2)}` : earningsValue}
-                </p>
-
-                <div className="flex p-[3px]" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10 }}>
-                  {(['daily', 'weekly', 'monthly'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setEarningsTab(t)}
-                      className="flex-1 py-1.5 text-xs font-semibold capitalize transition-all"
-                      style={{
-                        borderRadius: 8,
-                        ...(earningsTab === t
-                          ? { background: 'rgba(0,130,255,0.3)', color: '#00c8ff' }
-                          : { color: 'rgba(255,255,255,0.4)' }),
-                      }}
-                    >
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {earningsMiniCards.map((card) => (
-                    <div
-                      key={card.label}
-                      className="rounded-xl p-2.5"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,190,255,0.1)' }}
-                    >
-                      <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{card.value}</p>
-                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{card.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ── BOX 2: TOTAL RECYCLED ────────────────────────────────── */}
-            <div className="px-5 mb-4">
-              <div
-                className="rounded-2xl p-4 space-y-3"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
+                Cash out now
+              </button>
+              <button
+                className="flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all hover:brightness-110 active:scale-[0.97]"
+                style={{
+                  background: 'transparent',
+                  border: '1.5px solid rgba(0,200,255,0.5)',
+                  color: '#00c8ff',
+                  boxShadow: '0 0 14px rgba(0,200,255,0.15)',
+                  letterSpacing: '0.01em',
+                }}
               >
-                <p className="section-label">TOTAL RECYCLED</p>
-
-                <p style={{ fontSize: 32, color: '#ffffff', fontWeight: 500, lineHeight: 1 }}>
-                  {demoStats.poundsRecycled > 0 ? `${demoStats.poundsRecycled} lbs` : recycledValue}
-                </p>
-
-                <div className="flex p-[3px]" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10 }}>
-                  {(['daily', 'weekly', 'monthly'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setRecycledTab(t)}
-                      className="flex-1 py-1.5 text-xs font-semibold capitalize transition-all"
-                      style={{
-                        borderRadius: 8,
-                        ...(recycledTab === t
-                          ? { background: 'rgba(0,130,255,0.3)', color: '#00c8ff' }
-                          : { color: 'rgba(255,255,255,0.4)' }),
-                      }}
-                    >
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {recycledMiniCards.map((card) => (
-                    <div
-                      key={card.label}
-                      className="rounded-xl p-2.5"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,190,255,0.1)' }}
-                    >
-                      <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{card.value}</p>
-                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{card.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                Payout details
+              </button>
             </div>
 
-            {/* ── CURRENT BAG PROGRESS ─────────────────────────────────── */}
-            {currentProgressBag && (
-              <div className="px-5 mb-4">
-                <p className="section-label mb-3">CURRENT BAG PROGRESS</p>
-                <div
-                  className="rounded-2xl p-4"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="font-mono font-bold" style={{ fontSize: 14, color: '#ffffff' }}>
-                      {currentProgressBag.bag_code}
-                    </p>
-                    <span style={{ fontSize: 12, color: '#00c8ff' }}>
-                      {currentProgressBag.status === 'completed' ? 'Completed' : 'In progress'}
-                    </span>
-                  </div>
+            {/* ── IMPACT + MILESTONES + STATS + BANNER ────────────────────── */}
+            {(() => {
+              const progressPct = demoProgress
+              const wLbs        = Math.round(progressPct * 17 / 100)
+              const tier: 1 | 2 | 3 = wLbs >= 17 ? 3 : wLbs >= 10 ? 2 : 1
 
-                  {DEEDS_STEPS.map((step, i) => {
-                    const curIdx    = DEEDS_STEP_IDX[currentProgressBag.status] ?? 0
-                    const isDone    = i < curIdx
-                    const isCurrent = i === curIdx
-                    const bagDate   = new Date(currentProgressBag.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              const tierColor    = tier === 3 ? '#00D9FF'                   : tier === 2 ? '#3DFFD4'                   : '#5BFFB0'
+              const tierBorder   = tier === 3 ? 'rgba(0,217,255,0.28)'     : tier === 2 ? 'rgba(61,255,212,0.22)'    : 'rgba(91,255,176,0.25)'
+              const tierGlow     = tier === 3 ? 'rgba(0,217,255,0.18)'     : tier === 2 ? 'rgba(61,255,212,0.12)'    : 'rgba(91,255,176,0.13)'
+              const tierMsg      = tier === 3 ? 'Great job! You reached the goal!' : tier === 2 ? 'Making progress! Keep it up!' : 'More effort needed'
+              const tierSub      = tier === 3 ? 'The planet thanks you! 🌍'        : tier === 2 ? 'Almost there, keep recycling!'  : 'Every bag makes a difference!'
+              const tierProgGrad = tier === 3
+                ? 'linear-gradient(90deg,#0099cc 0%,#00D9FF 50%,#4EDBFF 100%)'
+                : tier === 2
+                ? 'linear-gradient(90deg,#3DFFD4 0%,#39E6FF 50%,#3DFFD4 100%)'
+                : 'linear-gradient(90deg,#00e890 0%,#5BFFB0 50%,#72FFCC 100%)'
+              const level       = progressPct >= 100 ? 'Community Hero'
+                                : progressPct >= 65  ? 'Planet Protector'
+                                : progressPct >= 25  ? 'Eco Warrior'
+                                                     : 'Eco Starter'
+              // Ring is cyan/teal for all incomplete states; switches to eco green only at 100%
+              const ringColor     = progressPct >= 100 ? '#5BFFB0' : '#00D9FF'
+              const ringSecondary = progressPct >= 100 ? '#3DFFd4cc' : '#00D9FF66'
+              const ringDuration  = progressPct >= 100 ? '1.5s' : tier === 3 ? '2s' : '3.5s'
 
-                    return (
-                      <div key={step.key} className="flex gap-3">
-                        <div className="flex flex-col items-center">
-                          <div
-                            style={{
-                              width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                              background: isDone ? '#22c55e' : isCurrent ? '#00c8ff' : 'rgba(255,255,255,0.2)',
-                              animation: isCurrent ? 'dotPulse 1.5s ease-in-out infinite' : 'none',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}
-                          >
-                            {isDone && (
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M4.5 12.75l6 6 9-13.5" />
-                              </svg>
-                            )}
-                            {isCurrent && (
-                              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
-                            )}
+              return (
+                <>
+                  {/* ── Logo gamified progress ──────────────────────── */}
+                  <div className="px-5 mb-4">
+                    <div className="rounded-3xl overflow-hidden" style={{ boxShadow: `0 8px 44px ${tierGlow}` }}>
+
+                      {/* Level + progress header */}
+                      <div className="px-5 pt-4 pb-4" style={{ background: 'rgba(3,10,26,0.98)' }}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>
+                              Your Level
+                            </p>
+                            <p style={{ fontSize: 17, fontWeight: 800, color: tierColor, letterSpacing: '-0.01em' }}>{level}</p>
+                            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>{tierSub}</p>
                           </div>
-                          {i < DEEDS_STEPS.length - 1 && (
-                            <div style={{ width: 1.5, flex: 1, minHeight: 20, marginTop: 3, marginBottom: 3, background: 'rgba(0,190,255,0.15)' }} />
+                          <div className="text-right">
+                            <p style={{ fontSize: 34, fontWeight: 900, color: tierColor, lineHeight: 1, letterSpacing: '-0.03em' }}>{progressPct}%</p>
+                            <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Goal Progress</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Logo animation zone */}
+                      <div style={{ position: 'relative', background: 'linear-gradient(180deg,#010812 0%,#020f1e 100%)', padding: '28px 20px 24px', textAlign: 'center', overflow: 'hidden' }}>
+
+                        {/* Background bloom */}
+                        <div style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', width: 260, height: 260, background: `${tierColor}12`, filter: 'blur(60px)', borderRadius: '50%', pointerEvents: 'none', animationName: 'logoBloom', animationDuration: '4s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite' }} />
+                        {tier === 3 && (
+                          <div style={{ position: 'absolute', top: '-5%', left: '50%', transform: 'translateX(-50%)', width: 340, height: 340, background: 'rgba(0,217,255,0.07)', filter: 'blur(80px)', borderRadius: '50%', pointerEvents: 'none' }} />
+                        )}
+
+                        {/* Logo — 180×180, centered */}
+                        <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto' }}>
+
+                          {/* Grayscale base */}
+                          <img
+                            src="/logo.png"
+                            alt=""
+                            draggable={false}
+                            style={{
+                              position: 'absolute', top: 0, left: 0,
+                              width: '100%', height: '100%',
+                              objectFit: 'contain',
+                              userSelect: 'none',
+                              filter: 'grayscale(1) brightness(0.28)',
+                            }}
+                          />
+
+                          {/* Color reveal — radial clip-path fills from center */}
+                          <img
+                            src="/logo.png"
+                            alt=""
+                            draggable={false}
+                            style={{
+                              position: 'absolute', top: 0, left: 0,
+                              width: '100%', height: '100%',
+                              objectFit: 'contain',
+                              userSelect: 'none',
+                              clipPath: `circle(${(Math.min(71, progressPct * 0.71)).toFixed(1)}% at 50% 50%)`,
+                              transition: 'clip-path 1.8s cubic-bezier(0.34,1.56,0.64,1)',
+                              filter: progressPct >= 65
+                                ? `drop-shadow(0 0 22px ${tierColor}cc) drop-shadow(0 0 44px ${tierColor}44)`
+                                : progressPct >= 25
+                                ? `drop-shadow(0 0 14px ${tierColor}88)`
+                                : `drop-shadow(0 0 6px ${tierColor}44)`,
+                            }}
+                          />
+
+                          {/* Eco spin ring (tier 2+) — cyan/teal below 100%, green at 100% */}
+                          {tier >= 2 && (
+                            <div style={{
+                              position: 'absolute', top: -12, left: -12, right: -12, bottom: -12,
+                              borderRadius: '50%',
+                              border: '2px solid transparent',
+                              borderTopColor: ringColor,
+                              borderRightColor: (tier === 3 || progressPct >= 100) ? ringSecondary : 'transparent',
+                              boxShadow: progressPct >= 100
+                                ? `0 0 16px rgba(91,255,176,0.6), 0 0 30px rgba(91,255,176,0.25)`
+                                : 'none',
+                              animationName: 'logoSpin',
+                              animationDuration: ringDuration,
+                              animationTimingFunction: 'linear',
+                              animationIterationCount: 'infinite',
+                              opacity: 0.9,
+                              transition: 'border-top-color 1.2s ease, border-right-color 1.2s ease, box-shadow 1.2s ease',
+                            }} />
+                          )}
+
+                          {/* Outer bloom ring — only at 100% */}
+                          {progressPct >= 100 && (
+                            <div style={{
+                              position: 'absolute', top: -22, left: -22, right: -22, bottom: -22,
+                              borderRadius: '50%',
+                              border: '1px solid rgba(91,255,176,0.28)',
+                              boxShadow: '0 0 14px rgba(91,255,176,0.18), inset 0 0 8px rgba(91,255,176,0.1)',
+                              pointerEvents: 'none',
+                              animationName: 'logoBloom',
+                              animationDuration: '2.4s',
+                              animationTimingFunction: 'ease-in-out',
+                              animationIterationCount: 'infinite',
+                            }} />
+                          )}
+
+                          {/* Eco particles (tier 2+) */}
+                          {tier >= 2 && [0, 72, 144, 216, 288].map((angle, i) => {
+                            const r   = 100 + (i % 2) * 7
+                            const rad = (angle * Math.PI) / 180
+                            const cx  = 90 + Math.cos(rad) * r
+                            const cy  = 90 + Math.sin(rad) * r
+                            return (
+                              <div key={i} style={{
+                                position: 'absolute', left: cx, top: cy,
+                                width: tier === 3 ? 7 : 5, height: tier === 3 ? 7 : 5,
+                                borderRadius: '50%', background: tierColor,
+                                opacity: 0.78, filter: 'blur(1px)',
+                                animationName: 'ecoFloat',
+                                animationDuration: `${2.2 + i * 0.4}s`,
+                                animationDelay: `${i * 0.46}s`,
+                                animationTimingFunction: 'ease-in-out',
+                                animationIterationCount: 'infinite',
+                              }} />
+                            )
+                          })}
+
+                          {/* Confetti at 100% */}
+                          {progressPct >= 100 && (
+                            <div style={{ position: 'absolute', inset: -30, pointerEvents: 'none', overflow: 'hidden' }}>
+                              {Array.from({ length: 18 }).map((_, i) => (
+                                <div key={i} style={{
+                                  position: 'absolute', top: -16,
+                                  left: `${(i * 17 + 4) % 92}%`,
+                                  width: 5, height: 9, borderRadius: 2,
+                                  background: ['#5BFFB0','#00D9FF','#3DFFD4','#72FFCC','#00B8FF','#5BFFB0'][i % 6],
+                                  animationName: 'confettiFall',
+                                  animationDuration: `${1.3 + (i % 5) * 0.18}s`,
+                                  animationDelay: `${(i * 0.09) % 0.6}s`,
+                                  animationTimingFunction: 'ease-in',
+                                  animationIterationCount: 'infinite',
+                                }} />
+                              ))}
+                            </div>
                           )}
                         </div>
-                        <div style={{ paddingBottom: i < DEEDS_STEPS.length - 1 ? 14 : 0 }}>
-                          <p style={{
-                            fontSize: 13,
-                            color: isDone || isCurrent ? '#ffffff' : 'rgba(255,255,255,0.35)',
-                            fontWeight: isDone || isCurrent ? 600 : 400,
-                          }}>
-                            {step.label}
+
+                        {/* GOAL ACHIEVED banner */}
+                        {progressPct >= 100 && (
+                          <p style={{ marginTop: 16, fontSize: 15, fontWeight: 900, color: '#00D9FF', letterSpacing: '0.14em', textTransform: 'uppercase', textShadow: '0 0 22px rgba(0,217,255,0.9), 0 0 44px rgba(0,184,255,0.45)' }}>
+                            GOAL ACHIEVED ✦
                           </p>
-                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                            {isDone ? bagDate : isCurrent ? step.activeLabel : 'Pending'}
-                          </p>
+                        )}
+
+                        {/* Progress bar */}
+                        <div style={{ marginTop: progressPct >= 100 ? 12 : 22 }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.36)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Logo Activation</p>
+                            <p style={{ fontSize: 11, fontWeight: 800, color: tierColor }}>{progressPct}% filled</p>
+                          </div>
+                          <div style={{ height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', width: `${progressPct}%`,
+                              background: tierProgGrad, backgroundSize: '200% auto',
+                              borderRadius: 999, boxShadow: `0 0 10px ${tierColor}99`,
+                              transition: 'width 1.8s cubic-bezier(0.4,0,0.2,1)',
+                              animationName: 'progressShimmer', animationDuration: '2.5s',
+                              animationTimingFunction: 'linear', animationIterationCount: 'infinite',
+                            }} />
+                          </div>
+                          <p style={{ fontSize: 10, color: tierColor, fontWeight: 600, marginTop: 6 }}>{tierMsg}</p>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
-            {/* ── BAG HISTORY ──────────────────────────────────────────── */}
-            {completedBagsList.length > 0 && (
-              <div className="px-5 mb-4">
-                <p className="section-label mb-3">BAG HISTORY</p>
-                <div
-                  className="rounded-2xl overflow-hidden"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-                >
-                  {completedBagsList.map((bag, i) => (
-                    <div
-                      key={bag.id}
-                      className="px-4 py-3 flex items-center justify-between"
-                      style={{ borderBottom: i < completedBagsList.length - 1 ? '1px solid rgba(0,190,255,0.08)' : 'none' }}
-                    >
-                      <div>
-                        <p className="font-mono font-bold" style={{ fontSize: 13, color: '#ffffff' }}>{bag.bag_code}</p>
-                        <p style={{ fontSize: 11, color: '#00c8ff', marginTop: 1 }}>$3.75 earned</p>
-                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
-                          {new Date(bag.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
                       </div>
-                      <span
-                        className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                        style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80' }}
-                      >
-                        ✓ Passed
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* ── IMPACT BREAKDOWN ─────────────────────────────────────── */}
-            <div className="px-5 mb-5">
-              <p className="section-label mb-3">IMPACT BREAKDOWN</p>
-              <div
-                className="rounded-2xl overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-              >
-                {[
-                  { icon: '♻️', label: 'Waste diverted', sub: 'From landfill this month',  value: `${lbsDiverted} lbs`, iconBg: 'rgba(0,200,255,0.12)' },
-                  { icon: '🌍', label: 'CO₂ reduced',     sub: 'Carbon footprint saved',    value: `${co2Saved} lbs`,    iconBg: 'rgba(0,230,118,0.1)'  },
-                  { icon: '🌱', label: 'Trees planted',   sub: 'Via recycling credits',     value: String(treesPlanted), iconBg: 'rgba(0,200,83,0.1)'   },
-                  { icon: '💰', label: 'Total earned',    sub: 'Since joining',             value: `$${earnings}`,       iconBg: 'rgba(255,193,7,0.12)' },
-                ].map((row, i, arr) => (
-                  <div
-                    key={row.label}
-                    className="px-4 py-3.5 flex items-center gap-3"
-                    style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,190,255,0.08)' : 'none' }}
-                  >
-                    <div
-                      className="flex items-center justify-center shrink-0"
-                      style={{ width: 36, height: 36, borderRadius: 10, background: row.iconBg, fontSize: 18 }}
-                    >
-                      {row.icon}
+                      {/* 3 milestone glass cards */}
+                      <div style={{ display: 'flex', gap: 7, padding: '12px 14px 14px', background: 'rgba(3,10,26,0.98)' }}>
+                        {([
+                          { range: '0–9 lbs',   label: 'Keep\nrecycling!',    color: '#5BFFB0', glow: 'rgba(91,255,176,0.22)',  border: 'rgba(91,255,176,0.30)',  bg: 'rgba(91,255,176,0.08)',  active: tier === 1 },
+                          { range: '10–16 lbs', label: 'Eco\nenergy rising!', color: '#3DFFD4', glow: 'rgba(61,255,212,0.22)',  border: 'rgba(61,255,212,0.30)',  bg: 'rgba(61,255,212,0.07)',  active: tier === 2 },
+                          { range: '17+ lbs',   label: 'Goal\nreached! ✦',    color: '#00D9FF', glow: 'rgba(0,217,255,0.28)',   border: 'rgba(0,217,255,0.34)',   bg: 'rgba(0,217,255,0.09)',   active: tier === 3 },
+                        ] as const).map((ms, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              flex: 1, borderRadius: 14, padding: '10px 6px 9px',
+                              background: ms.active ? ms.bg : 'rgba(255,255,255,0.02)',
+                              border: 'none',
+                              boxShadow: ms.active ? `0 0 24px ${ms.glow}, inset 0 0 14px ${ms.glow}` : 'none',
+                              textAlign: 'center' as const, transition: 'all 0.4s ease',
+                            }}
+                          >
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: ms.color, margin: '0 auto 6px', boxShadow: ms.active ? `0 0 10px ${ms.color}, 0 0 4px ${ms.color}` : 'none', transition: 'box-shadow 0.4s ease' }} />
+                            <p style={{ fontSize: 10, fontWeight: 800, color: ms.color, marginBottom: 3, lineHeight: 1.2 }}>{ms.range}</p>
+                            <p style={{ fontSize: 8.5, color: ms.active ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.28)', lineHeight: 1.35, whiteSpace: 'pre-line' }}>{ms.label}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{row.sub}</p>
-                    </div>
-                    <p style={{ fontSize: 14, color: '#00c8ff', fontWeight: 500, flexShrink: 0 }}>{row.value}</p>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  {/* ── Demo Controls ────────────────────────────── */}
+                  <div className="px-5 mb-4">
+                    <div style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '11px 14px' }}>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                          Demo Controls
+                        </p>
+                        {demoPlaying && (
+                          <span style={{ fontSize: 9, fontWeight: 600, color: '#5BFFB0' }}>● Playing…</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {[
+                          { label: 'Reset',   isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(0) } },
+                          { label: '▶ Play',  isPlay: true,  action: startDemoAnimation },
+                          { label: '25%',     isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(25) } },
+                          { label: '65%',     isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(65) } },
+                          { label: '100%',    isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(100) } },
+                        ].map((btn) => (
+                          <button
+                            key={btn.label}
+                            onClick={btn.action}
+                            style={{
+                              padding: '5px 13px', borderRadius: 8,
+                              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                              background: btn.isPlay ? 'rgba(34,197,94,0.11)' : 'rgba(0,200,255,0.07)',
+                              border: `1px solid ${btn.isPlay ? 'rgba(34,197,94,0.28)' : 'rgba(0,200,255,0.18)'}`,
+                              color: btn.isPlay ? '#22c55e' : '#00c8ff',
+                            }}
+                          >
+                            {btn.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly stats */}
+                  <div className="px-5 mb-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Earnings card */}
+                      <div className="rounded-2xl p-4" style={{ background: 'rgba(0,87,231,0.12)', boxShadow: '0 4px 28px rgba(0,130,255,0.14), inset 0 0 20px rgba(0,100,200,0.07)', position: 'relative', overflow: 'hidden' }}>
+                        <p style={{ fontSize: 9, fontWeight: 700, color: '#00c8ff', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                          Weekly total earnings
+                        </p>
+                        <p style={{ fontSize: 28, fontWeight: 800, color: '#ffffff', lineHeight: 1.1, marginBottom: 6 }}>
+                          {earningsWeekIdx === 0
+                            ? (demoStats.unpaidEarnings > 0 ? `$${demoStats.unpaidEarnings.toFixed(2)}` : `$${(wLbs * 1.5).toFixed(2)}`)
+                            : `$${WEEKLY_EARNINGS[earningsWeekIdx].amount!.toFixed(2)}`}
+                        </p>
+                        <p style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 6 }}>Keep up the good work!</p>
+                        <select
+                          value={earningsWeekIdx}
+                          onChange={e => setEarningsWeekIdx(Number(e.target.value))}
+                          style={{
+                            display: 'block', width: '100%',
+                            background: 'rgba(0,0,0,0.38)',
+                            border: '1px solid rgba(0,200,255,0.15)',
+                            borderRadius: 6, outline: 'none', cursor: 'pointer',
+                            color: 'rgba(255,255,255,0.52)',
+                            fontSize: 8.5, fontWeight: 600, letterSpacing: '0.02em',
+                            padding: '3px 5px',
+                            colorScheme: 'dark',
+                          }}
+                        >
+                          {WEEKLY_EARNINGS.map((w, i) => (
+                            <option key={i} value={i} style={{ background: '#0a1628' }}>
+                              {i === 0 ? 'Current Week' : w.label}
+                            </option>
+                          ))}
+                        </select>
+                        {/* Floating $ icon */}
+                        <span style={{
+                          position: 'absolute', top: 10, right: 14,
+                          fontSize: 22, fontWeight: 900, color: '#00c8ff',
+                          filter: 'drop-shadow(0 0 8px rgba(0,200,255,0.7)) drop-shadow(0 0 16px rgba(0,180,255,0.35))',
+                          lineHeight: 1,
+                        }}>$</span>
+                      </div>
+                      {/* Recycled card */}
+                      <div className="rounded-2xl p-4" style={{ background: 'rgba(0,150,80,0.10)', boxShadow: '0 4px 28px rgba(61,255,212,0.10), inset 0 0 20px rgba(0,150,80,0.06)', position: 'relative', overflow: 'hidden' }}>
+                        <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(34,197,94,0.85)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                          Weekly total recycled
+                        </p>
+                        <p style={{ fontSize: 28, fontWeight: 800, color: '#ffffff', lineHeight: 1.1, marginBottom: 6 }}>
+                          {recycledWeekIdx === 0
+                            ? (demoStats.poundsRecycled > 0 ? `${demoStats.poundsRecycled} lbs` : `${wLbs} lbs`)
+                            : `${WEEKLY_RECYCLED[recycledWeekIdx].lbs} lbs`}
+                        </p>
+                        <p style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 6 }}>Keep up the good work!</p>
+                        <select
+                          value={recycledWeekIdx}
+                          onChange={e => setRecycledWeekIdx(Number(e.target.value))}
+                          style={{
+                            display: 'block', width: '100%',
+                            background: 'rgba(0,0,0,0.38)',
+                            border: '1px solid rgba(91,255,176,0.15)',
+                            borderRadius: 6, outline: 'none', cursor: 'pointer',
+                            color: 'rgba(255,255,255,0.52)',
+                            fontSize: 8.5, fontWeight: 600, letterSpacing: '0.02em',
+                            padding: '3px 5px',
+                            colorScheme: 'dark',
+                          }}
+                        >
+                          {WEEKLY_RECYCLED.map((w, i) => (
+                            <option key={i} value={i} style={{ background: '#0a1628' }}>
+                              {i === 0 ? 'Current Week' : w.label}
+                            </option>
+                          ))}
+                        </select>
+                        {/* Floating recycled bottle SVG */}
+                        <svg
+                          width="22" height="34"
+                          viewBox="0 0 22 34"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{
+                            position: 'absolute', top: 8, right: 14,
+                            filter: 'drop-shadow(0 0 7px rgba(91,255,176,0.7)) drop-shadow(0 0 14px rgba(61,255,212,0.35))',
+                          }}
+                        >
+                          {/* Cap */}
+                          <rect x="7" y="0" width="8" height="4" rx="1.5" fill="#3DFFD4" opacity="0.9" />
+                          {/* Neck */}
+                          <rect x="8.5" y="4" width="5" height="3" rx="1" fill="#5BFFB0" opacity="0.85" />
+                          {/* Body */}
+                          <path d="M5 7 Q3 9 3 12 L3 28 Q3 31 5.5 31.5 L16.5 31.5 Q19 31 19 28 L19 12 Q19 9 17 7 Z" fill="rgba(91,255,176,0.18)" stroke="#3DFFD4" strokeWidth="1.1" strokeOpacity="0.7" />
+                          {/* Recycle arrows — simplified ♻ path */}
+                          <text x="11" y="23" textAnchor="middle" fontSize="10" fill="#5BFFB0" opacity="0.9" fontWeight="bold">♻</text>
+                          {/* Water line shimmer */}
+                          <path d="M5 22 Q11 20 17 22" stroke="#3DFFD4" strokeWidth="0.8" strokeOpacity="0.45" fill="none" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Motivation banner */}
+                  <div className="px-5 mb-6">
+                    <div
+                      className="rounded-2xl px-4 py-4 flex items-center gap-3"
+                      style={{ background: 'rgba(0,87,231,0.08)', boxShadow: '0 4px 24px rgba(0,190,255,0.08), inset 0 0 16px rgba(0,100,200,0.05)', backdropFilter: 'blur(12px)' }}
+                    >
+                      <span style={{ fontSize: 28, filter: 'drop-shadow(0 0 8px rgba(34,197,94,0.6))' }}>🌍</span>
+                      <div className="flex-1">
+                        <p style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', lineHeight: 1.3 }}>Recycling more helps the planet</p>
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Every pound counts. Thank you!</p>
+                      </div>
+                      <span style={{ fontSize: 18 }}>🌿</span>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
 
           </div>
         )}
@@ -1132,170 +1335,94 @@ export default function ConsumerDashboard() {
         {tab === 'account' && (
           <div style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
 
-            {/* Profile Card */}
-            <div className="px-5 pt-5 mb-5">
-              <div
-                className="rounded-2xl p-4 flex items-center gap-4"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-              >
-                {/* Avatar with verified badge */}
-                <div className="relative shrink-0">
-                  <div
-                    className="flex items-center justify-center rounded-full font-extrabold"
-                    style={{
-                      width: 60, height: 60,
-                      background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
-                      color: '#ffffff',
-                      fontSize: 20,
-                      boxShadow: '0 0 20px rgba(0,190,255,0.35)',
-                    }}
-                  >
-                    {initials}
-                  </div>
-                  <div
-                    className="absolute flex items-center justify-center"
-                    style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      background: '#22c55e',
-                      border: '2px solid #060e24',
-                      bottom: 0, right: 0,
-                    }}
-                  >
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </div>
+            {/* Profile Header — borderless */}
+            <div className="px-5 pt-6 pb-5 flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div style={{ width: 62, height: 62, borderRadius: '50%', background: 'linear-gradient(135deg,#0057e7,#00c8ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 21, color: '#fff', boxShadow: '0 0 28px rgba(0,190,255,0.45)' }}>
+                  {initials}
                 </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p style={{ fontSize: 17, color: '#ffffff', fontWeight: 600 }}>{profile?.full_name ?? '—'}</p>
-                  <p style={{ fontSize: 11, color: '#00c8ff', marginTop: 3 }}>Verified Eco Member</p>
-                  <button
-                    className="mt-2 rounded-full px-3 py-1 font-semibold transition-opacity hover:opacity-80 active:scale-[0.96]"
-                    style={{
-                      background: 'rgba(0,190,255,0.08)',
-                      border: '1px solid rgba(0,190,255,0.2)',
-                      color: 'rgba(0,210,255,0.7)',
-                      fontSize: 11,
-                    }}
-                  >
+                <div style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: '50%', background: '#22c55e', border: '2px solid #060e24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 12.75l6 6 9-13.5" /></svg>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p style={{ fontSize: 18, color: '#ffffff', fontWeight: 700, letterSpacing: '-0.01em' }}>{profile?.full_name ?? '—'}</p>
+                <p style={{ fontSize: 11, color: '#00c8ff', marginTop: 3 }}>Verified Eco Member</p>
+                <div className="flex items-center gap-3 mt-2">
+                  <button style={{ fontSize: 11, color: 'rgba(0,210,255,0.75)', fontWeight: 600, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
                     Edit profile
+                  </button>
+                  <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>·</span>
+                  <button
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    style={{ fontSize: 11, color: 'rgba(248,113,113,0.75)', fontWeight: 600, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  >
+                    {signingOut ? 'Signing out…' : 'Sign out'}
                   </button>
                 </div>
               </div>
             </div>
 
             {/* MY IMPACT */}
-            <div className="px-5 mb-5">
-              <p className="section-label mb-3">MY IMPACT</p>
-              <div
-                className="rounded-2xl overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-              >
-                {[
-                  { icon: '🌍', iconBg: 'rgba(0,230,118,0.1)',   label: 'CO₂ Impact',    sub: `You saved ${co2Saved} lbs of CO₂` },
-                  { icon: '♻️', iconBg: 'rgba(0,200,255,0.12)',  label: 'Waste Reduced', sub: `${lbsDiverted} lbs recycled`      },
-                ].map((row, i, arr) => (
-                  <button
-                    key={row.label}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 transition-opacity hover:opacity-80 active:opacity-70"
-                    style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,190,255,0.08)' : 'none' }}
-                  >
-                    <div
-                      className="flex items-center justify-center shrink-0"
-                      style={{ width: 36, height: 36, borderRadius: 10, background: row.iconBg, fontSize: 18 }}
-                    >
-                      {row.icon}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{row.sub}</p>
-                    </div>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
+            <div className="px-5 mb-4">
+              <SectionLabel title="My Impact" accent={ACCENT} />
+              {[
+                { icon: '🌍', label: 'CO₂ Impact',    sub: `You saved ${co2Saved} lbs of CO₂`, glow: 'rgba(91,255,176,0.55)'  },
+                { icon: '♻️', label: 'Waste Reduced', sub: `${lbsDiverted} lbs recycled`,       glow: 'rgba(0,217,255,0.55)'  },
+              ].map((row) => (
+                <button key={row.label} className="w-full flex items-center gap-4 py-3 transition-opacity hover:opacity-75 active:opacity-60">
+                  <span style={{ fontSize: 23, width: 28, textAlign: 'center', filter: `drop-shadow(0 0 7px ${row.glow})`, flexShrink: 0 }}>{row.icon}</span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{row.sub}</p>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+              ))}
             </div>
 
             {/* EARNINGS & WALLET */}
-            <div className="px-5 mb-5">
-              <p className="section-label mb-3">EARNINGS & WALLET</p>
-              <div
-                className="rounded-2xl overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-              >
-                {[
-                  { icon: '💰', iconBg: 'rgba(255,193,7,0.12)',  label: 'Rewards',   sub: `$${earnings} earned`,  badge: null  },
-                  { icon: '💳', iconBg: 'rgba(139,92,246,0.15)', label: 'Wallet',    sub: 'Manage payments',      badge: null  },
-                  { icon: '🎁', iconBg: 'rgba(0,230,118,0.1)',   label: 'Referrals', sub: 'Invite friends',       badge: '+$5' },
-                ].map((row, i, arr) => (
-                  <button
-                    key={row.label}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 transition-opacity hover:opacity-80 active:opacity-70"
-                    style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,190,255,0.08)' : 'none' }}
-                  >
-                    <div
-                      className="flex items-center justify-center shrink-0"
-                      style={{ width: 36, height: 36, borderRadius: 10, background: row.iconBg, fontSize: 18 }}
-                    >
-                      {row.icon}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{row.sub}</p>
-                    </div>
-                    {row.badge && (
-                      <span
-                        className="rounded-full px-2 py-0.5 text-xs font-bold mr-1"
-                        style={{ background: 'rgba(0,200,255,0.12)', color: '#00c8ff', border: '1px solid rgba(0,190,255,0.25)' }}
-                      >
-                        {row.badge}
-                      </span>
-                    )}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
+            <div className="px-5 mb-4">
+              <SectionLabel title="Earnings & Wallet" accent={ACCENT} />
+              {[
+                { icon: '💰', label: 'Rewards',   sub: `$${earnings} earned`, badge: null,  glow: 'rgba(255,193,7,0.55)'   },
+                { icon: '💳', label: 'Wallet',    sub: 'Manage payments',     badge: null,  glow: 'rgba(139,92,246,0.55)'  },
+                { icon: '🎁', label: 'Referrals', sub: 'Invite friends',      badge: '+$5', glow: 'rgba(91,255,176,0.55)'  },
+              ].map((row) => (
+                <button key={row.label} className="w-full flex items-center gap-4 py-3 transition-opacity hover:opacity-75 active:opacity-60">
+                  <span style={{ fontSize: 23, width: 28, textAlign: 'center', filter: `drop-shadow(0 0 7px ${row.glow})`, flexShrink: 0 }}>{row.icon}</span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{row.sub}</p>
+                  </div>
+                  {row.badge && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#00c8ff', background: 'rgba(0,200,255,0.1)', borderRadius: 99, padding: '2px 8px', marginRight: 4 }}>
+                      {row.badge}
+                    </span>
+                  )}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+              ))}
             </div>
 
-            {/* ACCOUNT */}
-            <div className="px-5 mb-6">
-              <p className="section-label mb-3">ACCOUNT</p>
-              <div
-                className="rounded-2xl overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
-              >
-                {[
-                  { icon: '⚙️', iconBg: 'rgba(0,190,255,0.1)', label: 'Settings',        sub: 'Preferences & notifications' },
-                  { icon: '❓', iconBg: 'rgba(255,193,7,0.1)',  label: 'Help & Support',  sub: 'FAQ & contact us'            },
-                  { icon: '🔒', iconBg: 'rgba(255,23,68,0.08)', label: 'Privacy & Terms', sub: 'Data & legal'                },
-                ].map((row, i, arr) => (
-                  <button
-                    key={row.label}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 transition-opacity hover:opacity-80 active:opacity-70"
-                    style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,190,255,0.08)' : 'none' }}
-                  >
-                    <div
-                      className="flex items-center justify-center shrink-0"
-                      style={{ width: 36, height: 36, borderRadius: 10, background: row.iconBg, fontSize: 18 }}
-                    >
-                      {row.icon}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{row.sub}</p>
-                    </div>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
+            {/* ACCOUNT SETTINGS */}
+            <div className="px-5 mb-8">
+              <SectionLabel title="Account" accent={ACCENT} />
+              {[
+                { icon: '⚙️', label: 'Settings',        sub: 'Preferences & notifications', glow: 'rgba(0,217,255,0.5)'   },
+                { icon: '❓', label: 'Help & Support',  sub: 'FAQ & contact us',            glow: 'rgba(255,193,7,0.5)'   },
+                { icon: '🔒', label: 'Privacy & Terms', sub: 'Data & legal',                glow: 'rgba(248,113,113,0.4)' },
+              ].map((row) => (
+                <button key={row.label} className="w-full flex items-center gap-4 py-3 transition-opacity hover:opacity-75 active:opacity-60">
+                  <span style={{ fontSize: 23, width: 28, textAlign: 'center', filter: `drop-shadow(0 0 7px ${row.glow})`, flexShrink: 0 }}>{row.icon}</span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>{row.label}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{row.sub}</p>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+              ))}
             </div>
 
           </div>

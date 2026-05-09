@@ -9,6 +9,10 @@ import { useAuthStore } from '../../store/authStore'
 
 import { DEV_BYPASS_AUTH } from '../../lib/devBypass'
 import { Spinner } from '../../components/ui'
+import { EmptyState } from '../../components/ui/EmptyState'
+import { SectionLabel } from '../../components/ui/dashboard'
+
+const ACCENT = '#4ade80'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -150,36 +154,34 @@ function QueueTab({
   return (
     <div className="space-y-3">
       {/* Counter cards */}
-      <div className="grid grid-cols-3 gap-2.5 mb-1">
+      <div className="grid grid-cols-3 gap-2 mb-1">
         {/* Queue Pending */}
-        <div className="rounded-2xl p-3.5 flex flex-col gap-1" style={{ background: 'rgba(0,188,212,0.07)', border: '1px solid rgba(0,188,212,0.25)' }}>
-          <p style={{ fontSize: 28, color: '#00BCD4', fontWeight: 700, lineHeight: 1 }}>{totalWaiting}</p>
-          <p style={{ fontSize: 9, color: 'rgba(0,188,212,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 3 }}>Queue Pending</p>
+        <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(74,222,128,0.07)', border: `1px solid ${ACCENT}40` }}>
+          <p style={{ fontSize: 24, color: ACCENT, fontWeight: 700, lineHeight: 1 }}>{totalWaiting}</p>
+          <p style={{ fontSize: 10, color: `${ACCENT}99`, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 3 }}>In Queue</p>
         </div>
-        {/* Accepted Incoming */}
-        <div className="rounded-2xl p-3.5 flex flex-col gap-1" style={{ background: 'rgba(0,230,118,0.06)', border: '1px solid rgba(0,230,118,0.22)' }}>
-          <p style={{ fontSize: 28, color: '#00E676', fontWeight: 700, lineHeight: 1 }}>{acceptedCount}</p>
-          <p style={{ fontSize: 9, color: 'rgba(0,230,118,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 3 }}>Accepted</p>
+        {/* Accepted */}
+        <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(0,230,118,0.06)', border: '1px solid rgba(0,230,118,0.22)' }}>
+          <p style={{ fontSize: 24, color: '#00E676', fontWeight: 700, lineHeight: 1 }}>{acceptedCount}</p>
+          <p style={{ fontSize: 10, color: 'rgba(0,230,118,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 3 }}>Accepted</p>
         </div>
-        {/* Caution Incoming */}
-        <div className="rounded-2xl p-3.5 flex flex-col gap-1" style={{ background: 'rgba(255,214,0,0.06)', border: '1px solid rgba(255,214,0,0.25)' }}>
-          <div className="flex items-center gap-1.5">
-            <p style={{ fontSize: 28, color: '#FFD600', fontWeight: 700, lineHeight: 1 }}>{cautionCount}</p>
+        {/* Caution */}
+        <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(255,214,0,0.06)', border: '1px solid rgba(255,214,0,0.25)' }}>
+          <div className="flex items-center gap-1">
+            <p style={{ fontSize: 24, color: '#FFD600', fontWeight: 700, lineHeight: 1 }}>{cautionCount}</p>
             {cautionCount > 0 && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFD600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 2, opacity: 0.8 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFD600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 2, opacity: 0.8 }}>
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                 <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             )}
           </div>
-          <p style={{ fontSize: 9, color: 'rgba(255,214,0,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 3 }}>Caution</p>
+          <p style={{ fontSize: 10, color: 'rgba(255,214,0,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 3 }}>Caution</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-1">
-        <p style={{ fontSize: 10, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          DRIVER QUEUE
-        </p>
+        <SectionLabel title="Driver Queue" accent={ACCENT} />
         {totalWaiting > 0 && (
           <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(255,214,0,0.12)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)' }}>
             {totalWaiting} pending
@@ -596,9 +598,7 @@ function ScanInTab({
       {/* ── Recent scan-ins ── */}
       {recentEntries.length > 0 && (
         <div>
-          <p style={{ fontSize: 10, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-            TODAY'S SCAN-INS
-          </p>
+          <SectionLabel title="Today's Scan-ins" accent={ACCENT} />
           <div className="space-y-2.5">
             {recentEntries.slice(0, 10).map((entry) => (
               <div
@@ -637,18 +637,18 @@ function HistoryTab({ entries }: { entries: HistoryEntry[] }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p style={{ fontSize: 10, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          COMPLETED BAGS
-        </p>
+        <SectionLabel title="Completed Bags" accent={ACCENT} />
         <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(0,230,118,0.12)', color: '#00E676', border: '1px solid rgba(0,230,118,0.28)' }}>
           {entries.length} total
         </span>
       </div>
 
       {entries.length === 0 && (
-        <div className="py-12 text-center">
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>No completed bags yet today</p>
-        </div>
+        <EmptyState
+          icon="📋"
+          title="No completed bags yet"
+          description="Bags you check in will appear here."
+        />
       )}
 
       <div className="space-y-3">
@@ -670,7 +670,7 @@ function HistoryTab({ entries }: { entries: HistoryEntry[] }) {
             </div>
 
             {/* People */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Consumer</p>
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2, fontWeight: 500 }}>{entry.consumerName}</p>
@@ -679,10 +679,10 @@ function HistoryTab({ entries }: { entries: HistoryEntry[] }) {
                 <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Driver</p>
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2, fontWeight: 500 }}>{entry.driverName}</p>
               </div>
-              <div>
-                <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Worker</p>
-                <p style={{ fontSize: 11, color: '#00BCD4', marginTop: 2, fontWeight: 600 }}>{entry.workerName}</p>
-              </div>
+            </div>
+            <div>
+              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Worker</p>
+              <p style={{ fontSize: 11, color: '#00BCD4', marginTop: 2, fontWeight: 600 }}>{entry.workerName}</p>
             </div>
 
             {/* Timestamp */}
@@ -720,9 +720,9 @@ function HistoryTab({ entries }: { entries: HistoryEntry[] }) {
 
 function StatCard({ value, label, accent, sub }: { value: string; label: string; accent: string; sub?: string }) {
   return (
-    <div className="rounded-2xl p-4 flex flex-col gap-1" style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${accent}35` }}>
-      <p style={{ fontSize: 26, color: accent, fontWeight: 700, lineHeight: 1.1 }}>{value}</p>
-      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+    <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${accent}35` }}>
+      <p style={{ fontSize: 22, color: accent, fontWeight: 700, lineHeight: 1.1 }}>{value}</p>
+      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</p>
       {sub && <p style={{ fontSize: 11, color: accent, marginTop: 2 }}>{sub}</p>}
     </div>
   )
@@ -781,7 +781,7 @@ function MyStatsTab({
 
       {/* Volume over time */}
       <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,188,212,0.18)' }}>
-        <p style={{ fontSize: 11, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Bags Scanned</p>
+        <SectionLabel title="Bags Scanned" accent={ACCENT} />
         <div className="grid grid-cols-4 gap-2">
           {[
             { label: 'Today',  value: today },
@@ -790,8 +790,8 @@ function MyStatsTab({
             { label: 'Year',   value: year  },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-xl p-2.5 text-center" style={{ background: 'rgba(0,188,212,0.08)', border: '1px solid rgba(0,188,212,0.15)' }}>
-              <p style={{ fontSize: 20, color: '#00BCD4', fontWeight: 700 }}>{value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}</p>
-              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{label}</p>
+              <p style={{ fontSize: 18, color: '#00BCD4', fontWeight: 700 }}>{value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}</p>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 2 }}>{label}</p>
             </div>
           ))}
         </div>
@@ -956,7 +956,7 @@ export default function WarehouseDashboard() {
       {/* ── Tab bar ── */}
       <div
         className="flex mb-5 -mx-4 px-2 overflow-x-auto"
-        style={{ borderBottom: '1px solid rgba(0,188,212,0.15)' }}
+        style={{ borderBottom: '1px solid rgba(0,188,212,0.15)', scrollbarWidth: 'none' }}
       >
         {TABS.map(({ value, label }) => (
           <button
@@ -965,7 +965,7 @@ export default function WarehouseDashboard() {
             className="shrink-0 px-3 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap"
             style={
               tab === value
-                ? { borderBottomColor: '#00BCD4', color: '#00BCD4' }
+                ? { borderBottomColor: ACCENT, color: ACCENT }
                 : { borderBottomColor: 'transparent', color: '#7B909C' }
             }
           >
@@ -976,7 +976,28 @@ export default function WarehouseDashboard() {
 
       {/* ── Queue tab ── */}
       {tab === 'queue' && (
-        <>
+        <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}>
+          {/* AI Bag Inspection card */}
+          <Link
+            to="/bag-inspection"
+            className="flex items-center gap-3 rounded-2xl px-4 py-4 mb-5 transition-all hover:brightness-110 active:scale-[0.98]"
+            style={{ background: 'rgba(0,188,212,0.08)', border: '1px solid rgba(0,188,212,0.3)', boxShadow: '0 0 20px rgba(0,188,212,0.08)', textDecoration: 'none' }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(0,188,212,0.15)', border: '1px solid rgba(0,188,212,0.35)', fontSize: 20 }}
+            >
+              🤖
+            </div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', marginBottom: 2 }}>AI Bag Inspection</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Green / Yellow / Red quality control flow</p>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(0,188,212,0.6)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </Link>
+
           <QueueTab
             onQueueScanIn={(code, driver, consumer) => addEntry(code, driver, consumer)}
           />
@@ -996,38 +1017,44 @@ export default function WarehouseDashboard() {
               <Link to={`/bag/${bag.id}/inspect`} className="rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#00BCD4,#0097A7)' }}>Inspect →</Link>
             </div>
           ))}
-        </>
+        </div>
       )}
 
       {/* ── Scan In tab ── */}
       {tab === 'scan' && (
-        <ScanInTab
-          scanState={scanState}
-          setScanState={setScanState}
-          scannerKey={scannerKey}
-          manualCode={manualCode}
-          setManualCode={setManualCode}
-          processScan={processScan}
-          handleManualSubmit={handleManualSubmit}
-          confirmCheckIn={confirmCheckIn}
-          resetScanner={resetScanner}
-          recentEntries={completedEntries}
-          onSuccessCallback={(code) => addEntry(code)}
-        />
+        <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}>
+          <ScanInTab
+            scanState={scanState}
+            setScanState={setScanState}
+            scannerKey={scannerKey}
+            manualCode={manualCode}
+            setManualCode={setManualCode}
+            processScan={processScan}
+            handleManualSubmit={handleManualSubmit}
+            confirmCheckIn={confirmCheckIn}
+            resetScanner={resetScanner}
+            recentEntries={completedEntries}
+            onSuccessCallback={(code) => addEntry(code)}
+          />
+        </div>
       )}
 
       {/* ── History tab ── */}
       {tab === 'history' && (
-        <HistoryTab entries={completedEntries} />
+        <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}>
+          <HistoryTab entries={completedEntries} />
+        </div>
       )}
 
       {/* ── My Stats tab ── */}
       {tab === 'stats' && (
-        <MyStatsTab
-          myStats={myStats}
-          statsLoading={statsLoading}
-          historyCount={completedEntries.length}
-        />
+        <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}>
+          <MyStatsTab
+            myStats={myStats}
+            statsLoading={statsLoading}
+            historyCount={completedEntries.length}
+          />
+        </div>
       )}
     </DashboardShell>
   )

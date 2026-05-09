@@ -5,7 +5,14 @@ import { getRoleDashboardPath } from './lib/auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
-import LandingScreen from './screens/LandingScreen'
+import WelcomePage from './screens/WelcomePage'
+import RealLoginPage from './screens/RealLoginPage'
+import LiveDashboardPage from './screens/LiveDashboardPage'
+import LiveBagsPage from './screens/live/LiveBagsPage'
+import LiveFundraisersPage from './screens/live/LiveFundraisersPage'
+import LiveWalletPage from './screens/live/LiveWalletPage'
+import { RequireAuth } from './components/RequireAuth'
+import { RequireRole } from './components/RequireRole'
 import LoginScreen from './screens/LoginScreen'
 import SignupScreen from './screens/SignupScreen'
 import PendingApprovalScreen from './screens/PendingApprovalScreen'
@@ -15,6 +22,7 @@ import WarehouseDashboard from './screens/dashboards/WarehouseDashboard'
 import WarehouseSupervisorDashboard from './screens/dashboards/WarehouseSupervisorDashboard'
 import PartnerDashboard from './screens/dashboards/PartnerDashboard'
 import AdminDashboard from './screens/dashboards/AdminDashboard'
+import FundraiserDashboard from './screens/dashboards/FundraiserDashboard'
 import ScannerScreen from './screens/ScannerScreen'
 import BagDetailScreen from './screens/BagDetailScreen'
 import InspectionScreen from './screens/InspectionScreen'
@@ -28,6 +36,41 @@ import FundraisersPage from './screens/fundraisers/FundraisersPage'
 import FundraiserDetailPage from './screens/fundraisers/FundraiserDetailPage'
 import MyFundraiserPage from './screens/fundraisers/MyFundraiserPage'
 import ScanResultPage from './screens/fundraisers/ScanResultPage'
+import CreateFundraiserPage from './screens/fundraisers/CreateFundraiserPage'
+import QRScanPage from './screens/fundraisers/QRScanPage'
+import EarningsDashboardPage from './screens/EarningsDashboardPage'
+import DriverRoutesPage from './screens/DriverRoutesPage'
+import BagInspectionPage from './screens/BagInspectionPage'
+import AdminDashboardPage from './screens/AdminDashboardPage'
+import BagLifecyclePage from './screens/BagLifecyclePage'
+import ContaminationAlertsPage from './screens/ContaminationAlertsPage'
+import RecyclingDestinationPage from './screens/RecyclingDestinationPage'
+import PartnerDashboardPage from './screens/PartnerDashboardPage'
+import LeaderboardPage from './screens/LeaderboardPage'
+import ReportsCenterPage from './screens/ReportsCenterPage'
+import DonationReceiptPage from './screens/DonationReceiptPage'
+import AIRecommendationsPage from './screens/AIRecommendationsPage'
+import NotificationsPage from './screens/NotificationsPage'
+import FraudDetectionPage from './screens/FraudDetectionPage'
+import WalletPage from './screens/WalletPage'
+import FundraiserAdminPage from './screens/FundraiserAdminPage'
+import LiveScanPage from './screens/LiveScanPage'
+import LiveInspectionPage from './screens/LiveInspectionPage'
+import LiveFundraiserDetailPage from './screens/live/LiveFundraiserDetailPage'
+import LiveMyFundraisersPage from './screens/live/LiveMyFundraisersPage'
+import LiveFundraiserDashboardPage from './screens/live/LiveFundraiserDashboardPage'
+import LiveNotificationsPage from './screens/live/LiveNotificationsPage'
+import LivePayoutAdminPage from './screens/live/LivePayoutAdminPage'
+import LiveReportsPage from './screens/live/LiveReportsPage'
+import LiveAdminPage from './screens/live/LiveAdminPage'
+import LiveAuditLogPage from './screens/live/LiveAuditLogPage'
+import LiveSettingsPage from './screens/live/LiveSettingsPage'
+import TermsPage from './screens/TermsPage'
+import PrivacyPage from './screens/PrivacyPage'
+import ConsentPage from './screens/ConsentPage'
+import PresentationModePage from './screens/PresentationModePage'
+import ReadinessChecklistPage from './screens/ReadinessChecklistPage'
+import LaunchChecklistPage from './screens/LaunchChecklistPage'
 
 function HomeRedirect() {
   const { user, role, approvalStatus, isLoading } = useAuthStore()
@@ -47,13 +90,10 @@ function HomeRedirect() {
   }
 
   // Not logged in
-  if (!user) return <LandingScreen />
+  if (!user) return <WelcomePage />
 
-  // Logged in but no profile row (e.g. demo account created without profile)
-  if (!role) {
-    console.warn('[HomeRedirect] user has no profile — redirecting to login')
-    return <Navigate to="/login" replace />
-  }
+  // Logged in but no profile row (e.g. account created before profile insert completed)
+  if (!role) return <Navigate to="/real-login" replace />
 
   // Profile exists but not yet approved
   if (approvalStatus !== 'approved') return <Navigate to="/pending-approval" replace />
@@ -71,6 +111,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
+        <Route path="/welcome" element={<WelcomePage />} />
+        <Route path="/real-login" element={<RealLoginPage />} />
         <Route path="/demo-simulation" element={<DemoSimulationPage />} />
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/signup" element={<SignupScreen />} />
@@ -84,31 +126,73 @@ function App() {
         />
 
         {/* Role dashboards */}
-        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved><ConsumerDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/driver" element={<ProtectedRoute requireApproved><DriverDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/warehouse" element={<ProtectedRoute requireApproved><WarehouseDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/warehouse-supervisor" element={<ProtectedRoute requireApproved><WarehouseSupervisorDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/partner" element={<ProtectedRoute requireApproved><PartnerDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/admin" element={<ProtectedRoute requireApproved><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved allowedRoles={['consumer', 'admin']}><ConsumerDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/driver" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/warehouse" element={<ProtectedRoute requireApproved allowedRoles={['warehouse_employee', 'warehouse_supervisor', 'admin']}><WarehouseDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/warehouse-supervisor" element={<ProtectedRoute requireApproved allowedRoles={['warehouse_supervisor', 'admin']}><WarehouseSupervisorDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/partner" element={<ProtectedRoute requireApproved allowedRoles={['partner', 'admin']}><PartnerDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/admin" element={<ProtectedRoute requireApproved allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/fundraiser" element={<ProtectedRoute requireApproved allowedRoles={['fundraiser', 'admin']}><FundraiserDashboard /></ProtectedRoute>} />
 
         {/* Driver route flow */}
-        <Route path="/dashboard/driver/route" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/routes" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route-map" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route/stop/:stopId" element={<ProtectedRoute requireApproved><RouteStopPage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckinPage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/scan" element={<ProtectedRoute requireApproved><DriverScanScreen /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverRoutePage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/routes" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverRoutePage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route-map" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverRoutePage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route/stop/:stopId" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><RouteStopPage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/warehouse-checkin" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><WarehouseCheckinPage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/scan" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverScanScreen /></ProtectedRoute>} />
 
         {/* Bag lifecycle */}
         <Route path="/scan" element={<ProtectedRoute requireApproved><ScannerScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId" element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
-        <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
+        <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved allowedRoles={['warehouse_employee', 'warehouse_supervisor', 'admin']}><InspectionScreen /></ProtectedRoute>} />
 
         {/* Fundraisers — no auth required */}
         <Route path="/fundraisers" element={<FundraisersPage />} />
         <Route path="/fundraisers/:id" element={<FundraiserDetailPage />} />
         <Route path="/my-fundraiser" element={<MyFundraiserPage />} />
         <Route path="/scan-result" element={<ScanResultPage />} />
+        <Route path="/create-fundraiser" element={<CreateFundraiserPage />} />
+        <Route path="/qr-scan" element={<QRScanPage />} />
+        <Route path="/earnings" element={<EarningsDashboardPage />} />
+        <Route path="/driver-routes" element={<DriverRoutesPage />} />
+        <Route path="/bag-inspection" element={<BagInspectionPage />} />
+        <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+        <Route path="/bag-lifecycle" element={<BagLifecyclePage />} />
+        <Route path="/contamination-alerts" element={<ContaminationAlertsPage />} />
+        <Route path="/recycling-destination" element={<RecyclingDestinationPage />} />
+        <Route path="/partner-dashboard" element={<PartnerDashboardPage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/reports" element={<ReportsCenterPage />} />
+        <Route path="/donation-receipt" element={<DonationReceiptPage />} />
+        <Route path="/ai-recommendations" element={<AIRecommendationsPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/fraud-detection" element={<FraudDetectionPage />} />
+        <Route path="/wallet" element={<WalletPage />} />
+        <Route path="/fundraiser-admin" element={<FundraiserAdminPage />} />
+
+        {/* ── Live mode routes (Supabase-backed, guarded by RequireAuth) ── */}
+        <Route path="/live-dashboard"   element={<RequireAuth><LiveDashboardPage /></RequireAuth>} />
+        <Route path="/live-bags"        element={<RequireAuth><LiveBagsPage /></RequireAuth>} />
+        <Route path="/live-fundraisers" element={<RequireAuth><LiveFundraisersPage /></RequireAuth>} />
+        <Route path="/live-wallet"      element={<RequireAuth><RequireRole roles={['consumer']}><LiveWalletPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-scan"              element={<RequireAuth><RequireRole roles={['consumer']}><LiveScanPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-inspection"        element={<RequireAuth><LiveInspectionPage /></RequireAuth>} />
+        <Route path="/live-fundraisers/:id"   element={<RequireAuth><LiveFundraiserDetailPage /></RequireAuth>} />
+        <Route path="/live-my-fundraisers"         element={<RequireAuth><LiveMyFundraisersPage /></RequireAuth>} />
+        <Route path="/live-fundraiser-dashboard"  element={<RequireAuth><RequireRole roles={['fundraiser_admin', 'admin']}><LiveFundraiserDashboardPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-notifications"         element={<RequireAuth><LiveNotificationsPage /></RequireAuth>} />
+        <Route path="/live-payout-admin"          element={<RequireAuth><RequireRole roles={['admin']}><LivePayoutAdminPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-reports"               element={<RequireAuth><RequireRole roles={['admin', 'partner']}><LiveReportsPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-admin"                 element={<RequireAuth><RequireRole roles={['admin']}><LiveAdminPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-audit-log"             element={<RequireAuth><RequireRole roles={['admin']}><LiveAuditLogPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-settings"              element={<RequireAuth><RequireRole roles={['admin']}><LiveSettingsPage /></RequireRole></RequireAuth>} />
+        <Route path="/terms"   element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/consent" element={<ConsentPage />} />
+        <Route path="/presentation-mode"          element={<PresentationModePage />} />
+        <Route path="/readiness-checklist"        element={<ReadinessChecklistPage />} />
+        <Route path="/launch-checklist"           element={<LaunchChecklistPage />} />
       </Routes>
       <FullDemoHUD />
     </BrowserRouter>

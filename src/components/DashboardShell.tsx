@@ -45,7 +45,7 @@ export function DashboardShell({ title, children }: Props) {
     try { await signOut() } catch { /* no real session in dev bypass — safe to ignore */ }
     clearAuth()
     localStorage.removeItem('baykid-auth')
-    navigate('/login', { replace: true })
+    navigate('/real-login', { replace: true })
   }
 
   // Unchanged

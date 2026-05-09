@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { demoFundraisers, pctFunded, fmtNum, typeAccent, type Fundraiser } from '../../lib/demoFundraisers'
+import FundraiserCountdown from '../../components/FundraiserCountdown'
+import { demoFundraisers, pctFunded, fmtNum, typeAccent, getFundraiserStatus, type Fundraiser } from '../../lib/demoFundraisers'
+import { useToast } from '../../components/ui/Toast'
 
 function ProgressBar({ raised, goal, animate }: { raised: number; goal: number; animate: boolean }) {
   const p = pctFunded(raised, goal)
@@ -63,6 +65,7 @@ function NotFound() {
 export default function FundraiserDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const toast = useToast()
   const [animate, setAnimate] = useState(false)
   const [joined, setJoined] = useState(false)
 
@@ -75,8 +78,9 @@ export default function FundraiserDetailPage() {
 
   if (!fundraiser) return <NotFound />
 
-  const colors = typeAccent(fundraiser.type)
-  const p      = pctFunded(fundraiser.raised, fundraiser.goal)
+  const colors  = typeAccent(fundraiser.type)
+  const p       = pctFunded(fundraiser.raised, fundraiser.goal)
+  const expired = getFundraiserStatus(fundraiser.endDate) === 'expired'
 
   const fade = (delay = 0): React.CSSProperties => ({
     opacity:    animate ? 1 : 0,
@@ -133,7 +137,7 @@ export default function FundraiserDetailPage() {
             </div>
 
             {/* Pills */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-3">
               {[
                 { icon: '👥', label: `${fundraiser.supporters} supporters` },
                 { icon: '♻️', label: `${fundraiser.percentToCause}% goes to cause` },
@@ -149,6 +153,9 @@ export default function FundraiserDetailPage() {
                 </div>
               ))}
             </div>
+
+            {/* Countdown */}
+            <FundraiserCountdown endDate={fundraiser.endDate} />
           </div>
 
           {/* Progress card */}
@@ -241,36 +248,131 @@ export default function FundraiserDetailPage() {
 
           {/* CTAs */}
           <div className="flex flex-col gap-3" style={fade(300)}>
-            <button
-              onClick={() => setJoined(true)}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300"
-              style={
-                joined
-                  ? { background: 'rgba(20,184,166,0.15)', border: '1px solid rgba(20,184,166,0.4)', color: '#5eead4', cursor: 'default' }
-                  : { background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff', border: 'none' }
-              }
-            >
-              {joined ? (
-                <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  Fundraiser Joined
-                </>
-              ) : (
-                <>♻️ Join Fundraiser</>
-              )}
-            </button>
 
+            {/* Join button — disabled when expired */}
+            {expired ? (
+              <div
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)', cursor: 'not-allowed' }}
+              >
+                This fundraiser has ended
+              </div>
+            ) : (
+              <button
+                onClick={() => { setJoined(true); toast.success('Fundraiser joined!') }}
+                disabled={joined}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300"
+                style={
+                  joined
+                    ? { background: 'rgba(20,184,166,0.15)', border: '1px solid rgba(20,184,166,0.4)', color: '#5eead4', cursor: 'default' }
+                    : { background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff', border: 'none' }
+                }
+              >
+                {joined ? (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Fundraiser Joined ✓
+                  </>
+                ) : (
+                  <>♻️ Join Fundraiser</>
+                )}
+              </button>
+            )}
+
+            {/* ── Success card — slides in after joining ─────────────────────── */}
+            <div
+              style={{
+                maxHeight:  joined && !expired ? 240 : 0,
+                opacity:    joined && !expired ? 1 : 0,
+                overflow:   'hidden',
+                transition: 'max-height 0.45s ease, opacity 0.35s ease',
+              }}
+            >
+              <div
+                className="rounded-2xl p-4"
+                style={{
+                  background: 'rgba(0,200,128,0.07)',
+                  border:     '1px solid rgba(0,200,128,0.28)',
+                  boxShadow:  '0 0 24px rgba(0,200,128,0.1)',
+                }}
+              >
+                {/* Header */}
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>🎉</span>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: '#5eead4' }}>
+                      You're now supporting
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                      {fundraiser.name}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Impact preview */}
+                <div
+                  className="rounded-xl px-3.5 py-2.5"
+                  style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.15)' }}
+                >
+                  <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                    Your next recycled bag will send{' '}
+                    <span style={{ color: '#00c8ff', fontWeight: 700 }}>{fundraiser.percentToCause}%</span>
+                    {' '}of earnings to this fundraiser.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recycle CTA — appears after joining */}
+            <div
+              style={{
+                maxHeight:  joined && !expired ? 64 : 0,
+                opacity:    joined && !expired ? 1 : 0,
+                overflow:   'hidden',
+                transition: 'max-height 0.45s ease 0.1s, opacity 0.35s ease 0.1s',
+              }}
+            >
+              <Link
+                to="/qr-scan"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all"
+                style={{ background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff' }}
+              >
+                <span>♻️</span>
+                Recycle a Bag for This Fundraiser
+              </Link>
+            </div>
+
+            {/* My fundraiser dashboard link — always visible, label updates */}
             <Link
               to="/my-fundraiser"
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}
             >
-              View My Fundraiser Dashboard
+              {joined ? 'View My Fundraiser Impact' : 'View My Fundraiser Dashboard'}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
+            </Link>
+
+            {/* Fundraiser Admin link */}
+            <Link
+              to="/fundraiser-admin"
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-semibold transition-all"
+              style={{ background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.22)', color: '#00c8ff' }}
+            >
+              🏀 Fundraiser Admin
+            </Link>
+
+            {/* Start Your Own Fundraiser */}
+            <Link
+              to="/create-fundraiser"
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-medium transition-all"
+              style={{ background: 'rgba(0,200,128,0.06)', border: '1px solid rgba(0,200,128,0.2)', color: 'rgba(94,234,212,0.7)' }}
+            >
+              <span>🌱</span>
+              Start Your Own Fundraiser
             </Link>
           </div>
 

@@ -1,11 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// TEMP DEV BYPASS — remove before production
-// Set DEV_BYPASS_AUTH = false to restore normal Supabase auth + approval checks.
+// Dev-only auth bypass — automatically disabled in production builds.
+// Set VITE_DEV_BYPASS_AUTH=false in .env.local to disable during development.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '../types'
 
-export const DEV_BYPASS_AUTH = true
+export const DEV_BYPASS_AUTH =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_DEV_BYPASS_AUTH !== 'false'
 
 // Maps LoginScreen role tab keys → app Role values
 type BypassKey = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin'

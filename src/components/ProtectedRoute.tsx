@@ -1,11 +1,13 @@
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-// TEMP DEV BYPASS - remove before production
 import { DEV_BYPASS_AUTH } from '../lib/devBypass'
+import { getRoleDashboardPath } from '../lib/auth'
+import type { Role } from '../types'
 
 interface Props {
   children: React.ReactNode
   requireApproved?: boolean
+  allowedRoles?: Role[]
 }
 
 function Spinner() {
@@ -16,16 +18,43 @@ function Spinner() {
   )
 }
 
-export function ProtectedRoute({ children, requireApproved = false }: Props) {
-  // TEMP DEV BYPASS - remove before production
+export function ProtectedRoute({ children, requireApproved = false, allowedRoles }: Props) {
   if (DEV_BYPASS_AUTH) return <>{children}</>
 
-  const { user, approvalStatus, isLoading } = useAuthStore()
+  const { user, role, approvalStatus, isLoading } = useAuthStore()
 
   if (isLoading) return <Spinner />
-  if (!user) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/real-login" replace />
   if (requireApproved && approvalStatus !== 'approved') {
     return <Navigate to="/pending-approval" replace />
+  }
+
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
+    const ownPath = getRoleDashboardPath(role)
+    return (
+      <div
+        className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
+        style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}
+      >
+        <div
+          className="rounded-2xl p-8 max-w-sm w-full"
+          style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.25)' }}
+        >
+          <span style={{ fontSize: 40, display: 'block', marginBottom: 16 }}>🚫</span>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#ffffff', marginBottom: 8 }}>Access Denied</h2>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 24 }}>
+            You don't have permission to view this page.
+          </p>
+          <Link
+            to={ownPath}
+            className="block py-3 rounded-2xl text-sm font-bold transition-all hover:brightness-110"
+            style={{ background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.3)', color: '#00c8ff', textDecoration: 'none' }}
+          >
+            ← Go to my dashboard
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return <>{children}</>

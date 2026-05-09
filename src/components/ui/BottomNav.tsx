@@ -30,19 +30,19 @@ export function BottomNav({ items }: Props) {
           onClick={item.onClick}
           className="relative flex flex-1 flex-col items-center gap-1 py-3 transition-all duration-150 active:scale-90"
         >
-          {item.badge != null && item.badge > 0 && (
-            <span
-              className="absolute right-1/4 top-1.5 z-10 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
-              style={{ backgroundColor: '#ef4444' }}
-            >
-              {item.badge > 99 ? '99+' : item.badge}
-            </span>
-          )}
           <span
             className="relative z-10 transition-all"
             style={{ color: item.active ? '#00c8ff' : 'rgba(255,255,255,0.35)' }}
           >
             {item.icon}
+            {item.badge != null && item.badge > 0 && (
+              <span
+                className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                style={{ backgroundColor: '#ef4444' }}
+              >
+                {item.badge > 99 ? '99+' : item.badge}
+              </span>
+            )}
           </span>
           <span
             className="relative z-10 text-[10px] transition-colors"

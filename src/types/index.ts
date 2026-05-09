@@ -5,6 +5,7 @@ export type Role =
   | 'warehouse_supervisor'
   | 'partner'
   | 'admin'
+  | 'fundraiser'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 

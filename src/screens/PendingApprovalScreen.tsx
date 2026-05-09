@@ -16,7 +16,7 @@ export default function PendingApprovalScreen() {
   const handleSignOut = async () => {
     await signOut()
     clearAuth()
-    navigate('/login')
+    navigate('/real-login')
   }
 
   const roleLabel = profile?.role ? (ROLE_LABELS[profile.role] ?? profile.role) : ''

@@ -16,7 +16,7 @@ const SIZE = {
 
 const VARIANT_STYLE: Record<NonNullable<Props['variant']>, React.CSSProperties> = {
   primary: {
-    background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
+    background: 'var(--gradient-primary)',
     border: 'none',
     borderRadius: '14px',
     color: '#ffffff',

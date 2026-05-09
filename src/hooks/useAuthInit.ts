@@ -2,14 +2,12 @@ import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchProfile } from '../lib/auth'
 import { useAuthStore } from '../store/authStore'
-// TEMP DEV BYPASS - remove before production
 import { DEV_BYPASS_AUTH } from '../lib/devBypass'
 
 export function useAuthInit() {
   const { setUser, setProfile, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
-  // TEMP DEV BYPASS - remove before production
   if (DEV_BYPASS_AUTH) { setLoading(false); return }
 
   // Resolve loading on initial page load

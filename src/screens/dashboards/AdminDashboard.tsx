@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { DashboardShell } from '../../components/DashboardShell'
 import { AdminOverview } from '../admin/AdminOverview'
@@ -28,29 +29,50 @@ export default function AdminDashboard() {
   const pendingCount = users.filter((u) => u.approval_status === 'pending').length
   const openAlerts   = alerts.filter((a) => a.status === 'open').length
 
-  const tabs: { value: Tab; label: string; urgent?: boolean }[] = [
+  const tabs: { value: Tab; label: string; urgent?: boolean; muted?: boolean }[] = [
     { value: 'overview',    label: 'Overview' },
     { value: 'users',       label: `Users${pendingCount > 0 ? ` (${pendingCount})` : ''}`, urgent: pendingCount > 0 },
     { value: 'emergencies', label: `Emergencies${openAlerts > 0 ? ` (${openAlerts})` : ''}`, urgent: openAlerts > 0 },
     { value: 'dispatch',    label: 'Dispatch' },
-    { value: 'broadcasts',  label: 'Broadcasts' },
+    { value: 'broadcasts',  label: 'Broadcasts', muted: true },
   ]
 
   return (
     <DashboardShell title="Admin">
+      <div className="mb-4 flex gap-2 flex-wrap">
+        <Link
+          to="/live-admin"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.28)', color: '#00c8ff', textDecoration: 'none' }}
+        >
+          🛡️ Admin Center
+        </Link>
+        <Link
+          to="/live-payout-admin"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', textDecoration: 'none' }}
+        >
+          💰 Payout Admin
+          {pendingCount > 0 && (
+            <span style={{ background: '#fbbf24', color: '#000', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              Live
+            </span>
+          )}
+        </Link>
+      </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"
-        style={{ borderBottom: '1px solid rgba(0,188,212,0.15)' }}
+        style={{ borderBottom: '1px solid rgba(0,188,212,0.15)', scrollbarWidth: 'none' }}
       >
-        {tabs.map(({ value, label, urgent }) => (
+        {tabs.map(({ value, label, urgent, muted }) => (
           <button
             key={value}
             onClick={() => setTab(value)}
             className="shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors"
             style={
               tab === value
-                ? { borderBottomColor: '#00BCD4', color: '#00BCD4' }
-                : { borderBottomColor: 'transparent', color: urgent ? '#FFD600' : '#7B909C' }
+                ? { borderBottomColor: '#FFD600', color: '#FFD600' }
+                : { borderBottomColor: 'transparent', color: urgent ? '#FFD600' : muted ? 'rgba(255,255,255,0.25)' : '#7B909C' }
             }
           >
             {label}
@@ -58,11 +80,11 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {tab === 'overview'    && <AdminOverview />}
-      {tab === 'users'       && <UserManagement />}
-      {tab === 'emergencies' && <EmergencyAlerts />}
-      {tab === 'dispatch'    && <RouteDispatch />}
-      {tab === 'broadcasts'  && <AdminAlerts />}
+      {tab === 'overview'    && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><AdminOverview /></div>}
+      {tab === 'users'       && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><UserManagement /></div>}
+      {tab === 'emergencies' && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><EmergencyAlerts /></div>}
+      {tab === 'dispatch'    && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><RouteDispatch /></div>}
+      {tab === 'broadcasts'  && <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}><AdminAlerts /></div>}
     </DashboardShell>
   )
 }

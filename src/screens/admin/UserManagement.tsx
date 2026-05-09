@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAllUsers, updateUserRole, updateUserApproval } from '../../lib/admin'
 import { useAuthStore } from '../../store/authStore'
+import { EmptyState } from '../../components/ui/EmptyState'
+import { useToast } from '../../components/ui/Toast'
 import type { Role, ApprovalStatus, UserRecord } from '../../types'
 
 const ROLES: Role[] = [
@@ -35,6 +37,7 @@ function fmt(iso: string) {
 export function UserManagement() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<ApprovalStatus | 'all'>('all')
   const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -52,6 +55,9 @@ export function UserManagement() {
     try {
       await updateUserRole(u.id, role)
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      toast.success(`Role updated to ${role}`)
+    } catch {
+      toast.error('Failed to update role')
     } finally {
       setSavingFor(u.id, false)
     }
@@ -63,6 +69,10 @@ export function UserManagement() {
       await updateUserApproval(u.id, status)
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
       queryClient.invalidateQueries({ queryKey: ['admin-stats'] })
+      const msg = status === 'approved' ? 'User approved' : status === 'rejected' ? 'User suspended' : 'Status updated'
+      toast.success(msg)
+    } catch {
+      toast.error('Failed to update approval')
     } finally {
       setSavingFor(u.id, false)
     }
@@ -149,12 +159,11 @@ export function UserManagement() {
       </div>
 
       {filtered.length === 0 && (
-        <div
-          className="rounded-2xl p-10 text-center"
-          style={{ border: '1px dashed rgba(0,190,255,0.15)', background: 'rgba(255,255,255,0.02)' }}
-        >
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>No users found</p>
-        </div>
+        <EmptyState
+          icon="👤"
+          title={search ? 'No users match your search' : filterStatus !== 'all' ? `No ${filterStatus} users` : 'No users yet'}
+          description={search ? 'Try a different name.' : filterStatus === 'pending' ? 'All approvals are up to date.' : undefined}
+        />
       )}
 
       {filtered.map((u) => {

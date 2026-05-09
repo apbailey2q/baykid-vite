@@ -46,7 +46,7 @@ function StatCard({
   const { bg, border } = CARD_COLORS[color]
   return (
     <div
-      className="rounded-2xl p-4"
+      className="rounded-2xl p-3"
       style={{
         background: bg,
         border: `1px solid ${highlight ? 'rgba(255,193,7,0.5)' : border}`,
@@ -116,7 +116,7 @@ export function AdminOverview() {
 
       {/* Users row */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.4)' }}>Users</p>
+        <p className="mb-2 section-label">Users</p>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Total Users" value={stats?.totalUsers ?? 0} sub="all roles" color="blue" />
           <StatCard
@@ -131,8 +131,8 @@ export function AdminOverview() {
 
       {/* Operations row */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.4)' }}>Operations</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <p className="mb-2 section-label">Operations</p>
+        <div className="grid grid-cols-3 gap-3">
           <StatCard label="Online Drivers" value={stats?.onlineDrivers ?? 0} color="green" />
           <StatCard label="Open Alerts" value={stats?.openAlerts ?? 0} color="red" highlight={(stats?.openAlerts ?? 0) > 0} />
           <StatCard label="Inspections" value={stats?.totalInspections ?? 0} color="indigo" />
@@ -141,7 +141,7 @@ export function AdminOverview() {
 
       {/* Bags row */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.4)' }}>Bags</p>
+        <p className="mb-2 section-label">Bags</p>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Total Bags" value={stats?.totalBags ?? 0} sub="in system" color="cyan" />
           <StatCard label="Total Scans" value={stats?.totalScans ?? 0} sub="all time" color="gray" />

@@ -11,8 +11,8 @@ interface Props {
 const PAD = { none: '', sm: 'p-3', md: 'p-4', lg: 'p-6' } as const
 
 const BASE: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(0,190,255,0.15)',
+  background: 'var(--glass-bg)',
+  border: '1px solid var(--glass-border)',
   borderRadius: '16px',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',

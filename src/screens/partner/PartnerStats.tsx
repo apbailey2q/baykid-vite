@@ -26,7 +26,7 @@ function StatCard({
   const { bg, border } = CARD_COLORS[color]
   return (
     <div
-      className="rounded-2xl p-4"
+      className="rounded-2xl p-3"
       style={{ background: bg, border: `1px solid ${border}` }}
     >
       <p className="text-2xl font-extrabold" style={{ color: '#E0F7FA' }}>{value}</p>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import FundraiserCountdown from '../../components/FundraiserCountdown'
 import {
   activeFundraiser,
   myFundraiserStats,
@@ -127,7 +128,8 @@ export default function MyFundraiserPage() {
                 <span className="text-[10px] font-bold uppercase tracking-widest block mb-0.5" style={{ color: colors.text }}>
                   {fund.type}
                 </span>
-                <p className="text-sm font-semibold truncate" style={{ color: '#ffffff' }}>{fund.name}</p>
+                <p className="text-sm font-semibold truncate mb-1.5" style={{ color: '#ffffff' }}>{fund.name}</p>
+                <FundraiserCountdown endDate={fund.endDate} compact />
               </div>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                 <path d="M5 12h14M12 5l7 7-7 7" />

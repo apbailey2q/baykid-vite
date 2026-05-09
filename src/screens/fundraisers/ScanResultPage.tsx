@@ -54,6 +54,17 @@ export default function ScanResultPage() {
 
           {/* Confirmed badge */}
           <div className="flex flex-col items-center text-center mb-8" style={fade(0)}>
+            {/* Inspection Passed pill */}
+            <div
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-4"
+              style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.35)' }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 5px rgba(74,222,128,0.8)' }} />
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#4ade80' }}>
+                Inspection Passed
+              </span>
+            </div>
+
             <div
               className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
               style={{
@@ -242,20 +253,45 @@ export default function ScanResultPage() {
           {/* CTAs */}
           <div className="flex flex-col gap-3" style={fade(340)}>
             <Link
-              to="/my-fundraiser"
+              to="/bag-lifecycle"
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all"
               style={{ background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff' }}
+            >
+              View Bag Lifecycle
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <Link
+              to="/my-fundraiser"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all"
+              style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.25)', color: '#00c8ff' }}
             >
               View Fundraiser Impact
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </Link>
+
+            <Link
+              to="/donation-receipt"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all"
+              style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.28)', color: '#4ade80' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              View Donation Receipt
+            </Link>
             <Link
               to="/scan"
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}
             >
+              <span>♻️</span>
               Scan Another Bag
             </Link>
           </div>

@@ -91,7 +91,7 @@ export default function LandingScreen() {
           {RECYCLING_SVG(34)}
         </div>
 
-        <h1 style={{ fontSize: 36, fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
+        <h1 style={{ fontSize: 'clamp(26px, 9vw, 36px)', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
           Cyan's <span style={{ color: '#00c8ff' }}>Brooklynn</span>
         </h1>
         <p className="section-label mt-1.5">Recycling Enterprise</p>

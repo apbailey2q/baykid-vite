@@ -63,6 +63,8 @@ export default function RealLoginPage() {
           navigate('/pending-approval', { replace: true })
           return
         }
+        // Admins stay on the login page so they can pick a destination role
+        if ((profile.role as string) === 'admin') return
         const path = getRoleDashboardPath(profile.role)
         if (path) navigate(path, { replace: true })
       } catch {

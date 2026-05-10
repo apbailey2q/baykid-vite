@@ -24,7 +24,7 @@ export function RequireRole({ roles, children }: Props) {
       const fetched = await getUserRoles(user.id)
       if (!mounted) return
       setUserRoles(fetched)
-      setAllowed(roles.some(r => fetched.includes(r)))
+      setAllowed(fetched.includes('admin') || roles.some(r => fetched.includes(r)))
       setChecking(false)
     }
     check()

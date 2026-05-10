@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { fetchProfile, getRoleDashboardPath } from '../lib/auth'
+import type { Role } from '../types'
 import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
 
@@ -16,6 +17,16 @@ const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'partner',    label: 'Partner' },
   { value: 'admin',      label: 'Admin' },
 ]
+
+// Maps the UI dropdown key → the DB role value used by getRoleDashboardPath
+const ACCESS_ROLE_TO_DB: Record<AccessRole, Role> = {
+  consumer:   'consumer',
+  driver:     'driver',
+  warehouse:  'warehouse_employee',
+  fundraiser: 'fundraiser',
+  partner:    'partner',
+  admin:      'admin',
+}
 
 function roleMatches(selected: AccessRole, profileRole: string): boolean {
   if (selected === 'warehouse') {
@@ -45,14 +56,18 @@ export default function RealLoginPage() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return
-      const profile = await fetchProfile(data.session.user.id)
-      if (!profile) return
-      if (profile.approval_status !== 'approved') {
-        navigate('/pending-approval', { replace: true })
-        return
+      try {
+        const profile = await fetchProfile(data.session.user.id)
+        if (!profile) return
+        if (profile.approval_status !== 'approved') {
+          navigate('/pending-approval', { replace: true })
+          return
+        }
+        const path = getRoleDashboardPath(profile.role)
+        if (path) navigate(path, { replace: true })
+      } catch {
+        // silently ignore — user will sign in manually
       }
-      const path = getRoleDashboardPath(profile.role)
-      if (path) navigate(path, { replace: true })
     })
   }, [navigate])
 
@@ -86,21 +101,6 @@ export default function RealLoginPage() {
     }
   }
 
-  async function ensureProfile(userId: string, userEmail: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle()
-    if (!data) {
-      await supabase
-        .from('profiles')
-        .upsert(
-          { id: userId, email: userEmail, role: 'consumer', approval_status: 'pending' },
-          { onConflict: 'id' }
-        )
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -115,27 +115,53 @@ export default function RealLoginPage() {
     setLoading(true)
 
     if (mode === 'signin') {
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
-      if (authErr) {
-        setError(authErr.message)
-      } else if (data.user) {
-        await ensureProfile(data.user.id, data.user.email ?? email)
-        const profile = await fetchProfile(data.user.id)
-        if (!profile) {
+      try {
+        // Step 1 — authenticate
+        const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+        if (authErr || !data.user) {
+          setError(authErr?.message ?? 'Sign in failed. Please try again.')
+          return
+        }
+
+        // Step 2 — fetch real profile from DB (source of truth for role)
+        const { data: profile, error: profileErr } = await supabase
+          .from('profiles')
+          .select('id, role, approval_status')
+          .eq('id', data.user.id)
+          .maybeSingle()
+
+        if (profileErr || !profile) {
           await supabase.auth.signOut()
           setError('Profile not found. Please contact support.')
-        } else if (!roleMatches(selectedRole, profile.role)) {
+          return
+        }
+
+        // Step 3 — approval gate (before role check)
+        if (profile.approval_status !== 'approved') {
+          navigate('/pending-approval', { replace: true })
+          return
+        }
+
+        // Step 4 — role check; admins bypass entirely
+        const realRole = (profile.role as string).toLowerCase()
+        const isAdmin  = realRole === 'admin'
+
+        if (!isAdmin && !roleMatches(selectedRole, realRole)) {
           await supabase.auth.signOut()
           setError('Selected role does not match this account. Please choose the correct role and try again.')
-        } else if (profile.approval_status !== 'approved') {
-          navigate('/pending-approval', { replace: true })
-        } else {
-          localStorage.setItem('baykid-last-email', email)
-          const path = getRoleDashboardPath(profile.role)
-          path
-            ? navigate(path, { replace: true })
-            : setError(`Unrecognized role "${profile.role}". Please contact support.`)
+          return
         }
+
+        // Step 5 — navigate; admins go to the selected role's dashboard
+        localStorage.setItem('baykid-last-email', email)
+        const targetRole = isAdmin ? ACCESS_ROLE_TO_DB[selectedRole] : (realRole as Role)
+        const path = getRoleDashboardPath(targetRole)
+        path
+          ? navigate(path, { replace: true })
+          : setError(`Unrecognized role "${targetRole}". Please contact support.`)
+      } catch (err) {
+        console.error('[signin]', err)
+        setError('An unexpected error occurred. Please try again.')
       }
     } else {
       const { data, error: authErr } = await supabase.auth.signUp({ email, password })

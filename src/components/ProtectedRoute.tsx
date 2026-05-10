@@ -29,8 +29,8 @@ export function ProtectedRoute({ children, requireApproved = false, allowedRoles
     return <Navigate to="/pending-approval" replace />
   }
 
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    const ownPath = getRoleDashboardPath(role)
+  if (allowedRoles && (!role || !allowedRoles.includes(role))) {
+    const ownPath = role ? getRoleDashboardPath(role) : '/real-login'
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center px-6 text-center"

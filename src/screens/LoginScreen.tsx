@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { signIn, fetchProfile, getRoleDashboardPath } from '../lib/auth'
+import { Link } from 'react-router-dom'
 import DemoMode from '../components/DemoMode'
-import { DEV_BYPASS_AUTH, getMockProfile, getMockUser, getMockDashboardPath } from '../lib/devBypass'
-import { useAuthStore } from '../store/authStore'
-import { useDemoFlowStore } from '../store/demoFlowStore'
+import { DEV_BYPASS_AUTH } from '../lib/devBypass'
 import { GlassCard } from '../components/ui/GlassCard'
-import { PrimaryButton } from '../components/ui/PrimaryButton'
 
 // ── Role selector (UI only — does not affect signIn) ──────────────────────────
 type RoleTab = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
@@ -23,13 +19,6 @@ const ROLES: { id: RoleTab; label: string; icon: string }[] = [
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function LoginScreen() {
-  const navigate = useNavigate()
-  const { setUser, setProfile } = useAuthStore()
-
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [role, setRole]           = useState<RoleTab>('consumer')
   const [fundraiserGlow, setFundraiserGlow] = useState(true)
@@ -52,62 +41,9 @@ export default function LoginScreen() {
     return () => clearTimeout(t)
   }, [])
 
-  // ── Fixed handleSubmit — fetches profile and navigates directly ─────────────
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      // 1. Sign in with Supabase
-      const { user } = await signIn(email, password)
-      if (!user) throw new Error('Sign in failed — no user returned')
-
-      // 2. Fetch profile to get role + approval status
-      const profile = await fetchProfile(user.id)
-      if (!profile) throw new Error('Account not set up correctly. Please contact support.')
-
-      // 3. Route based on approval status
-      if (profile.approval_status !== 'approved') {
-        navigate('/pending-approval')
-        return
-      }
-
-      // 4. Navigate directly to the correct role dashboard
-      navigate(getRoleDashboardPath(profile.role))
-
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleEnterDemo = () => {
-    if (role === 'fundraiser') {
-      navigate('/fundraisers')
-      return
-    }
-    if (role === 'admin') {
-      navigate('/admin-dashboard')
-      return
-    }
-    if (role === 'partner') {
-      navigate('/partner-dashboard')
-      return
-    }
-    setUser(getMockUser(role))
-    setProfile(getMockProfile(role))
-    navigate(getMockDashboardPath(role))
-  }
-
-  const handleRunFullDemo = () => {
-    useDemoFlowStore.getState().startDemo()
-    // navigation is handled by FullDemoHUD's useEffect once isRunning becomes true
-  }
-
   return (
     <>
-      {!DEV_BYPASS_AUTH && demoMode && <DemoMode onClose={() => setDemoMode(false)} />}
+      {demoMode && <DemoMode onClose={() => setDemoMode(false)} />}
       <div
         className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-12"
         style={{ background: '#03162f' }}
@@ -173,7 +109,7 @@ export default function LoginScreen() {
 
             {/* Card heading */}
             <h2 className="mb-5 text-base font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              {DEV_BYPASS_AUTH ? 'Enter as' : 'Sign in to'}{' '}
+              Explore as{' '}
               <span style={{ color: '#ffffff', fontWeight: 600 }}>{roleLabel}</span>
             </h2>
 
@@ -235,147 +171,35 @@ export default function LoginScreen() {
               Slide to see more roles
             </p>
 
-            {DEV_BYPASS_AUTH && (
-              <div className="mt-2 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleEnterDemo}
-                  className="flex w-full items-center justify-center gap-2 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
-                  style={{
-                    background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
-                    borderRadius: 14,
-                    boxShadow: '0 4px 24px rgba(0,190,255,0.35)',
-                  }}
-                >
-                  Enter Demo
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRunFullDemo}
-                  className="flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
-                  style={{
-                    background: 'rgba(0,200,255,0.08)',
-                    border: '1px solid rgba(0,200,255,0.35)',
-                    borderRadius: 14,
-                    color: '#00c8ff',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  Run Full Demo
-                </button>
-
-              </div>
-            )}
-
-            {!DEV_BYPASS_AUTH && <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
-              <div className="space-y-1.5">
-                <label className="section-label block">Email</label>
-                <input
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm px-4 py-2.5 outline-none placeholder:text-white/30"
-                />
-              </div>
-
-              {/* Password */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="section-label">Password</label>
-                  <button
-                    type="button"
-                    className="text-xs transition-opacity hover:opacity-70"
-                    style={{ color: 'rgba(0,200,255,0.7)' }}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm px-4 py-2.5 outline-none placeholder:text-white/30"
-                />
-              </div>
-
-              {/* Error message */}
-              {error && (
-                <div
-                  className="px-4 py-2.5 text-sm"
-                  style={{
-                    background: 'rgba(239,68,68,0.1)',
-                    border: '1px solid rgba(239,68,68,0.25)',
-                    borderRadius: 12,
-                    color: '#f87171',
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              {/* Submit button */}
-              <PrimaryButton type="submit" fullWidth loading={loading}>
-                {!loading && (
-                  <>
-                    Sign In
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </>
-                )}
-              </PrimaryButton>
-
-              {/* Demo mode button */}
-              <button
-                type="button"
-                onClick={handleEnterDemo}
-                className="w-full rounded-xl border border-cyan-400/20 bg-transparent py-3 text-cyan-300 text-sm hover:bg-cyan-500/10 transition"
-              >
-                🚀 Continue in Demo Mode
-              </button>
-            </form>}
+            <button
+              type="button"
+              onClick={() => setDemoMode(true)}
+              className="flex w-full items-center justify-center gap-2 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+              style={{
+                background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
+                borderRadius: 14,
+                boxShadow: '0 4px 24px rgba(0,190,255,0.35)',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Run Demo
+            </button>
 
           </GlassCard>
 
-          {/* Create account + Run Demo — hidden in demo mode */}
-          {!DEV_BYPASS_AUTH && (
-            <>
-              <p className="mt-7 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                New to Cyan's Brooklynn?{' '}
-                <Link
-                  to="/signup"
-                  className="font-medium transition-opacity hover:opacity-80"
-                  style={{ color: '#00c8ff' }}
-                >
-                  Create account
-                </Link>
-              </p>
-              <button
-                type="button"
-                onClick={() => setDemoMode(true)}
-                className="mt-5 flex items-center gap-2 text-sm font-medium transition-opacity hover:opacity-80"
-                style={{ color: 'rgba(56,189,248,0.6)' }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                Run Demo
-              </button>
-            </>
-          )}
+          {/* Create account */}
+          <p className="mt-7 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            New to Cyan's Brooklynn?{' '}
+            <Link
+              to="/signup"
+              className="font-medium transition-opacity hover:opacity-80"
+              style={{ color: '#00c8ff' }}
+            >
+              Create account
+            </Link>
+          </p>
         </div>
       </div>
 

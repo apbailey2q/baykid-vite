@@ -16,10 +16,14 @@ import {
   completeRoute,
   touchLastActive,
   startRoute,
+  createRouteForDriver,
+  getDriverCompletedStops,
+  getDriverWeeklyEarnings,
+  getPendingBags,
+  getDriverWalletBalance,
 } from '../../lib/driver'
 import { getBroadcastsForRole } from '../../lib/points'
 import { DEV_BYPASS_AUTH } from '../../lib/devBypass'
-import { useDemoStore } from '../../store/demoStore'
 import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { DriverRouteView } from '../driver/DriverRouteView'
 import { signOut } from '../../lib/auth'
@@ -38,27 +42,6 @@ const CONFETTI_PIECES = Array.from({ length: 30 }, (_, i) => ({
   dur: `${1.5 + (i % 5) * 0.28}s`,
   size: 14 + (i % 6) * 3,
 }))
-
-const MOCK_HISTORY = [
-  { id: '1', bag: 'BAG-2025-001', address: '45 Atlantic Ave, Brooklyn NY',    status: 'completed', earned: 5.00, ts: '2025-04-30T10:30:00' },
-  { id: '2', bag: 'BAG-2025-002', address: '128 Flatbush Ave, Brooklyn NY',   status: 'completed', earned: 5.00, ts: '2025-04-30T11:15:00' },
-  { id: '3', bag: 'BAG-2025-003', address: '78 Fulton St, Brooklyn NY',       status: 'completed', earned: 4.50, ts: '2025-04-30T12:00:00' },
-  { id: '4', bag: 'BAG-2025-004', address: '200 Myrtle Ave, Brooklyn NY',     status: 'completed', earned: 5.00, ts: '2025-04-29T14:20:00' },
-  { id: '5', bag: 'BAG-2025-005', address: '15 Nostrand Ave, Brooklyn NY',    status: 'completed', earned: 5.00, ts: '2025-04-29T09:45:00' },
-  { id: '6', bag: 'BAG-2025-006', address: '33 Ocean Ave, Brooklyn NY',       status: 'completed', earned: 4.50, ts: '2025-04-28T13:30:00' },
-  { id: '7', bag: 'BAG-2025-007', address: '91 Eastern Pkwy, Brooklyn NY',    status: 'completed', earned: 5.00, ts: '2025-04-28T10:00:00' },
-]
-
-const WEEK_HISTORY = [
-  { label: 'May 1–7, 2026',      amount: 34.00, pickups: 7 },
-  { label: 'Apr 24–30, 2026',    amount: 29.50, pickups: 6 },
-  { label: 'Apr 17–23, 2026',    amount: 41.00, pickups: 9 },
-  { label: 'Apr 10–16, 2026',    amount: 22.75, pickups: 5 },
-  { label: 'Apr 3–9, 2026',      amount: 35.00, pickups: 7 },
-  { label: 'Mar 27–Apr 2, 2026', amount: 18.50, pickups: 4 },
-  { label: 'Mar 20–26, 2026',    amount: 44.25, pickups: 9 },
-  { label: 'Mar 13–19, 2026',    amount: 31.00, pickups: 7 },
-]
 
 const MOCK_SCHEDULE = [
   { day: 'Mon', date: 'Apr 28', isToday: false, status: 'completed' as const, blocks: ['8 AM–12 PM', '1 PM–5 PM'] },
@@ -80,36 +63,6 @@ const ACCOUNT_CATEGORIES = [
   { icon: '📍', title: 'Service Zones',          subtitle: 'Areas you cover'                    },
   { icon: '✅', title: 'Safety Checklist',       subtitle: 'Pre-trip inspection items'          },
   { icon: '💬', title: 'Support',                subtitle: 'Help center and contact us'         },
-]
-
-const ZIP_ZONES = [
-  {
-    zip: '37086', city: 'La Vergne, TN', pickups: 4, bags: 11,
-    demand: 'highest' as const, closest: true,
-    locations: [
-      { id: 'a1', address: '114 S 11th St',      customer: 'J. Williams',  mi: 0.6, mins: 3,  bags: 3 },
-      { id: 'a2', address: '832 Chicamauga Ave',  customer: 'M. Thompson', mi: 1.2, mins: 5,  bags: 3 },
-      { id: 'a3', address: '1409 McGavock Pike',  customer: 'T. Harris',   mi: 1.7, mins: 7,  bags: 2 },
-      { id: 'a4', address: '407 S 14th St',       customer: 'D. Brooks',   mi: 2.1, mins: 8,  bags: 3 },
-    ],
-  },
-  {
-    zip: '37138', city: 'Smyrna, TN', pickups: 3, bags: 8,
-    demand: 'moderate' as const, closest: false,
-    locations: [
-      { id: 'b1', address: '210 Beasley Dr',        customer: 'A. Johnson',  mi: 3.4, mins: 11, bags: 3 },
-      { id: 'b2', address: '512 Enon Springs Rd',   customer: 'C. Davis',    mi: 4.1, mins: 14, bags: 2 },
-      { id: 'b3', address: '88 Almaville Rd',       customer: 'R. Martinez', mi: 5.0, mins: 17, bags: 3 },
-    ],
-  },
-  {
-    zip: '37013', city: 'Nolensville, TN', pickups: 2, bags: 6,
-    demand: 'low' as const, closest: false,
-    locations: [
-      { id: 'c1', address: '340 Sunset Rd',         customer: 'K. Wilson',  mi: 6.2, mins: 20, bags: 3 },
-      { id: 'c2', address: '714 Rocky Fork Rd',     customer: 'B. Taylor',  mi: 7.5, mins: 24, bags: 3 },
-    ],
-  },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -254,8 +207,6 @@ export default function DriverDashboard() {
 
   useDriverInactivity()
 
-  const { bags: demoBags, createRoute } = useDemoStore()
-
   const [driverTab, setDriverTab] = useState<DriverTab>((location.state as { tab?: DriverTab } | null)?.tab ?? 'home')
 
   const [toggling, setToggling]           = useState(false)
@@ -263,16 +214,15 @@ export default function DriverDashboard() {
   const [completingRoute, setCompletingRoute] = useState(false)
   const [msgBanner, setMsgBanner]         = useState<string | null>(null)
   const [selectedPickupCount, setSelectedPickupCount] = useState(0)
-  const [selectedPickupInputs, setSelectedPickupInputs] = useState<import('../../store/demoStore').PickupInput[]>([])
+  const [selectedPickupInputs, setSelectedPickupInputs] = useState<{ id: string; address: string; bags: number }[]>([])
   const [pickupsResetKey, setPickupsResetKey] = useState(0)
   // dev-bypass online state (replaces driverStatus.is_online in demo mode)
   const [devIsOnline, setDevIsOnline]     = useState(() => localStorage.getItem('isOnline') === 'true')
   // earnings payout
   const [showPayoutModal, setShowPayoutModal] = useState(false)
   const [payoutDone, setPayoutDone]       = useState(false)
-  const [availablePayout, setAvailablePayout] = useState(14.50)
   const [showConfetti, setShowConfetti]   = useState(false)
-  const [expandedZip, setExpandedZip]             = useState<string | null>(null)
+  const [_expandedZip, setExpandedZip]   = useState<string | null>(null)
   const [selectedPickupIds, setSelectedPickupIds] = useState<Set<string>>(new Set())
   const [weekDropdownOpen, setWeekDropdownOpen]         = useState(false)
   const [todayDropdownOpen, setTodayDropdownOpen]       = useState(false)
@@ -284,6 +234,30 @@ export default function DriverDashboard() {
     queryKey: ['driver-broadcasts'],
     queryFn: () => getBroadcastsForRole('driver'),
     refetchInterval: 60_000,
+  })
+
+  const { data: availablePayout = 0 } = useQuery({
+    queryKey: ['driver-balance', user?.id],
+    queryFn: () => getDriverWalletBalance(user!.id),
+    enabled: !DEV_BYPASS_AUTH && !!user,
+  })
+
+  const { data: completedStops = [] } = useQuery({
+    queryKey: ['driver-completed-stops', user?.id],
+    queryFn: () => getDriverCompletedStops(user!.id),
+    enabled: !DEV_BYPASS_AUTH && !!user,
+  })
+
+  const { data: weekHistory = [] } = useQuery({
+    queryKey: ['driver-weekly-earnings', user?.id],
+    queryFn: () => getDriverWeeklyEarnings(user!.id),
+    enabled: !DEV_BYPASS_AUTH && !!user,
+  })
+
+  const { data: pendingBags = [] } = useQuery({
+    queryKey: ['driver-pending-bags'],
+    queryFn: () => getPendingBags(30),
+    refetchInterval: 30_000,
   })
 
   useBroadcastAlerts(
@@ -871,7 +845,7 @@ export default function DriverDashboard() {
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.3 }}>Recycling pickups are piling up</p>
                     <p style={{ fontSize: 10, color: 'rgba(0,200,255,0.7)', marginTop: 3, fontWeight: 500 }}>
-                      {demoBags.filter(b => b.status === 'pending_pickup').length} requests near you
+                      {pendingBags.length} requests near you
                     </p>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -883,145 +857,80 @@ export default function DriverDashboard() {
             </div>
 
 
-            {/* Available Pickups — ZIP Accordion */}
+            {/* Available Pickups — real pending bags */}
             <div>
               <SectionLabel title="Available Pickups" accent={ACCENT} />
-              <div className="space-y-2">
-                {ZIP_ZONES.map((zone) => {
-                  const isOpen = expandedZip === zone.zip
-                  const demandColor = zone.demand === 'highest' ? '#5BFFB0' : zone.demand === 'moderate' ? '#FFB340' : '#00BFFF'
-                  const demandBg    = zone.demand === 'highest' ? 'rgba(91,255,176,0.1)'  : zone.demand === 'moderate' ? 'rgba(255,179,64,0.1)'  : 'rgba(0,191,255,0.08)'
-                  const demandGlow  = zone.demand === 'highest' ? 'rgba(91,255,176,0.22)' : zone.demand === 'moderate' ? 'rgba(255,179,64,0.18)' : 'rgba(0,191,255,0.14)'
-                  const zoneSelectedCount = zone.locations.filter(l => selectedPickupIds.has(l.id)).length
-
-                  return (
-                    <div
-                      key={zone.zip}
-                      style={{
-                        borderRadius: 16, overflow: 'hidden',
-                        background: 'rgba(255,255,255,0.04)',
-                        boxShadow: isOpen
-                          ? `0 0 22px ${demandGlow}, 0 4px 18px rgba(0,0,0,0.22)`
-                          : '0 2px 14px rgba(0,0,0,0.18)',
-                        transition: 'box-shadow 0.3s ease',
-                      }}
-                    >
-                      {/* ZIP header — tappable */}
+              {pendingBags.length === 0 ? (
+                <div className="rounded-2xl px-4 py-6 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>No pending pickups right now</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pendingBags.map((bag) => {
+                    const isSelected = selectedPickupIds.has(bag.id)
+                    return (
                       <button
-                        className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:opacity-80 transition-opacity"
-                        onClick={() => setExpandedZip(prev => prev === zone.zip ? null : zone.zip)}
+                        key={bag.id}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-2xl active:opacity-75 transition-all"
+                        style={{
+                          background: isSelected ? 'rgba(0,200,255,0.07)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${isSelected ? 'rgba(0,200,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                          boxShadow: isSelected ? '0 0 14px rgba(0,200,255,0.18)' : 'none',
+                          transition: 'all 0.18s ease',
+                        }}
+                        onClick={() => {
+                          setSelectedPickupIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has(bag.id)) next.delete(bag.id); else next.add(bag.id)
+                            return next
+                          })
+                        }}
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p style={{ fontSize: 16, color: '#ffffff', fontWeight: 700 }}>{zone.zip}</p>
-                            {zone.closest && (
-                              <span style={{ fontSize: 9, fontWeight: 700, color: '#00D9FF', background: 'rgba(0,200,255,0.1)', borderRadius: 99, padding: '2px 8px', boxShadow: '0 0 8px rgba(0,200,255,0.2)', letterSpacing: '0.05em' }}>Closest</span>
-                            )}
-                            {zoneSelectedCount > 0 && (
-                              <span style={{ fontSize: 9, fontWeight: 700, color: '#5BFFB0', background: 'rgba(91,255,176,0.12)', borderRadius: 99, padding: '2px 7px' }}>{zoneSelectedCount} selected</span>
-                            )}
-                          </div>
-                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{zone.city}</p>
-                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>{zone.pickups} pickups · {zone.bags} bags</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
-                          <span style={{
-                            fontSize: 9, fontWeight: 700, color: demandColor,
-                            background: demandBg, borderRadius: 99, padding: '2px 8px',
-                            boxShadow: `0 0 8px ${demandGlow}`, letterSpacing: '0.04em',
-                            textTransform: 'uppercase',
-                          }}>
-                            {zone.demand === 'highest' ? 'Highest demand' : zone.demand === 'moderate' ? 'Moderate' : 'Low demand'}
-                          </span>
-                          <svg
-                            width="14" height="14" viewBox="0 0 24 24" fill="none"
-                            stroke="rgba(0,200,255,0.5)" strokeWidth="2.2"
-                            strokeLinecap="round" strokeLinejoin="round"
-                            style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease' }}
-                          >
-                            <path d="M6 9l6 6 6-6" />
-                          </svg>
-                        </div>
-                      </button>
-
-                      {/* Expandable location list */}
-                      <div style={{
-                        maxHeight: isOpen ? `${zone.locations.length * 76 + 24}px` : '0px',
-                        overflow: 'hidden',
-                        transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)',
-                      }}>
+                        {/* Glow checkbox */}
                         <div style={{
-                          opacity: isOpen ? 1 : 0,
-                          transition: 'opacity 0.22s ease 0.06s',
-                          borderTop: '1px solid rgba(0,200,255,0.08)',
-                          paddingTop: 4, paddingBottom: 6,
+                          width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                          border: `1.5px solid ${isSelected ? '#00D9FF' : 'rgba(255,255,255,0.18)'}`,
+                          background: isSelected ? 'rgba(0,200,255,0.14)' : 'transparent',
+                          boxShadow: isSelected ? '0 0 9px rgba(0,200,255,0.38)' : 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.18s ease',
                         }}>
-                          {zone.locations.map((loc) => {
-                            const isSelected = selectedPickupIds.has(loc.id)
-                            return (
-                              <button
-                                key={loc.id}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:opacity-75 transition-all"
-                                style={{ background: isSelected ? 'rgba(0,200,255,0.05)' : 'transparent' }}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedPickupIds(prev => {
-                                    const next = new Set(prev)
-                                    if (next.has(loc.id)) next.delete(loc.id); else next.add(loc.id)
-                                    return next
-                                  })
-                                }}
-                              >
-                                {/* Glow checkbox */}
-                                <div style={{
-                                  width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                                  border: `1.5px solid ${isSelected ? '#00D9FF' : 'rgba(255,255,255,0.18)'}`,
-                                  background: isSelected ? 'rgba(0,200,255,0.14)' : 'transparent',
-                                  boxShadow: isSelected ? '0 0 9px rgba(0,200,255,0.38)' : 'none',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  transition: 'all 0.18s ease',
-                                }}>
-                                  {isSelected && (
-                                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                                      <path d="M2 6l3 3 5-5" stroke="#00D9FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  )}
-                                </div>
-
-                                {/* Address + meta */}
-                                <div className="flex-1 min-w-0">
-                                  <p style={{ fontSize: 13, color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.82)', fontWeight: isSelected ? 600 : 500 }}>{loc.address}</p>
-                                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.36)', marginTop: 1 }}>{loc.customer} · {loc.mi} mi · {loc.mins} min</p>
-                                </div>
-
-                                {/* Bag count */}
-                                <p style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#00D9FF' : 'rgba(0,200,255,0.5)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                  {loc.bags} bags
-                                </p>
-                              </button>
-                            )
-                          })}
+                          {isSelected && (
+                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6l3 3 5-5" stroke="#00D9FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
                         </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono font-bold" style={{ fontSize: 13, color: isSelected ? '#00c8ff' : 'rgba(255,255,255,0.82)' }}>{bag.bag_code}</p>
+                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{bag.city ?? 'Location TBD'}</p>
+                        </div>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: bag.status === 'assigned' ? '#FFB340' : '#5BFFB0', background: bag.status === 'assigned' ? 'rgba(255,179,64,0.1)' : 'rgba(91,255,176,0.1)', borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                          {bag.status === 'assigned' ? 'Assigned' : 'Pending'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* Add to Route — appears when any pickups are selected */}
-              {selectedPickupIds.size > 0 && (
+              {selectedPickupIds.size > 0 && user && (
                 <button
                   className="w-full mt-3 rounded-2xl py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98]"
                   style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 20px rgba(0,190,255,0.32)' }}
-                  onClick={() => {
-                    const inputs = ZIP_ZONES
-                      .flatMap(z => z.locations)
-                      .filter(l => selectedPickupIds.has(l.id))
-                      .map(l => ({ id: l.id, address: l.address, bags: l.bags }))
-                    createRoute(inputs)
-                    setSelectedPickupIds(new Set())
-                    setExpandedZip(null)
-                    navigate('/dashboard/driver/route-map')
+                  onClick={async () => {
+                    const selected = pendingBags.filter(b => selectedPickupIds.has(b.id))
+                    const stops = selected.map(b => ({ address: b.city ?? 'Pickup', zipCode: '', bagCode: b.bag_code }))
+                    const routeName = `Route ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                    try {
+                      const route = await createRouteForDriver(user.id, routeName, stops)
+                      setSelectedPickupIds(new Set())
+                      setExpandedZip(null)
+                      navigate(`/dashboard/driver/route-map?routeId=${route.id}`)
+                    } catch {
+                      // silent
+                    }
                   }}
                 >
                   Add to Route · {selectedPickupIds.size} pickup{selectedPickupIds.size !== 1 ? 's' : ''}
@@ -1117,7 +1026,7 @@ export default function DriverDashboard() {
           <div className="px-5 pt-5 pb-4 space-y-5" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
             <p style={{ fontSize: 22, color: '#ffffff', fontWeight: 500 }}>Earnings</p>
 
-            {/* Payout card — no border */}
+            {/* Payout card */}
             <div
               className="rounded-2xl p-5"
               style={{ background: 'rgba(255,255,255,0.06)', boxShadow: '0 0 28px rgba(0,190,255,0.08)' }}
@@ -1126,27 +1035,25 @@ export default function DriverDashboard() {
                 <div>
                   <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Payout</p>
                   <p style={{ fontSize: 38, color: '#ffffff', fontWeight: 700, lineHeight: 1.1, marginTop: 4 }}>
-                    ${availablePayout.toFixed(2)}
+                    ${(availablePayout as number).toFixed(2)}
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setShowConfetti(true)
-                    setShowPayoutModal(true)
-                  }}
+                  onClick={() => { setShowConfetti(true); setShowPayoutModal(true) }}
                   className="rounded-2xl px-4 py-2 text-sm font-bold text-white"
                   style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 2px 14px rgba(0,190,255,0.35)' }}
                 >
                   Payout ↑
                 </button>
               </div>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{MOCK_HISTORY.length} completed pickups this week</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{completedStops.length} completed pickups</p>
             </div>
 
-            {/* TODAY (COMPLETED TODAY) — unified collapsible card */}
+            {/* TODAY (COMPLETED TODAY) */}
             {(() => {
-              const today = '2025-04-30'
-              const todayItems = MOCK_HISTORY.filter(h => h.ts.startsWith(today))
+              const todayStr = new Date().toISOString().slice(0, 10)
+              const todayItems = completedStops.filter(s => s.completed_at?.startsWith(todayStr))
+              const todayEarned = todayItems.length * 5
               return (
                 <div
                   className="rounded-2xl p-4"
@@ -1154,101 +1061,57 @@ export default function DriverDashboard() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p style={{ fontSize: 10, color: ACCENT, fontWeight: 600, letterSpacing: '0.04em' }}>TODAY (COMPLETED TODAY)</p>
-                      <p style={{ fontSize: 22, color: '#ffffff', fontWeight: 700, marginTop: 2 }}>$14.50</p>
+                      <p style={{ fontSize: 10, color: ACCENT, fontWeight: 600, letterSpacing: '0.04em' }}>TODAY</p>
+                      <p style={{ fontSize: 22, color: '#ffffff', fontWeight: 700, marginTop: 2 }}>${todayEarned.toFixed(2)}</p>
                       <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{todayItems.length} pickups</p>
                     </div>
                     <button
                       onClick={() => setTodayDropdownOpen(v => !v)}
                       style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', padding: '4px 0', cursor: 'pointer' }}
                     >
-                      <svg
-                        width="14" height="14" viewBox="0 0 14 14" fill="none"
-                        style={{ transform: todayDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease', color: 'rgba(255,255,255,0.35)' }}
-                      >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: todayDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease', color: 'rgba(255,255,255,0.35)' }}>
                         <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
                   </div>
-                  <div
-                    style={{
-                      maxHeight: todayDropdownOpen ? `${todayItems.length * 76 + 16}px` : '0px',
-                      overflow: 'hidden',
-                      transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)',
-                    }}
-                  >
+                  <div style={{ maxHeight: todayDropdownOpen ? `${todayItems.length * 76 + 16}px` : '0px', overflow: 'hidden', transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)' }}>
                     <div style={{ opacity: todayDropdownOpen ? 1 : 0, transition: 'opacity 0.2s ease 0.06s', marginTop: 12 }}>
-                      {todayItems.map((h, i) => {
-                        const d = new Date(h.ts)
-                        const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-                        const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-                          completed:    { label: 'Completed',   color: '#4ade80' },
-                          at_warehouse: { label: 'At Warehouse', color: '#67e8f9' },
-                          accepted:     { label: 'Accepted',    color: '#a78bfa' },
-                        }
-                        const badge = STATUS_LABELS[h.status] ?? { label: h.status, color: '#7B909C' }
-                        return (
-                          <div
-                            key={h.id}
-                            className="flex items-start justify-between gap-2 py-3"
-                            style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(255,255,255,0.04)' }}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-mono font-bold" style={{ fontSize: 13, color: '#00c8ff' }}>{h.bag}</p>
-                              <p style={{ fontSize: 12, color: '#ffffff', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.address}</p>
-                              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{timeStr}</p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(74,222,128,0.12)', color: badge.color }}>{badge.label}</span>
-                              <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>+${h.earned.toFixed(2)}</p>
-                            </div>
+                      {todayItems.length === 0 ? (
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No pickups today yet</p>
+                      ) : todayItems.map((s, i) => (
+                        <div key={s.id} className="flex items-start justify-between gap-2 py-3" style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(255,255,255,0.04)' }}>
+                          <div className="flex-1 min-w-0">
+                            <p style={{ fontSize: 12, color: '#ffffff', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.address}</p>
+                            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{new Date(s.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
                           </div>
-                        )
-                      })}
+                          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80' }}>Completed</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               )
             })()}
 
-            {/* WEEK — full width, no border, with collapsible history */}
-            <div
-              className="rounded-2xl p-4"
-              style={{ background: 'rgba(255,255,255,0.05)', boxShadow: '0 0 20px rgba(0,190,255,0.05)' }}
-            >
+            {/* WEEK — collapsible history */}
+            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.05)', boxShadow: '0 0 20px rgba(0,190,255,0.05)' }}>
               <div className="flex items-start justify-between">
                 <div>
                   <p style={{ fontSize: 10, color: ACCENT, fontWeight: 600, letterSpacing: '0.04em' }}>WEEK</p>
-                  <p style={{ fontSize: 22, color: '#ffffff', fontWeight: 700, marginTop: 2 }}>$34.00</p>
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>7 pickups</p>
+                  <p style={{ fontSize: 22, color: '#ffffff', fontWeight: 700, marginTop: 2 }}>${weekHistory[0]?.amount?.toFixed(2) ?? '0.00'}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{weekHistory[0]?.pickups ?? 0} pickups</p>
                 </div>
-                <button
-                  onClick={() => setWeekDropdownOpen(v => !v)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', padding: '4px 0', cursor: 'pointer' }}
-                >
+                <button onClick={() => setWeekDropdownOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', padding: '4px 0', cursor: 'pointer' }}>
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>History</span>
-                  <svg
-                    width="14" height="14" viewBox="0 0 14 14" fill="none"
-                    style={{ transform: weekDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease', color: 'rgba(255,255,255,0.35)' }}
-                  >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: weekDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease', color: 'rgba(255,255,255,0.35)' }}>
                     <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               </div>
-              <div
-                style={{
-                  maxHeight: weekDropdownOpen ? `${WEEK_HISTORY.length * 52 + 16}px` : '0px',
-                  overflow: 'hidden',
-                  transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)',
-                }}
-              >
+              <div style={{ maxHeight: weekDropdownOpen ? `${weekHistory.length * 52 + 16}px` : '0px', overflow: 'hidden', transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)' }}>
                 <div style={{ opacity: weekDropdownOpen ? 1 : 0, transition: 'opacity 0.2s ease 0.06s', marginTop: 12 }}>
-                  {WEEK_HISTORY.map((w, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between py-3"
-                      style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
-                    >
+                  {weekHistory.map((w, i) => (
+                    <div key={i} className="flex items-center justify-between py-3" style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                       <div>
                         <p style={{ fontSize: 12, color: '#ffffff', fontWeight: 500 }}>{w.label}</p>
                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{w.pickups} pickups</p>
@@ -1256,69 +1119,37 @@ export default function DriverDashboard() {
                       <p style={{ fontSize: 14, fontWeight: 700, color: '#4ade80' }}>${w.amount.toFixed(2)}</p>
                     </div>
                   ))}
+                  {weekHistory.length === 0 && (
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No earnings history yet</p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Bag History — collapsible, no border */}
-            {(() => {
-              const today = '2025-04-30'
-              const historyItems = MOCK_HISTORY.filter(h => !h.ts.startsWith(today))
-              return (
-                <div>
-                  <button
-                    onClick={() => setBagHistoryDropdownOpen(v => !v)}
-                    className="w-full flex items-center justify-between mb-3"
-                    style={{ background: 'none', padding: 0, cursor: 'pointer' }}
-                  >
-                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bag History</p>
-                    <svg
-                      width="14" height="14" viewBox="0 0 14 14" fill="none"
-                      style={{ transform: bagHistoryDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease', color: 'rgba(255,255,255,0.35)' }}
-                    >
-                      <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <div
-                    style={{
-                      maxHeight: bagHistoryDropdownOpen ? `${historyItems.length * 76 + 16}px` : '0px',
-                      overflow: 'hidden',
-                      transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)',
-                    }}
-                  >
-                    <div style={{ opacity: bagHistoryDropdownOpen ? 1 : 0, transition: 'opacity 0.2s ease 0.06s' }} className="space-y-0">
-                      {historyItems.map((h, i) => {
-                        const d = new Date(h.ts)
-                        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                        const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-                          completed:    { label: 'Completed',   color: '#4ade80' },
-                          at_warehouse: { label: 'At Warehouse', color: '#67e8f9' },
-                          accepted:     { label: 'Accepted',    color: '#a78bfa' },
-                        }
-                        const badge = STATUS_LABELS[h.status] ?? { label: h.status, color: '#7B909C' }
-                        return (
-                          <div
-                            key={h.id}
-                            className="flex items-start justify-between gap-2 py-3"
-                            style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-mono font-bold" style={{ fontSize: 13, color: '#00c8ff' }}>{h.bag}</p>
-                              <p style={{ fontSize: 12, color: '#ffffff', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.address}</p>
-                              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{dateStr}</p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(74,222,128,0.12)', color: badge.color }}>{badge.label}</span>
-                              <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>+${h.earned.toFixed(2)}</p>
-                            </div>
-                          </div>
-                        )
-                      })}
+            {/* Bag History */}
+            <div>
+              <button onClick={() => setBagHistoryDropdownOpen(v => !v)} className="w-full flex items-center justify-between mb-3" style={{ background: 'none', padding: 0, cursor: 'pointer' }}>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pickup History</p>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: bagHistoryDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.28s ease', color: 'rgba(255,255,255,0.35)' }}>
+                  <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <div style={{ maxHeight: bagHistoryDropdownOpen ? `${completedStops.length * 76 + 16}px` : '0px', overflow: 'hidden', transition: 'max-height 0.34s cubic-bezier(0.4,0,0.2,1)' }}>
+                <div style={{ opacity: bagHistoryDropdownOpen ? 1 : 0, transition: 'opacity 0.2s ease 0.06s' }} className="space-y-0">
+                  {completedStops.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No completed pickups yet</p>
+                  ) : completedStops.map((s, i) => (
+                    <div key={s.id} className="flex items-start justify-between gap-2 py-3" style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                      <div className="flex-1 min-w-0">
+                        <p style={{ fontSize: 12, color: '#ffffff', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.address}</p>
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{new Date(s.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                      </div>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80' }}>Completed</span>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              )
-            })()}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1599,10 +1430,12 @@ export default function DriverDashboard() {
             </button>
           ) : (
             <button
-              disabled={selectedPickupCount === 0}
-              onClick={() => {
-                if (selectedPickupInputs.length > 0) {
-                  createRoute(selectedPickupInputs)
+              disabled={selectedPickupCount === 0 || !user}
+              onClick={async () => {
+                if (selectedPickupInputs.length > 0 && user) {
+                  const stops = selectedPickupInputs.map(i => ({ address: i.address, zipCode: '' }))
+                  const routeName = `Route ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  try { await createRouteForDriver(user.id, routeName, stops) } catch { /* silent */ }
                   setSelectedPickupCount(0)
                   setSelectedPickupInputs([])
                   setPickupsResetKey((k) => k + 1)
@@ -1692,15 +1525,15 @@ export default function DriverDashboard() {
               <>
                 <div>
                   <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>PAYOUT SUMMARY</p>
-                  <p style={{ fontSize: 36, fontWeight: 700, color: '#ffffff' }}>${availablePayout.toFixed(2)}</p>
+                  <p style={{ fontSize: 36, fontWeight: 700, color: '#ffffff' }}>${(availablePayout as number).toFixed(2)}</p>
                   <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
                     Great work! Your completed pickups are ready for payout.
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Completed Orders', value: String(MOCK_HISTORY.filter(h => h.ts.startsWith('2025-04-30')).length) },
-                    { label: 'Total Bags',        value: String(MOCK_HISTORY.filter(h => h.ts.startsWith('2025-04-30')).length) },
+                    { label: 'Completed Pickups', value: String(completedStops.length) },
+                    { label: 'Total Bags',         value: String(completedStops.length) },
                   ].map((s) => (
                     <div
                       key={s.label}
@@ -1721,11 +1554,11 @@ export default function DriverDashboard() {
                     Cancel
                   </button>
                   <button
-                    onClick={() => { setAvailablePayout(0); setPayoutDone(true) }}
+                    onClick={() => setPayoutDone(true)}
                     className="flex-2 rounded-2xl py-3.5 text-sm font-bold text-white"
                     style={{ flex: 2, background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 20px rgba(0,190,255,0.3)' }}
                   >
-                    Pay ${availablePayout.toFixed(2)}
+                    Pay ${(availablePayout as number).toFixed(2)}
                   </button>
                 </div>
               </>

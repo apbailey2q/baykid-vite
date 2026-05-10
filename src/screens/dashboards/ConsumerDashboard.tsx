@@ -1,13 +1,11 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
 import { signOut } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
 import {
-  getConsumerPoints,
   getConsumerBags,
-  getConsumerWeeklyActivity,
-  getConsumerStreak,
   getBroadcastsForRole,
 } from '../../lib/points'
 import { useBroadcastAlerts } from '../../hooks/useBroadcastAlerts'
@@ -15,10 +13,69 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
 import { SectionLabel } from '../../components/ui/dashboard'
-import { useDemoStore } from '../../store/demoStore'
-import ScanModal from '../../components/demo/ScanModal'
 import QuickActionPage, { type QuickPage } from '../../components/demo/QuickActionPage'
-import PaidOutModal from '../../components/demo/PaidOutModal'
+
+async function fetchWalletBalance(userId: string) {
+  const { data } = await supabase
+    .from('wallet_transactions')
+    .select('type, amount')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+  const txns = data ?? []
+  const earned   = txns.filter(t => ['earning','bonus','referral'].includes(t.type)).reduce((s,t) => s + Number(t.amount), 0)
+  const donated  = txns.filter(t => t.type === 'donation').reduce((s,t) => s + Number(t.amount), 0)
+  const paid_out = txns.filter(t => t.type === 'payout').reduce((s,t) => s + Number(t.amount), 0)
+  return { balance: Math.max(0, earned - donated - paid_out), totalEarned: earned }
+}
+
+async function fetchWeeklyEarnings(userId: string) {
+  const rows: { label: string; amount: number | null }[] = [{ label: 'Current Week', amount: null }]
+  for (let w = 1; w <= 8; w++) {
+    const end   = new Date(); end.setDate(end.getDate() - (w - 1) * 7); end.setHours(23,59,59,999)
+    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0,0,0,0)
+    const { data } = await supabase
+      .from('wallet_transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .in('type', ['earning','bonus','referral'])
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+    const total = (data ?? []).reduce((s,t) => s + Number(t.amount), 0)
+    const label = `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`
+    rows.push({ label, amount: total })
+  }
+  return rows
+}
+
+async function fetchWeeklyLbs(userId: string) {
+  const rows: { label: string; lbs: number | null }[] = [{ label: 'Current Week', lbs: null }]
+  for (let w = 1; w <= 8; w++) {
+    const end   = new Date(); end.setDate(end.getDate() - (w - 1) * 7); end.setHours(23,59,59,999)
+    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0,0,0,0)
+    const { data } = await supabase
+      .from('qr_bags')
+      .select('co2_saved_lbs')
+      .eq('consumer_id', userId)
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+    const total = Math.round((data ?? []).reduce((s,b) => s + (Number(b.co2_saved_lbs) || 0), 0))
+    const label = `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`
+    rows.push({ label, amount: total } as unknown as { label: string; lbs: number | null })
+  }
+  return rows as { label: string; lbs: number | null }[]
+}
+
+async function fetchTopFundraiser() {
+  const { data } = await supabase
+    .from('fundraisers')
+    .select('id, name, goal_amount, raised_amount, bag_count')
+    .eq('status', 'active')
+    .order('raised_amount', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,29 +121,6 @@ const BAG_STATUS_BADGE: Record<string, { label: string; bg: string; color: strin
 const CONFETTI_COLORS = ['#00c8ff', '#00E676', '#FFD600', '#FF6D00', '#E040FB', '#FF4081']
 const CELEBRATE_MSGS  = ['Way to go', 'You rock', 'Keep it up', 'Amazing work', "You're crushing it"]
 
-const WEEKLY_EARNINGS: { label: string; amount: number | null }[] = [
-  { label: 'Current Week',       amount: null  },
-  { label: 'May 4–10, 2026',     amount: 25.50 },
-  { label: 'Apr 27–May 3, 2026', amount: 18.75 },
-  { label: 'Apr 20–26, 2026',    amount: 32.10 },
-  { label: 'Apr 13–19, 2026',    amount: 21.00 },
-  { label: 'Apr 6–12, 2026',     amount: 14.80 },
-  { label: 'Mar 30–Apr 5, 2026', amount: 17.37 },
-  { label: 'Mar 23–29, 2026',    amount: 12.25 },
-  { label: 'Mar 15–21, 2026',    amount: 19.60 },
-]
-
-const WEEKLY_RECYCLED: { label: string; lbs: number | null }[] = [
-  { label: 'Current Week',       lbs: null },
-  { label: 'May 4–10, 2026',     lbs: 340  },
-  { label: 'Apr 27–May 3, 2026', lbs: 285  },
-  { label: 'Apr 20–26, 2026',    lbs: 310  },
-  { label: 'Apr 13–19, 2026',    lbs: 225  },
-  { label: 'Apr 6–12, 2026',     lbs: 190  },
-  { label: 'Mar 30–Apr 5, 2026', lbs: 240  },
-  { label: 'Mar 23–29, 2026',    lbs: 175  },
-  { label: 'Mar 15–21, 2026',    lbs: 205  },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -210,28 +244,13 @@ export default function ConsumerDashboard() {
   const [selectedCategory, setSelectedCategory] = useState('Eco Tips')
   const [bagTab, setBagTab]           = useState<'active' | 'history'>('active')
   const [showManual, setShowManual]   = useState(false)
-
   const [activePage, setActivePage]   = useState<QuickPage | null>(null)
-  const [showScan, setShowScan]       = useState(false)
-  const [showPaidOut, setShowPaidOut] = useState(false)
-  const [scanInitialCode, setScanInitialCode] = useState<string | null>(null)
   const [earningsWeekIdx, setEarningsWeekIdx] = useState(0)
   const [recycledWeekIdx, setRecycledWeekIdx]  = useState(0)
 
-  const [demoProgress, setDemoProgress] = useState(0)
-  const [demoPlaying, setDemoPlaying]   = useState(false)
-  const demoRafRef = useRef<number | null>(null)
-
-  const { bags: demoBags, stats: demoStats, processPayout } = useDemoStore()
+  const demoRafRef = useRef<number | null>(null) // kept for cleanup only
 
   // ── Data queries ───────────────────────────────────────────────────────────
-  useQuery({
-    queryKey: ['consumer-points', user?.id],
-    queryFn: () => getConsumerPoints(user!.id),
-    enabled: !!user,
-    staleTime: 30_000,
-  })
-
   const { data: myBags = [], isLoading: loadingBags } = useQuery({
     queryKey: ['consumer-bags', user?.id],
     queryFn: () => getConsumerBags(user!.id),
@@ -239,22 +258,37 @@ export default function ConsumerDashboard() {
     staleTime: 30_000,
   })
 
-  const { data: weeklyData = [] } = useQuery({
-    queryKey: ['consumer-weekly', user?.id],
-    queryFn: () => getConsumerWeeklyActivity(user!.id),
-    enabled: !!user,
-  })
-
-  useQuery({
-    queryKey: ['consumer-streak', user?.id],
-    queryFn: () => getConsumerStreak(user!.id),
-    enabled: !!user,
-  })
-
   const { data: broadcasts = [] } = useQuery({
     queryKey: ['consumer-broadcasts'],
     queryFn: () => getBroadcastsForRole('consumer'),
     refetchInterval: 60_000,
+  })
+
+  const { data: walletData } = useQuery({
+    queryKey: ['consumer-wallet', user?.id],
+    queryFn: () => fetchWalletBalance(user!.id),
+    enabled: !!user,
+    staleTime: 30_000,
+  })
+
+  const { data: WEEKLY_EARNINGS = [{ label: 'Current Week', amount: null }] } = useQuery({
+    queryKey: ['consumer-weekly-earnings', user?.id],
+    queryFn: () => fetchWeeklyEarnings(user!.id),
+    enabled: !!user,
+    staleTime: 60_000,
+  })
+
+  const { data: WEEKLY_RECYCLED = [{ label: 'Current Week', lbs: null }] } = useQuery({
+    queryKey: ['consumer-weekly-lbs', user?.id],
+    queryFn: () => fetchWeeklyLbs(user!.id),
+    enabled: !!user,
+    staleTime: 60_000,
+  })
+
+  const { data: topFundraiser } = useQuery({
+    queryKey: ['top-fundraiser'],
+    queryFn: fetchTopFundraiser,
+    staleTime: 120_000,
   })
 
   // ── Realtime broadcast listener ────────────────────────────────────────────
@@ -267,18 +301,18 @@ export default function ConsumerDashboard() {
   )
 
   // ── Derived stats ──────────────────────────────────────────────────────────
-  const completedBags = myBags.filter((b) => b.status === 'completed').length
-  const activeBags    = myBags.filter((b) => b.status !== 'completed').length
-  const lbsDiverted   = Math.round(completedBags * 2.5)
-  const co2Saved      = Math.round(completedBags * 1.2)
-  const earnings      = (completedBags * 3.75).toFixed(2)
+  const completedBags  = myBags.filter((b) => b.status === 'inspected' || b.status === 'completed').length
+  const activeBags     = myBags.filter((b) => !['inspected','completed','recycled'].includes(b.status)).length
+  const lbsDiverted    = Math.round(myBags.reduce((s, b) => s + (Number((b as unknown as { co2_saved_lbs?: number }).co2_saved_lbs) || 0), 0))
+  const co2Saved       = lbsDiverted
+  const balance        = walletData?.balance ?? 0
+  const earnings       = (walletData?.totalEarned ?? completedBags * 3.75).toFixed(2)
   const unreadMsgCount = broadcasts.length
+  const realProgress   = Math.min(100, lbsDiverted > 0 ? Math.round((lbsDiverted / 17) * 100) : 0)
 
   const filteredBags =
     bagTab === 'history' ? myBags.filter((b) => b.status === 'completed') :
     myBags.filter((b) => b.status !== 'completed')
-
-  const weekBags  = weeklyData.reduce((s, d) => s + d.bags, 0)
 
   const newsItems = broadcasts.length > 0
     ? broadcasts.slice(0, 2).map((b) => ({ title: 'Admin Update', desc: b.message }))
@@ -307,72 +341,18 @@ export default function ConsumerDashboard() {
     return () => clearInterval(id)
   }, [celebBadge])
 
-  // ── Logo demo animation ────────────────────────────────────────────────────
-  const cancelDemoAnimation = useCallback(() => {
-    if (demoRafRef.current !== null) {
-      cancelAnimationFrame(demoRafRef.current)
-      demoRafRef.current = null
-    }
-    setDemoPlaying(false)
+  useEffect(() => () => {
+    if (demoRafRef.current !== null) cancelAnimationFrame(demoRafRef.current)
   }, [])
 
-  const startDemoAnimation = useCallback(() => {
-    cancelDemoAnimation()
-    setDemoProgress(0)
-    setDemoPlaying(true)
-    const startTime = performance.now()
-    // [endMs, fromPct, toPct] — linear interpolation between waypoints
-    const segs: [number, number, number][] = [
-      [2500,   0,  25],  // 0→25 over 2.5s
-      [3500,  25,  25],  // hold 25 for 1s
-      [7500,  25,  65],  // 25→65 over 4s
-      [8500,  65,  65],  // hold 65 for 1s
-      [11500, 65,  99],  // 65→99 over 3s
-      [12500, 99,  99],  // hold 99 for 1s
-      [13500, 99, 100],  // 99→100 over 1s
-    ]
-    function animate(now: number) {
-      const elapsed = now - startTime
-      if (elapsed >= 13500) {
-        setDemoProgress(100)
-        setDemoPlaying(false)
-        demoRafRef.current = null
-        return
-      }
-      let progress = 0
-      let prevMs = 0
-      for (const [endMs, fromPct, toPct] of segs) {
-        if (elapsed < endMs) {
-          const dur = endMs - prevMs
-          const t = dur > 0 ? (elapsed - prevMs) / dur : 1
-          progress = fromPct + (toPct - fromPct) * t
-          break
-        }
-        prevMs = endMs
-        progress = toPct
-      }
-      setDemoProgress(Math.round(progress))
-      demoRafRef.current = requestAnimationFrame(animate)
-    }
-    demoRafRef.current = requestAnimationFrame(animate)
-  }, [cancelDemoAnimation])
-
-  useEffect(() => {
-    if (tab !== 'deeds') return
-    startDemoAnimation()
-  }, [tab, startDemoAnimation])
-
-  useEffect(() => () => cancelDemoAnimation(), [cancelDemoAnimation])
-
-  // ── Manual bag request (opens ScanModal pre-seeded) ──────────────────────
+  // ── Manual bag entry → real scanner ──────────────────────────────────────
   const handleManualRequest = (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = code.trim()
     if (!trimmed) return
-    setScanInitialCode(trimmed.toUpperCase())
     setCode('')
     setShowManual(false)
-    setShowScan(true)
+    navigate(`/scan`, { state: { bagCode: trimmed.toUpperCase() } })
   }
 
   const handleSignOut = async () => {
@@ -490,7 +470,7 @@ export default function ConsumerDashboard() {
             {/* ── Scan Bag ── */}
             <div className="px-5 mb-5 mt-20">
               <button
-                onClick={() => setShowScan(true)}
+                onClick={() => navigate('/scan')}
                 className="w-full flex items-center justify-center gap-3 rounded-2xl py-6 text-lg font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
@@ -562,24 +542,28 @@ export default function ConsumerDashboard() {
                   </button>
                 </div>
                 {/* Featured fundraiser row */}
-                <div className="px-4 py-3 flex items-center gap-3">
-                  <span className="shrink-0" style={{ fontSize: 24 }}>🏀</span>
-                  <div className="flex-1 min-w-0">
-                    <p style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 2 }}>
-                      East Nashville High Basketball
-                    </p>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                      <div className="h-full rounded-full" style={{ width: '43%', background: 'linear-gradient(90deg, #0057e7, #00c8ff)' }} />
+                {topFundraiser && (
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    <span className="shrink-0" style={{ fontSize: 24 }}>🌱</span>
+                    <div className="flex-1 min-w-0">
+                      <p style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 2 }}>
+                        {topFundraiser.name}
+                      </p>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round((Number(topFundraiser.raised_amount) / Number(topFundraiser.goal_amount)) * 100))}%`, background: 'linear-gradient(90deg, #0057e7, #00c8ff)' }} />
+                      </div>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                        {Math.min(100, Math.round((Number(topFundraiser.raised_amount) / Number(topFundraiser.goal_amount)) * 100))}% funded · {topFundraiser.bag_count} supporters
+                      </p>
                     </div>
-                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>43% funded · 48 supporters</p>
+                    <button
+                      onClick={() => navigate(`/fundraisers/${topFundraiser.id}`)}
+                      style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', borderRadius: 10, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      View
+                    </button>
                   </div>
-                  <button
-                    onClick={() => navigate('/fundraisers/fund-001')}
-                    style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', borderRadius: 10, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                  >
-                    View
-                  </button>
-                </div>
+                )}
                 {/* My Fundraiser Impact row */}
                 <div
                   className="px-4 py-3 flex items-center justify-between"
@@ -720,7 +704,7 @@ export default function ConsumerDashboard() {
 
                 {/* Primary scan button */}
                 <button
-                  onClick={() => setShowScan(true)}
+                  onClick={() => navigate('/scan')}
                   className="w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-base font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
                   style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 6px 28px rgba(0,190,255,0.45)' }}
                 >
@@ -798,12 +782,12 @@ export default function ConsumerDashboard() {
                   <div className="space-y-3">
                     {[0, 1, 2].map((i) => <Skeleton key={i} height="h-16" rounded="rounded-2xl" />)}
                   </div>
-                ) : filteredBags.length === 0 && demoBags.length === 0 ? (
+                ) : filteredBags.length === 0 ? (
                   <EmptyState
                     icon="♻️"
                     title={bagTab === 'history' ? 'No completed bags yet' : 'No active bags'}
                     description={bagTab === 'history' ? 'Completed bags will appear here.' : 'Scan a bag to get started.'}
-                    action={bagTab !== 'history' ? { label: 'Scan Bag', onClick: () => setShowScan(true) } : undefined}
+                    action={bagTab !== 'history' ? { label: 'Scan Bag', onClick: () => navigate('/scan') } : undefined}
                   />
                 ) : (
                   <div className="space-y-2.5">
@@ -820,38 +804,6 @@ export default function ConsumerDashboard() {
                         >
                           <div>
                             <p className="font-mono font-bold" style={{ fontSize: 14, color: '#ffffff' }}>{bag.bag_code}</p>
-                            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                              {dateStr} · {timeStr} · 1 bag
-                            </p>
-                          </div>
-                          <span
-                            className="rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0"
-                            style={{ background: badge.bg, color: badge.color }}
-                          >
-                            {badge.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                    {demoBags.map((bag) => {
-                      const DEMO_STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
-                        pending_pickup:   { label: 'Pending',      bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
-                        driver_accepted:  { label: 'Driver Assigned', bg: 'rgba(139,92,246,0.18)', color: '#a78bfa' },
-                        at_warehouse:     { label: 'At Warehouse', bg: 'rgba(0,190,255,0.12)',   color: '#67e8f9' },
-                        completed:        { label: 'Delivered',    bg: 'rgba(34,197,94,0.15)',   color: '#4ade80' },
-                      }
-                      const badge = DEMO_STATUS_BADGE[bag.status] ?? { label: bag.status, bg: 'rgba(255,255,255,0.08)', color: '#7B909C' }
-                      const d = new Date(bag.requestedAt)
-                      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-                      return (
-                        <div
-                          key={bag.id}
-                          className="px-1 py-3 flex items-center justify-between"
-                          style={{ borderBottom: '1px solid rgba(0,190,255,0.07)' }}
-                        >
-                          <div>
-                            <p className="font-mono font-bold" style={{ fontSize: 14, color: '#ffffff' }}>{bag.bagCode}</p>
                             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
                               {dateStr} · {timeStr} · 1 bag
                             </p>
@@ -904,7 +856,7 @@ export default function ConsumerDashboard() {
                 Current Balance
               </p>
               <p style={{ fontSize: 56, fontWeight: 800, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.02em' }}>
-                {demoStats.unpaidEarnings > 0 ? `$${demoStats.unpaidEarnings.toFixed(2)}` : `$${(weekBags * 3.75).toFixed(2)}`}
+                ${balance.toFixed(2)}
               </p>
               <p style={{ fontSize: 12, color: 'rgba(0,210,255,0.75)', marginTop: 10, fontWeight: 500 }}>
                 Payout scheduled for 5/11
@@ -914,7 +866,7 @@ export default function ConsumerDashboard() {
             {/* ── PAYOUT BUTTONS ──────────────────────────────────────────── */}
             <div className="px-5 flex gap-3 mt-5 mb-6">
               <button
-                onClick={() => setShowPaidOut(true)}
+                onClick={() => navigate('/live-wallet')}
                 className="flex-1 py-3.5 rounded-2xl font-bold text-sm text-white transition-all hover:brightness-110 active:scale-[0.97]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
@@ -940,8 +892,8 @@ export default function ConsumerDashboard() {
 
             {/* ── IMPACT + MILESTONES + STATS + BANNER ────────────────────── */}
             {(() => {
-              const progressPct = demoProgress
-              const wLbs        = Math.round(progressPct * 17 / 100)
+              const progressPct = realProgress
+              const wLbs        = lbsDiverted
               const tier: 1 | 2 | 3 = wLbs >= 17 ? 3 : wLbs >= 10 ? 2 : 1
 
               const tierColor    = tier === 3 ? '#00D9FF'                   : tier === 2 ? '#3DFFD4'                   : '#5BFFB0'
@@ -1161,42 +1113,6 @@ export default function ConsumerDashboard() {
                     </div>
                   </div>
 
-                  {/* ── Demo Controls ────────────────────────────── */}
-                  <div className="px-5 mb-4">
-                    <div style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '11px 14px' }}>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          Demo Controls
-                        </p>
-                        {demoPlaying && (
-                          <span style={{ fontSize: 9, fontWeight: 600, color: '#5BFFB0' }}>● Playing…</span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {[
-                          { label: 'Reset',   isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(0) } },
-                          { label: '▶ Play',  isPlay: true,  action: startDemoAnimation },
-                          { label: '25%',     isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(25) } },
-                          { label: '65%',     isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(65) } },
-                          { label: '100%',    isPlay: false, action: () => { cancelDemoAnimation(); setDemoProgress(100) } },
-                        ].map((btn) => (
-                          <button
-                            key={btn.label}
-                            onClick={btn.action}
-                            style={{
-                              padding: '5px 13px', borderRadius: 8,
-                              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                              background: btn.isPlay ? 'rgba(34,197,94,0.11)' : 'rgba(0,200,255,0.07)',
-                              border: `1px solid ${btn.isPlay ? 'rgba(34,197,94,0.28)' : 'rgba(0,200,255,0.18)'}`,
-                              color: btn.isPlay ? '#22c55e' : '#00c8ff',
-                            }}
-                          >
-                            {btn.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Weekly stats */}
                   <div className="px-5 mb-4">
@@ -1208,8 +1124,8 @@ export default function ConsumerDashboard() {
                         </p>
                         <p style={{ fontSize: 28, fontWeight: 800, color: '#ffffff', lineHeight: 1.1, marginBottom: 6 }}>
                           {earningsWeekIdx === 0
-                            ? (demoStats.unpaidEarnings > 0 ? `$${demoStats.unpaidEarnings.toFixed(2)}` : `$${(wLbs * 1.5).toFixed(2)}`)
-                            : `$${WEEKLY_EARNINGS[earningsWeekIdx].amount!.toFixed(2)}`}
+                            ? `$${balance.toFixed(2)}`
+                            : `$${(WEEKLY_EARNINGS[earningsWeekIdx]?.amount ?? 0).toFixed(2)}`}
                         </p>
                         <p style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 6 }}>Keep up the good work!</p>
                         <select
@@ -1247,8 +1163,8 @@ export default function ConsumerDashboard() {
                         </p>
                         <p style={{ fontSize: 28, fontWeight: 800, color: '#ffffff', lineHeight: 1.1, marginBottom: 6 }}>
                           {recycledWeekIdx === 0
-                            ? (demoStats.poundsRecycled > 0 ? `${demoStats.poundsRecycled} lbs` : `${wLbs} lbs`)
-                            : `${WEEKLY_RECYCLED[recycledWeekIdx].lbs} lbs`}
+                            ? `${lbsDiverted} lbs`
+                            : `${WEEKLY_RECYCLED[recycledWeekIdx]?.lbs ?? 0} lbs`}
                         </p>
                         <p style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 6 }}>Keep up the good work!</p>
                         <select
@@ -1418,10 +1334,7 @@ export default function ConsumerDashboard() {
 
       <BottomNav tab={tab} onTab={setTab} msgCount={unreadMsgCount} />
 
-      {/* ── DEMO OVERLAYS ─────────────────────────────────────────────────── */}
       {activePage && <QuickActionPage page={activePage} onClose={() => setActivePage(null)} />}
-      {showScan    && <ScanModal consumerName={firstName} initialCode={scanInitialCode ?? undefined} onClose={() => { setShowScan(false); setScanInitialCode(null) }} />}
-      {showPaidOut && <PaidOutModal stats={demoStats} onClose={() => setShowPaidOut(false)} onConfirm={() => processPayout()} />}
 
       {/* ── CELEBRATION MODAL ─────────────────────────────────────────────── */}
       {celebBadge && (

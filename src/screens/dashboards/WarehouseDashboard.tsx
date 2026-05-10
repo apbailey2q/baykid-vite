@@ -870,7 +870,7 @@ export default function WarehouseDashboard() {
   const [scanState, setScanState]       = useState<ScanState>({ phase: DEV_BYPASS_AUTH ? 'idle' : 'scanning' })
   const [scannerKey, setScannerKey]     = useState(0)
   const [manualCode, setManualCode]     = useState('')
-  const [completedEntries, setCompletedEntries] = useState<HistoryEntry[]>(MOCK_HISTORY)
+  const [completedEntries, setCompletedEntries] = useState<HistoryEntry[]>(DEV_BYPASS_AUTH ? MOCK_HISTORY : [])
 
   const { data: queue = [], isLoading: queueLoading } = useQuery({
     queryKey: ['inspection-queue'],
@@ -941,8 +941,9 @@ export default function WarehouseDashboard() {
     setScannerKey((k) => k + 1)
   }
 
-  const totalWaiting = MOCK_DRIVERS.reduce((s, d) => s + d.bags.filter((b) => b.warehouseStatus === 'waiting').length, 0)
-    + (DEV_BYPASS_AUTH ? 0 : queue.length)
+  const totalWaiting = DEV_BYPASS_AUTH
+    ? MOCK_DRIVERS.reduce((s, d) => s + d.bags.filter((b) => b.warehouseStatus === 'waiting').length, 0)
+    : queue.length
 
   const TABS: { value: Tab; label: string }[] = [
     { value: 'queue',   label: `Queue (${totalWaiting})` },
@@ -998,25 +999,35 @@ export default function WarehouseDashboard() {
             </svg>
           </Link>
 
-          <QueueTab
-            onQueueScanIn={(code, driver, consumer) => addEntry(code, driver, consumer)}
-          />
-
-          {/* Supabase queue items in PROD */}
-          {!DEV_BYPASS_AUTH && queueLoading && (
-            <div className="flex justify-center py-8">
-              <div className="h-7 w-7 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: '#00BCD4', borderTopColor: 'transparent' }} />
-            </div>
+          {/* DEV: mock driver queue */}
+          {DEV_BYPASS_AUTH && (
+            <QueueTab
+              onQueueScanIn={(code, driver, consumer) => addEntry(code, driver, consumer)}
+            />
           )}
-          {!DEV_BYPASS_AUTH && !queueLoading && queue.map((bag) => (
-            <div key={bag.id} className="mt-2 flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,188,212,0.15)' }}>
-              <div>
-                <p className="font-mono text-sm font-bold" style={{ color: '#E0F7FA' }}>{bag.bag_code}</p>
-                <p className="text-xs" style={{ color: '#7B909C' }}>Arrived {new Date(bag.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
-              </div>
-              <Link to={`/bag/${bag.id}/inspect`} className="rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#00BCD4,#0097A7)' }}>Inspect →</Link>
-            </div>
-          ))}
+
+          {/* PROD: real queue from Supabase */}
+          {!DEV_BYPASS_AUTH && (
+            <>
+              {queueLoading && (
+                <div className="flex justify-center py-8">
+                  <div className="h-7 w-7 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: '#00BCD4', borderTopColor: 'transparent' }} />
+                </div>
+              )}
+              {!queueLoading && queue.length === 0 && (
+                <EmptyState icon="📦" title="Queue is clear" description="No bags awaiting inspection right now." />
+              )}
+              {!queueLoading && queue.map((bag) => (
+                <div key={bag.id} className="mt-2 flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,188,212,0.15)' }}>
+                  <div>
+                    <p className="font-mono text-sm font-bold" style={{ color: '#E0F7FA' }}>{bag.bag_code}</p>
+                    <p className="text-xs" style={{ color: '#7B909C' }}>Arrived {new Date(bag.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+                  </div>
+                  <Link to={`/bag/${bag.id}/inspect`} className="rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#00BCD4,#0097A7)' }}>Inspect →</Link>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 

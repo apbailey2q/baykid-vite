@@ -64,11 +64,15 @@ export const DEMO_FLOW_STEPS: DemoFlowStep[] = [
 ]
 
 interface DemoFlowStore {
-  isRunning: boolean
-  step:      number
-  startDemo: () => void
-  goToStep:  (n: number) => void
-  stopDemo:  () => void
+  isRunning:     boolean
+  step:          number
+  audioEnabled:  boolean
+  captionsOn:    boolean
+  startDemo:     () => void
+  goToStep:      (n: number) => void
+  stopDemo:      () => void
+  enableAudio:   () => void
+  toggleCaptions: () => void
 }
 
 function applyBagStatus(stepConfig: DemoFlowStep) {
@@ -89,8 +93,13 @@ function applyBagStatus(stepConfig: DemoFlowStep) {
 }
 
 export const useDemoFlowStore = create<DemoFlowStore>((set) => ({
-  isRunning: false,
-  step:      0,
+  isRunning:    false,
+  step:         0,
+  audioEnabled: false,
+  captionsOn:   true,
+
+  enableAudio:    () => set({ audioEnabled: true, captionsOn: true }),
+  toggleCaptions: () => set(s => ({ captionsOn: !s.captionsOn })),
 
   startDemo: () => {
     // Insert or reset BAG-2026-DEMO in demoStore
@@ -130,5 +139,5 @@ export const useDemoFlowStore = create<DemoFlowStore>((set) => ({
     set({ step: clamped })
   },
 
-  stopDemo: () => set({ isRunning: false }),
+  stopDemo: () => set({ isRunning: false, audioEnabled: false }),
 }))

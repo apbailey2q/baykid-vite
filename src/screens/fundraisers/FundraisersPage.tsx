@@ -1,16 +1,71 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
 import LiveImpactCounter from '../../components/LiveImpactCounter'
 import FundraiserCountdown from '../../components/FundraiserCountdown'
 import {
-  demoFundraisers,
-  activeFundraiser,
   pctFunded,
   fmtNum,
   typeAccent,
   getFundraiserStatus,
   type Fundraiser,
 } from '../../lib/demoFundraisers'
+
+function orgEmoji(org: string | null): string {
+  if (!org) return '🌱'
+  const o = org.toLowerCase()
+  if (o.includes('school') || o.includes('high')) return '🏫'
+  if (o.includes('basket') || o.includes('sport') || o.includes('team')) return '🏀'
+  if (o.includes('stem') || o.includes('science') || o.includes('tech')) return '🔬'
+  if (o.includes('community') || o.includes('outreach') || o.includes('neighbor')) return '🏘️'
+  if (o.includes('environment') || o.includes('green') || o.includes('recycle')) return '♻️'
+  return '💚'
+}
+
+function orgType(org: string | null): string {
+  if (!org) return 'Community'
+  const o = org.toLowerCase()
+  if (o.includes('school') || o.includes('university') || o.includes('college')) return 'Education'
+  if (o.includes('team') || o.includes('sport') || o.includes('athletic')) return 'School Team'
+  if (o.includes('community') || o.includes('outreach') || o.includes('nonprofit')) return 'Community Program'
+  return 'Community'
+}
+
+async function fetchFundraisers() {
+  const { data, error } = await supabase
+    .from('fundraisers')
+    .select('id, name, description, organization, goal_amount, raised_amount, bag_count, percent_to_cause, start_date, end_date, status')
+    .in('status', ['active', 'completed'])
+    .order('created_at', { ascending: false })
+    .limit(20)
+  if (error) throw error
+  return (data ?? []).map(f => ({
+    id:             f.id,
+    name:           f.name,
+    type:           orgType(f.organization),
+    goal:           Number(f.goal_amount),
+    raised:         Number(f.raised_amount),
+    supporters:     f.bag_count ?? 0,
+    percentToCause: f.percent_to_cause,
+    description:    f.description ?? '',
+    impact:         '',
+    emoji:          orgEmoji(f.organization),
+    startDate:      f.start_date ?? '',
+    endDate:        f.end_date ?? '',
+  })) as Fundraiser[]
+}
+
+async function fetchPlatformStats() {
+  const [raisedRes, bagsRes] = await Promise.all([
+    supabase.from('fundraisers').select('raised_amount').in('status', ['active', 'completed']),
+    supabase.from('qr_bags').select('id', { count: 'exact', head: true }).in('status', ['inspected', 'recycled']),
+  ])
+  const totalRaised = (raisedRes.data ?? []).reduce((s, f) => s + Number(f.raised_amount), 0)
+  const totalBags   = bagsRes.count ?? 0
+  const communities = (raisedRes.data ?? []).length
+  return { totalRaised, totalBags, communities }
+}
 
 // ── Celebration overlay config ────────────────────────────────────────────────
 const FLOAT_ITEMS = [
@@ -26,19 +81,12 @@ const FLOAT_ITEMS = [
   { emoji: '💰', left: '88%', bottom: '42%', delay: '180ms', size: 16, dur: '2.4s' },
 ]
 
-// Live donation ticker mock data
+// Decorative ticker for page animation (names are illustrative)
 const DONATION_TICKER = [
   { name: 'Maya',             action: 'recycled 3 QR bags',   amount: '$4.20',  cause: 'East Nashville High Basketball', icon: '♻️' },
   { name: 'Coach Davis',      action: 'joined a fundraiser',  amount: null,     cause: 'Nashville Youth STEM Club',       icon: '🏀' },
   { name: 'Brooklynn Outreach', action: 'received support',   amount: '$18.75', cause: 'Community Cleanup Fund',          icon: '💰' },
   { name: 'Jordan',           action: 'recycled 5 QR bags',   amount: '$7.10',  cause: 'East Nashville High Basketball',  icon: '💵' },
-]
-
-// Platform-wide impact numbers (mock)
-const PLATFORM_STATS = [
-  { icon: '💰', label: 'Total Raised',           target: 128450, prefix: '$', suffix: '',  duration: 1600 },
-  { icon: '🏘️', label: 'Communities Supported',  target: 37,     prefix: '',  suffix: '',  duration: 1200 },
-  { icon: '♻️', label: 'Bags Recycled',          target: 12980,  prefix: '',  suffix: '',  duration: 1500 },
 ]
 
 // ── Count-up hook ─────────────────────────────────────────────────────────────
@@ -225,6 +273,23 @@ export default function FundraisersPage() {
   const [animate, setAnimate]           = useState(false)
   const [celebVisible, setCelebVisible] = useState(() => !sessionStorage.getItem('fundraiser-celeb-shown'))
   const [celebOpacity, setCelebOpacity] = useState(1)
+
+  const { data: liveFundraisers = [] } = useQuery({
+    queryKey: ['fundraisers-list'],
+    queryFn: fetchFundraisers,
+  })
+
+  const { data: platformStats } = useQuery({
+    queryKey: ['platform-stats'],
+    queryFn: fetchPlatformStats,
+  })
+
+  const fundraiserList = liveFundraisers
+  const PLATFORM_STATS = [
+    { icon: '💰', label: 'Total Raised',           target: platformStats?.totalRaised ?? 0,   prefix: '$', suffix: '',  duration: 1600 },
+    { icon: '🏘️', label: 'Communities Supported',  target: platformStats?.communities ?? 0,   prefix: '',  suffix: '',  duration: 1200 },
+    { icon: '♻️', label: 'Bags Recycled',          target: platformStats?.totalBags ?? 0,      prefix: '',  suffix: '',  duration: 1500 },
+  ]
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true))
@@ -515,39 +580,41 @@ export default function FundraisersPage() {
             </div>
 
             {/* ── You're Supporting pill ────────────────────────────────────────── */}
-            <div className="mb-6" style={fade(320)}>
-              <Link to={`/fundraisers/${activeFundraiser.id}`} className="block">
-                <div
-                  className="flex items-center gap-3 rounded-2xl px-4 py-3.5"
-                  style={{
-                    background: 'rgba(0,87,231,0.12)',
-                    border:     '1px solid rgba(0,200,255,0.22)',
-                    boxShadow:  '0 0 24px rgba(0,87,231,0.15)',
-                  }}
-                >
-                  <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>
-                    {activeFundraiser.emoji}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: 'rgba(0,200,255,0.7)' }}>
-                      You're now supporting
-                    </p>
-                    <p className="text-sm font-semibold truncate" style={{ color: '#ffffff' }}>
-                      {activeFundraiser.name}
-                    </p>
-                  </div>
-                  {/* Live dot */}
+            {fundraiserList[0] && (
+              <div className="mb-6" style={fade(320)}>
+                <Link to={`/fundraisers/${fundraiserList[0].id}`} className="block">
                   <div
-                    className="shrink-0 w-2 h-2 rounded-full"
+                    className="flex items-center gap-3 rounded-2xl px-4 py-3.5"
                     style={{
-                      background: '#00c8ff',
-                      boxShadow:  '0 0 8px rgba(0,200,255,0.8)',
-                      animation:  'supportingPulse 2s ease-in-out infinite',
+                      background: 'rgba(0,87,231,0.12)',
+                      border:     '1px solid rgba(0,200,255,0.22)',
+                      boxShadow:  '0 0 24px rgba(0,87,231,0.15)',
                     }}
-                  />
-                </div>
-              </Link>
-            </div>
+                  >
+                    <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>
+                      {fundraiserList[0].emoji}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: 'rgba(0,200,255,0.7)' }}>
+                        Active campaign
+                      </p>
+                      <p className="text-sm font-semibold truncate" style={{ color: '#ffffff' }}>
+                        {fundraiserList[0].name}
+                      </p>
+                    </div>
+                    {/* Live dot */}
+                    <div
+                      className="shrink-0 w-2 h-2 rounded-full"
+                      style={{
+                        background: '#00c8ff',
+                        boxShadow:  '0 0 8px rgba(0,200,255,0.8)',
+                        animation:  'supportingPulse 2s ease-in-out infinite',
+                      }}
+                    />
+                  </div>
+                </Link>
+              </div>
+            )}
 
             {/* ── Before / After ────────────────────────────────────────────────── */}
             <div className="mb-6" style={fade(360)}>
@@ -662,13 +729,18 @@ export default function FundraisersPage() {
 
             {/* Cards */}
             <div className="flex flex-col gap-4">
-              {demoFundraisers.map((f, i) => (
+              {fundraiserList.length === 0 && (
+                <p className="text-sm text-center py-8" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  No active campaigns yet. Check back soon!
+                </p>
+              )}
+              {fundraiserList.map((f, i) => (
                 <FundraiserCard key={f.id} fundraiser={f} delay={520 + i * 100} animate={animate} />
               ))}
             </div>
 
             {/* My fundraiser link */}
-            <div className="mt-6" style={fade(520 + demoFundraisers.length * 100)}>
+            <div className="mt-6" style={fade(520 + fundraiserList.length * 100)}>
               <Link
                 to="/my-fundraiser"
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all"

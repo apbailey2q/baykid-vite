@@ -95,7 +95,7 @@ export default function LiveDashboardPage() {
       // Fetch recent scans
       const { data: scans } = await supabase
         .from('bag_scans')
-        .select('id, scan_time, location, bags(bag_code, status)')
+        .select('id, scan_time, location, qr_bags(bag_code, status)')
         .eq('scanned_by', userId)
         .order('scan_time', { ascending: false })
         .limit(5)

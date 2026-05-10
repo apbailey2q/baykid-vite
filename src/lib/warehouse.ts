@@ -32,7 +32,7 @@ export interface WarehouseStats {
 
 export async function markBagAtWarehouse(bagId: string, userId: string): Promise<void> {
   const { data: bag } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .select('status')
     .eq('id', bagId)
     .maybeSingle()
@@ -46,7 +46,7 @@ export async function markBagAtWarehouse(bagId: string, userId: string): Promise
 
 export async function getInspectionQueue(): Promise<Bag[]> {
   const { data, error } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .select('*')
     .eq('status', 'at_warehouse')
     .order('updated_at', { ascending: true })

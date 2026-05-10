@@ -12,6 +12,7 @@ const ROLES: Role[] = [
   'warehouse_employee',
   'warehouse_supervisor',
   'partner',
+  'fundraiser',
   'admin',
 ]
 

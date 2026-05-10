@@ -7,7 +7,7 @@ export async function getPartnerStats(): Promise<PartnerStats> {
 
   const [bagsRes, inspRes, redRes] = await Promise.all([
     supabase
-      .from('bags')
+      .from('qr_bags')
       .select('id, status, created_at')
       .eq('partner_id', partnerId!),
     supabase

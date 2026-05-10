@@ -7,7 +7,9 @@
       "Bash(npm run *)",
       "Bash(npx vite *)",
       "Read(//c/Users/apbai/.claude/projects/c--Users-apbai-baykid-vite/memory/**)",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\apbai\\\\baykid-vite\\\\public\\\\\" -Force | ForEach-Object { \"$\\($_.Name\\) | $\\($_.Length\\) bytes | ext: $\\($_.Extension\\)\" })"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\apbai\\\\baykid-vite\\\\public\\\\\" -Force | ForEach-Object { \"$\\($_.Name\\) | $\\($_.Length\\) bytes | ext: $\\($_.Extension\\)\" })",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

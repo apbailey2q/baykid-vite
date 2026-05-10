@@ -5,7 +5,7 @@ export type InspectionWithPhotos = Inspection & { inspection_photos: InspectionP
 
 export async function getAllBags(limit = 100): Promise<Bag[]> {
   const { data, error } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .select('*')
     .order('updated_at', { ascending: false })
     .limit(limit)
@@ -17,7 +17,7 @@ export async function lookupOrCreateBag(rawCode: string): Promise<Bag> {
   const code = rawCode.trim().toUpperCase()
 
   const { data: existing } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .select('*')
     .eq('bag_code', code)
     .maybeSingle()
@@ -27,7 +27,7 @@ export async function lookupOrCreateBag(rawCode: string): Promise<Bag> {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: created, error } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .insert({ bag_code: code, status: 'pending', consumer_id: user?.id ?? null })
     .select()
     .single()
@@ -40,7 +40,7 @@ export async function lookupOrCreateBag(rawCode: string): Promise<Bag> {
 export async function lookupBagByCode(rawCode: string): Promise<Bag | null> {
   const code = rawCode.trim().toUpperCase()
   const { data } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .select('*')
     .eq('bag_code', code)
     .maybeSingle()
@@ -72,7 +72,7 @@ export async function getBagWithLatestInspection(bagId: string): Promise<{
   latestInspection: InspectionWithPhotos | null
 }> {
   const [bagResult, inspectionResult] = await Promise.all([
-    supabase.from('bags').select('*').eq('id', bagId).single(),
+    supabase.from('qr_bags').select('*').eq('id', bagId).single(),
     supabase
       .from('inspections')
       .select('*, inspection_photos(*)')
@@ -92,7 +92,7 @@ export async function getBagWithLatestInspection(bagId: string): Promise<{
 
 export async function updateBagStatus(bagId: string, status: BagStatus) {
   const { error } = await supabase
-    .from('bags')
+    .from('qr_bags')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', bagId)
   if (error) throw error
@@ -103,10 +103,20 @@ export async function createInspection(
   inspectorId: string,
   status: InspectionStatus,
   notes: string,
+  aiConfidence?: number,
 ): Promise<Inspection> {
   const { data, error } = await supabase
     .from('inspections')
-    .insert({ bag_id: bagId, inspector_id: inspectorId, status, notes: notes || null })
+    .insert({
+      bag_id:      bagId,
+      inspector_id: inspectorId,
+      status,
+      rag_status:  status,
+      notes:       notes || null,
+      ...(aiConfidence !== undefined && {
+        contamination_pct: status === 'red' ? 100 - aiConfidence : 0,
+      }),
+    })
     .select()
     .single()
   if (error) throw error

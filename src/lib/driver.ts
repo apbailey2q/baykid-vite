@@ -41,7 +41,7 @@ export async function touchLastActive(driverId: string): Promise<void> {
 
 export async function getActiveRoute(driverId: string): Promise<Route | null> {
   const { data } = await supabase
-    .from('routes')
+    .from('driver_routes')
     .select('*')
     .eq('driver_id', driverId)
     .in('status', ['pending', 'active', 'paused'])
@@ -80,7 +80,7 @@ export async function skipStop(stopId: string): Promise<void> {
 }
 
 export async function resumeRoute(routeId: string, driverId: string): Promise<void> {
-  await supabase.from('routes').update({ status: 'active' }).eq('id', routeId)
+  await supabase.from('driver_routes').update({ status: 'active' }).eq('id', routeId)
   await supabase
     .from('driver_status')
     .update({ active_route_id: routeId, updated_at: new Date().toISOString() })
@@ -88,7 +88,7 @@ export async function resumeRoute(routeId: string, driverId: string): Promise<vo
 }
 
 export async function pauseRoute(routeId: string, driverId: string): Promise<void> {
-  await supabase.from('routes').update({ status: 'paused' }).eq('id', routeId)
+  await supabase.from('driver_routes').update({ status: 'paused' }).eq('id', routeId)
   await supabase
     .from('driver_status')
     .update({ active_route_id: null, is_online: false, updated_at: new Date().toISOString() })
@@ -97,7 +97,7 @@ export async function pauseRoute(routeId: string, driverId: string): Promise<voi
 
 export async function completeRoute(routeId: string, driverId: string): Promise<void> {
   await supabase
-    .from('routes')
+    .from('driver_routes')
     .update({ status: 'completed', completed_at: new Date().toISOString() })
     .eq('id', routeId)
   await supabase
@@ -133,7 +133,7 @@ export async function getAllDrivers(): Promise<UserRecord[]> {
 
 export async function startRoute(routeId: string, driverId: string): Promise<void> {
   await supabase
-    .from('routes')
+    .from('driver_routes')
     .update({ status: 'active', started_at: new Date().toISOString() })
     .eq('id', routeId)
   await supabase
@@ -148,7 +148,7 @@ export async function createRouteForDriver(
   stops: Array<{ address: string; zipCode: string; bagCode?: string }>,
 ): Promise<Route> {
   const { data: route, error: routeErr } = await supabase
-    .from('routes')
+    .from('driver_routes')
     .insert({ driver_id: driverId, name, status: 'pending' })
     .select()
     .single()
@@ -171,7 +171,7 @@ export async function createRouteForDriver(
     if (!bagCode) continue
 
     const { data: bag } = await supabase
-      .from('bags')
+      .from('qr_bags')
       .select('id')
       .eq('bag_code', bagCode.toUpperCase())
       .maybeSingle()
@@ -184,7 +184,7 @@ export async function createRouteForDriver(
         .eq('stop_order', i + 1)
 
       await supabase
-        .from('bags')
+        .from('qr_bags')
         .update({ status: 'assigned', updated_at: new Date().toISOString() })
         .eq('id', bag.id)
     }
@@ -195,7 +195,7 @@ export async function createRouteForDriver(
 
 export async function createDemoRoute(driverId: string): Promise<Route> {
   const { data: route, error } = await supabase
-    .from('routes')
+    .from('driver_routes')
     .insert({ driver_id: driverId, name: 'Demo Route', status: 'active', started_at: new Date().toISOString() })
     .select()
     .single()
@@ -214,4 +214,65 @@ export async function createDemoRoute(driverId: string): Promise<Route> {
     .eq('driver_id', driverId)
 
   return route as Route
+}
+
+export async function getDriverCompletedStops(driverId: string, limit = 20) {
+  const routeIds = await supabase
+    .from('driver_routes')
+    .select('id')
+    .eq('driver_id', driverId)
+  const ids = (routeIds.data ?? []).map((r: { id: string }) => r.id)
+  if (!ids.length) return []
+  const { data } = await supabase
+    .from('route_stops')
+    .select('id, address, zip_code, completed_at, bag_id, route_id')
+    .in('route_id', ids)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(limit)
+  return (data ?? []) as Array<{
+    id: string; address: string; zip_code: string; completed_at: string; bag_id: string | null; route_id: string
+  }>
+}
+
+export async function getDriverWeeklyEarnings(driverId: string) {
+  const rows: { label: string; amount: number; pickups: number }[] = []
+  for (let w = 0; w < 8; w++) {
+    const end   = new Date(); end.setDate(end.getDate() - w * 7); end.setHours(23,59,59,999)
+    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0,0,0,0)
+    const { data } = await supabase
+      .from('wallet_transactions')
+      .select('amount')
+      .eq('user_id', driverId)
+      .eq('status', 'completed')
+      .in('type', ['earning','bonus'])
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+    const total = (data ?? []).reduce((s: number, t: { amount: string | number }) => s + Number(t.amount), 0)
+    const label = `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`
+    rows.push({ label, amount: total, pickups: data?.length ?? 0 })
+  }
+  return rows
+}
+
+export async function getPendingBags(limit = 20) {
+  const { data } = await supabase
+    .from('qr_bags')
+    .select('id, bag_code, city, status, created_at')
+    .in('status', ['pending', 'assigned'])
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return (data ?? []) as Array<{ id: string; bag_code: string; city: string | null; status: string; created_at: string }>
+}
+
+export async function getDriverWalletBalance(driverId: string) {
+  const { data } = await supabase
+    .from('wallet_transactions')
+    .select('type, amount')
+    .eq('user_id', driverId)
+    .eq('status', 'completed')
+  const txns   = data ?? []
+  const earned = txns.filter((t: { type: string }) => ['earning','bonus'].includes(t.type)).reduce((s: number, t: { amount: string | number }) => s + Number(t.amount), 0)
+  const paid   = txns.filter((t: { type: string }) => t.type === 'payout').reduce((s: number, t: { amount: string | number }) => s + Number(t.amount), 0)
+  return Math.max(0, earned - paid)
 }

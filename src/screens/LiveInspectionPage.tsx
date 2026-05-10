@@ -89,7 +89,7 @@ export default function LiveInspectionPage() {
       // Fetch real tables with real column names
       const [bagRes, scanRes] = await Promise.all([
         supabase
-          .from('bags')
+          .from('qr_bags')
           .select('id, bag_code, status, consumer_id')
           .eq('id', bagId)
           .maybeSingle(),
@@ -144,10 +144,10 @@ export default function LiveInspectionPage() {
 
     // ── 2. Update bags.status ───────────────────────────────────
     const { error: bagErr } = await supabase
-      .from('bags')
+      .from('qr_bags')
       .update({ status: RAG[rag].newBagStatus })
       .eq('id', bag.id)
-    if (bagErr) console.error('[bags update]', bagErr.message)
+    if (bagErr) console.error('[qr_bags update]', bagErr.message)
 
     // ── 3. GREEN: wallet credit + lifecycle event + fundraiser ──
     if (rag === 'green') {

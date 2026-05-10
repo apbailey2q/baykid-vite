@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 
 const ORG_TYPES = ['School', 'Sports Team', 'Church', 'Nonprofit', 'Community Outreach', 'Youth Program', 'Other']
 const PCT_OPTIONS = ['10', '20', '30']
@@ -29,8 +31,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default function CreateFundraiserPage() {
   const navigate  = useNavigate()
-  const [animate, setAnimate]     = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const { user }  = useAuthStore()
+  const [animate, setAnimate]       = useState(false)
+  const [submitted, setSubmitted]   = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [form, setForm] = useState({
     name:        '',
     orgType:     'School',
@@ -49,10 +54,35 @@ export default function CreateFundraiserPage() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }))
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setLoading(true)
+    setSubmitError(null)
+    try {
+      const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const desc = [form.description.trim(), form.fundsFor.trim() ? `Funds will support: ${form.fundsFor.trim()}` : ''].filter(Boolean).join('\n\n')
+      const { error } = await supabase.from('fundraisers').insert({
+        name:             form.name.trim(),
+        organization:     form.orgType,
+        goal_amount:      Number(form.goal) || 0,
+        city:             form.city.trim() || null,
+        description:      desc || null,
+        percent_to_cause: Number(form.donationPct),
+        status:           'pending',
+        raised_amount:    0,
+        bag_count:        0,
+        start_date:       new Date().toISOString().slice(0, 10),
+        end_date:         endDate,
+        ...(user ? { created_by: user.id } : {}),
+      })
+      if (error) throw error
+      setSubmitted(true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create fundraiser')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fade = (delay = 0): React.CSSProperties => ({
@@ -107,7 +137,7 @@ export default function CreateFundraiserPage() {
                 </div>
                 <h1 className="text-2xl font-bold mb-1" style={{ color: '#5eead4' }}>Fundraiser Created ✓</h1>
                 <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                  Your fundraiser has been submitted for demo review.
+                  Your fundraiser has been submitted for review.
                 </p>
               </div>
 
@@ -134,7 +164,7 @@ export default function CreateFundraiserPage() {
                   { label: 'Funding Goal',      value: form.goal ? `$${Number(form.goal).toLocaleString()}` : '—' },
                   { label: 'Donation %',         value: `${form.donationPct}% per QR bag scan` },
                   { label: 'City / Area',        value: form.city || '—' },
-                  { label: 'Status',             value: 'Pending Demo Approval', highlight: true },
+                  { label: 'Status',             value: 'Pending Review', highlight: true },
                 ].map((row) => (
                   <div
                     key={row.label}
@@ -159,7 +189,7 @@ export default function CreateFundraiserPage() {
               >
                 <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>💡</span>
                 <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  In the live app, your fundraiser would be reviewed and go live within 24 hours. Supporters could join and start recycling for your cause immediately.
+                  Your fundraiser is under review and will go live within 24 hours once approved. Supporters can then join and start recycling for your cause.
                 </p>
               </div>
 
@@ -314,18 +344,20 @@ export default function CreateFundraiserPage() {
 
                 {/* Submit */}
                 <div className="mt-6" style={fade(160)}>
+                  {submitError && (
+                    <div className="mb-3 rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.25)', color: '#FF6B6B' }}>
+                      {submitError}
+                    </div>
+                  )}
                   <button
                     type="submit"
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
                     style={{ background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff', boxShadow: '0 4px 24px rgba(0,190,255,0.3)' }}
                   >
                     <span>🌱</span>
-                    Create Fundraiser
+                    {loading ? 'Creating…' : 'Create Fundraiser'}
                   </button>
-
-                  <p className="text-center text-[10px] mt-3" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                    Demo only — no data is saved or submitted.
-                  </p>
                 </div>
               </form>
             </>

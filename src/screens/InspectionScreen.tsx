@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getBagWithLatestInspection, createInspection, uploadInspectionPhoto } from '../lib/bags'
+import { analyzeImage, type AIInspectionResult } from '../lib/aiInspection'
 import { useAuthStore } from '../store/authStore'
 import { InspectionStatusBadge } from '../components/BagStatusBadge'
 import { FullPageSpinner, Spinner, useToast } from '../components/ui'
@@ -76,6 +77,8 @@ export default function InspectionScreen() {
   const [previews, setPreviews] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitLabel, setSubmitLabel] = useState('')
+  const [aiResult, setAiResult] = useState<AIInspectionResult | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewsRef = useRef<string[]>([])
 
@@ -94,13 +97,27 @@ export default function InspectionScreen() {
   const isSupervisor = role === 'warehouse_supervisor' || role === 'admin'
   const isBlocked = isRedLocked && !supervisorOverride && !isSupervisor
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
     const newPreviews = files.map((f) => URL.createObjectURL(f))
+    const isFirstPhoto = photos.length === 0
     setPhotos((p) => [...p, ...files])
     setPreviews((p) => [...p, ...newPreviews])
     e.target.value = ''
+
+    if (isFirstPhoto) {
+      setAiLoading(true)
+      try {
+        const result = await analyzeImage(files[0])
+        setAiResult(result)
+        if (result.isAvailable) setInspStatus(result.classification)
+      } catch {
+        // AI failure is non-fatal; user can still submit manually
+      } finally {
+        setAiLoading(false)
+      }
+    }
   }
 
   const removePhoto = (idx: number) => {
@@ -116,7 +133,7 @@ export default function InspectionScreen() {
 
     try {
       setSubmitLabel('Saving inspection…')
-      const inspection = await createInspection(bagId, user.id, inspStatus, notes)
+      const inspection = await createInspection(bagId, user.id, inspStatus, notes, aiResult?.confidence)
 
       if (photos.length > 0) {
         for (let i = 0; i < photos.length; i++) {
@@ -243,60 +260,6 @@ export default function InspectionScreen() {
               </div>
             )}
 
-            {/* Status selection */}
-            <div
-              className="rounded-2xl p-5 space-y-3"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(0,188,212,0.15)',
-              }}
-            >
-              <p className="text-sm font-semibold" style={{ color: '#E0F7FA' }}>Inspection Result</p>
-              <div className="grid grid-cols-3 gap-3">
-                {STATUS_OPTS.map(({ status: s, label, activeStyle, idleStyle }) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setInspStatus(s)}
-                    className="rounded-xl py-3.5 text-sm font-bold transition-all"
-                    style={inspStatus === s ? activeStyle : idleStyle}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {inspStatus === 'red' && (
-                <p
-                  className="rounded-lg px-3 py-2 text-xs"
-                  style={{ background: 'rgba(255,23,68,0.08)', color: 'rgba(255,23,68,0.9)' }}
-                >
-                  Red will lock this bag. Only supervisors can re-inspect after this.
-                </p>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div
-              className="rounded-2xl p-5 space-y-2"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(0,188,212,0.15)',
-              }}
-            >
-              <label className="block text-sm font-semibold" style={{ color: '#E0F7FA' }}>
-                Notes{' '}
-                <span className="font-normal" style={{ color: '#7B909C' }}>(optional)</span>
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                placeholder="Describe condition, damage, or observations…"
-                className="w-full resize-none rounded-lg px-3 py-2.5 text-sm outline-none transition border border-[rgba(0,188,212,0.2)] focus:border-[rgba(0,188,212,0.5)] focus:ring-2 focus:ring-[rgba(0,188,212,0.1)] placeholder:text-[#7B909C]"
-                style={{ background: 'rgba(255,255,255,0.06)', color: '#E0F7FA' }}
-              />
-            </div>
-
             {/* Photo capture */}
             <div
               className="rounded-2xl p-5 space-y-3"
@@ -351,9 +314,130 @@ export default function InspectionScreen() {
                 </div>
               ) : (
                 <p className="text-xs" style={{ color: '#7B909C' }}>
-                  No photos added. Tap "+ Add Photo" to use your camera.
+                  Add a photo to get an AI safety classification.
                 </p>
               )}
+            </div>
+
+            {/* AI result panel */}
+            {(aiLoading || aiResult) && (
+              <div
+                className="rounded-2xl p-5 space-y-3"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(0,188,212,0.15)',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold" style={{ color: '#E0F7FA' }}>AI Analysis</p>
+                  {aiLoading && <Spinner size="sm" color="#00BCD4" />}
+                </div>
+
+                {aiLoading && (
+                  <p className="text-xs" style={{ color: '#7B909C' }}>Analyzing image…</p>
+                )}
+
+                {!aiLoading && aiResult && (
+                  <>
+                    {!aiResult.isAvailable ? (
+                      <p className="text-xs" style={{ color: '#7B909C' }}>{aiResult.reasoning}</p>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs" style={{ color: '#7B909C' }}>Suggested:</span>
+                          <span
+                            className="rounded-md px-2 py-0.5 text-xs font-bold"
+                            style={
+                              aiResult.classification === 'green'
+                                ? { background: 'rgba(0,230,118,0.15)', color: '#00E676' }
+                                : aiResult.classification === 'yellow'
+                                ? { background: 'rgba(255,214,0,0.15)', color: '#FFD600' }
+                                : { background: 'rgba(255,23,68,0.15)', color: '#FF1744' }
+                            }
+                          >
+                            {aiResult.classification.charAt(0).toUpperCase() + aiResult.classification.slice(1)}
+                          </span>
+                          <span className="text-xs ml-auto" style={{ color: '#7B909C' }}>
+                            {aiResult.confidence}% confidence
+                          </span>
+                        </div>
+                        <div
+                          className="h-1.5 w-full rounded-full overflow-hidden"
+                          style={{ background: 'rgba(255,255,255,0.08)' }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${aiResult.confidence}%`,
+                              background:
+                                aiResult.classification === 'green'
+                                  ? '#00E676'
+                                  : aiResult.classification === 'yellow'
+                                  ? '#FFD600'
+                                  : '#FF1744',
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs" style={{ color: '#7B909C' }}>{aiResult.reasoning}</p>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Status selection */}
+            <div
+              className="rounded-2xl p-5 space-y-3"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(0,188,212,0.15)',
+              }}
+            >
+              <p className="text-sm font-semibold" style={{ color: '#E0F7FA' }}>Inspection Result</p>
+              <div className="grid grid-cols-3 gap-3">
+                {STATUS_OPTS.map(({ status: s, label, activeStyle, idleStyle }) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setInspStatus(s)}
+                    className="rounded-xl py-3.5 text-sm font-bold transition-all"
+                    style={inspStatus === s ? activeStyle : idleStyle}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {inspStatus === 'red' && (
+                <p
+                  className="rounded-lg px-3 py-2 text-xs"
+                  style={{ background: 'rgba(255,23,68,0.08)', color: 'rgba(255,23,68,0.9)' }}
+                >
+                  Red will lock this bag. Only supervisors can re-inspect after this.
+                </p>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div
+              className="rounded-2xl p-5 space-y-2"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(0,188,212,0.15)',
+              }}
+            >
+              <label className="block text-sm font-semibold" style={{ color: '#E0F7FA' }}>
+                Notes{' '}
+                <span className="font-normal" style={{ color: '#7B909C' }}>(optional)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Describe condition, damage, or observations…"
+                className="w-full resize-none rounded-lg px-3 py-2.5 text-sm outline-none transition border border-[rgba(0,188,212,0.2)] focus:border-[rgba(0,188,212,0.5)] focus:ring-2 focus:ring-[rgba(0,188,212,0.1)] placeholder:text-[#7B909C]"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#E0F7FA' }}
+              />
             </div>
 
             <button

@@ -5,12 +5,12 @@ export async function getAdminStats(): Promise<AdminStats> {
   const [profilesRes, bagsCountRes, scansCountRes, inspCountRes, driversRes, alertsRes, bagStatusRes] =
     await Promise.all([
       supabase.from('profiles').select('id, approval_status'),
-      supabase.from('bags').select('id', { count: 'exact', head: true }),
+      supabase.from('qr_bags').select('id', { count: 'exact', head: true }),
       supabase.from('bag_scans').select('id', { count: 'exact', head: true }),
       supabase.from('inspections').select('id', { count: 'exact', head: true }),
       supabase.from('driver_status').select('id').eq('is_online', true),
       supabase.from('alerts').select('id').eq('status', 'open'),
-      supabase.from('bags').select('status'),
+      supabase.from('qr_bags').select('status'),
     ])
 
   const profiles = profilesRes.data ?? []

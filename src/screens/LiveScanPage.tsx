@@ -131,7 +131,7 @@ export default function LiveScanPage() {
     let bagId: string
 
     const { data: existing, error: lookupErr } = await supabase
-      .from('bags')
+      .from('qr_bags')
       .select('id, consumer_id')
       .eq('bag_code', code)
       .maybeSingle()
@@ -146,7 +146,7 @@ export default function LiveScanPage() {
       bagId = existing.id
     } else {
       const { data: created, error: createErr } = await supabase
-        .from('bags')
+        .from('qr_bags')
         .insert({ bag_code: code, consumer_id: user.id, status: 'pending' })
         .select('id')
         .single()

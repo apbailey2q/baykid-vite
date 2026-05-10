@@ -1,55 +1,81 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../store/authStore'
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const earningsStats = {
-  totalEarned:          186.45,
-  availableBalance:      74.20,
-  donatedToFundraisers:  42.75,
-  bagsRecycled:          64,
-  co2Saved:             268.8,
-  pointsEarned:       18_645,
+function txnIcon(type: string) {
+  if (type === 'earning')   return '♻️'
+  if (type === 'donation')  return '💚'
+  if (type === 'payout')    return '💳'
+  if (type === 'bonus')     return '🎉'
+  if (type === 'referral')  return '🤝'
+  return '💰'
 }
 
-const WEEKLY = [
-  { day: 'Mon', amount: 8.25  },
-  { day: 'Tue', amount: 12.40 },
-  { day: 'Wed', amount: 6.75  },
-  { day: 'Thu', amount: 15.90 },
-  { day: 'Fri', amount: 21.30 },
-  { day: 'Sat', amount: 18.50 },
-  { day: 'Sun', amount: 11.75 },
-]
+function txnLabel(txn: { description?: string; type: string }) {
+  if (txn.description) return txn.description
+  if (txn.type === 'earning')  return 'Recycling reward'
+  if (txn.type === 'donation') return 'Fundraiser donation'
+  if (txn.type === 'bonus')    return 'Bonus earned'
+  if (txn.type === 'payout')   return 'Payout request'
+  return 'Transaction'
+}
 
-const TRANSACTIONS = [
-  {
-    id: 'txn-001',
-    label: 'QR Bag CB-NASH-000421',
-    amount: '$2.00',
-    fundraiserAmount: '$0.85',
-    status: 'Reward processed',
-    icon: '♻️',
-  },
-  {
-    id: 'txn-002',
-    label: 'QR Bag CB-NASH-000398',
-    amount: '$3.10',
-    fundraiserAmount: '$1.20',
-    status: 'Fundraiser supported',
-    icon: '💰',
-  },
-  {
-    id: 'txn-003',
-    label: 'Weekly Recycling Bonus',
-    amount: '$7.50',
-    fundraiserAmount: '$0.00',
-    status: 'Bonus earned',
-    icon: '🎉',
-  },
-]
+async function fetchEarnings(userId: string) {
+  const weekStart = new Date()
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  weekStart.setHours(0, 0, 0, 0)
 
-const WEEKLY_MAX = Math.max(...WEEKLY.map((w) => w.amount))
+  const [txnRes, bagsRes, weekRes] = await Promise.all([
+    supabase
+      .from('wallet_transactions')
+      .select('id, type, amount, description, created_at')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('qr_bags')
+      .select('id, co2_saved_lbs, status')
+      .eq('consumer_id', userId),
+    supabase
+      .from('wallet_transactions')
+      .select('amount, created_at')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .in('type', ['earning', 'bonus', 'referral'])
+      .gte('created_at', weekStart.toISOString()),
+  ])
+
+  const txns = txnRes.data ?? []
+  const bags  = bagsRes.data ?? []
+  const weekTxns = weekRes.data ?? []
+
+  const totalEarned         = txns.filter(t => ['earning','bonus','referral'].includes(t.type)).reduce((s, t) => s + Number(t.amount), 0)
+  const donatedToFundraisers = txns.filter(t => t.type === 'donation').reduce((s, t) => s + Number(t.amount), 0)
+  const payouts             = txns.filter(t => t.type === 'payout').reduce((s, t) => s + Number(t.amount), 0)
+  const availableBalance    = Math.max(0, totalEarned - donatedToFundraisers - payouts)
+  const bagsRecycled        = bags.filter(b => b.status === 'inspected' || b.status === 'recycled').length
+  const co2Saved            = bags.reduce((s, b) => s + (Number(b.co2_saved_lbs) || 0), 0)
+  const pointsEarned        = Math.round(bagsRecycled * 291)
+
+  // Build weekly chart — group by day-of-week
+  const weekly = DAYS.map(day => ({ day, amount: 0 }))
+  for (const t of weekTxns) {
+    const dow = new Date(t.created_at).getDay()
+    weekly[dow].amount += Number(t.amount)
+  }
+  // Rotate so Mon is first
+  const weeklyDisplay = [...weekly.slice(1), weekly[0]]
+
+  return {
+    stats: { totalEarned, availableBalance, donatedToFundraisers, bagsRecycled, co2Saved, pointsEarned },
+    weekly: weeklyDisplay,
+    transactions: txns.slice(0, 5),
+  }
+}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -88,10 +114,22 @@ function StatCard({
 
 export default function EarningsDashboardPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [animate, setAnimate]               = useState(false)
   const [showPayout, setShowPayout]         = useState(false)
   const [payoutSuccess, setPayoutSuccess]   = useState(false)
   const [hoveredBar, setHoveredBar]         = useState<number | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['earnings', user?.id],
+    queryFn: () => fetchEarnings(user!.id),
+    enabled: !!user,
+  })
+
+  const earningsStats = data?.stats ?? { totalEarned: 0, availableBalance: 0, donatedToFundraisers: 0, bagsRecycled: 0, co2Saved: 0, pointsEarned: 0 }
+  const WEEKLY = data?.weekly ?? DAYS.slice(1).concat(DAYS[0]).map(day => ({ day, amount: 0 }))
+  const TRANSACTIONS = data?.transactions ?? []
+  const WEEKLY_MAX = Math.max(...WEEKLY.map(w => w.amount), 1)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true))
@@ -135,7 +173,7 @@ export default function EarningsDashboardPage() {
           }}
         >
           <span style={{ fontSize: 16 }}>✅</span>
-          <p style={{ fontSize: 13, fontWeight: 600, color: '#5eead4' }}>Demo payout request submitted.</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#5eead4' }}>Payout request submitted!</p>
         </div>
       )}
 
@@ -284,7 +322,13 @@ export default function EarningsDashboardPage() {
               className="rounded-2xl overflow-hidden"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,190,255,0.15)' }}
             >
-              {TRANSACTIONS.map((txn, i) => (
+              {isLoading && (
+                <p className="px-4 py-5 text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>Loading…</p>
+              )}
+              {!isLoading && TRANSACTIONS.length === 0 && (
+                <p className="px-4 py-5 text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>No transactions yet. Start recycling to earn rewards!</p>
+              )}
+              {!isLoading && TRANSACTIONS.map((txn, i) => (
                 <div
                   key={txn.id}
                   className="flex items-center gap-3 px-4 py-3.5"
@@ -294,19 +338,20 @@ export default function EarningsDashboardPage() {
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: 'rgba(0,190,255,0.08)', border: '1px solid rgba(0,190,255,0.15)', fontSize: 18 }}
                   >
-                    {txn.icon}
+                    {txnIcon(txn.type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {txn.label}
+                      {txnLabel(txn)}
                     </p>
-                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{txn.status}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                      {new Date(txn.created_at).toLocaleDateString()}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end shrink-0 gap-0.5">
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#00c8ff' }}>{txn.amount}</p>
-                    {txn.fundraiserAmount !== '$0.00' && (
-                      <p style={{ fontSize: 10, color: '#5eead4' }}>+{txn.fundraiserAmount} cause</p>
-                    )}
+                    <p style={{ fontSize: 13, fontWeight: 700, color: txn.type === 'payout' ? '#f87171' : '#00c8ff' }}>
+                      {txn.type === 'payout' ? '-' : '+'}${Number(txn.amount).toFixed(2)}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -332,7 +377,9 @@ export default function EarningsDashboardPage() {
               <div>
                 <p style={{ fontSize: 12, fontWeight: 700, color: '#5eead4', marginBottom: 1 }}>Community Giving</p>
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
-                  You've helped raise <span style={{ color: '#5eead4', fontWeight: 700 }}>$42.75</span> for East Nashville High Basketball.
+                  You've donated{' '}
+                  <span style={{ color: '#5eead4', fontWeight: 700 }}>${earningsStats.donatedToFundraisers.toFixed(2)}</span>{' '}
+                  to community fundraisers.
                 </p>
               </div>
             </div>
@@ -454,7 +501,7 @@ export default function EarningsDashboardPage() {
             </div>
 
             <p className="text-center text-[10px] mt-3" style={{ color: 'rgba(255,255,255,0.22)' }}>
-              Demo only — no real transaction occurs.
+              Payout requests are reviewed within 2–3 business days.
             </p>
           </div>
         </div>

@@ -57,7 +57,7 @@ export default function LiveReportsPage() {
         frRes,
         frCountRes,
       ] = await Promise.all([
-        supabase.from('bags').select('*', { count: 'exact', head: true }),
+        supabase.from('qr_bags').select('*', { count: 'exact', head: true }),
         supabase.from('bag_scans').select('*', { count: 'exact', head: true }),
         supabase.from('inspections').select('status'),
         supabase.from('fundraiser_contributions').select('type, amount'),

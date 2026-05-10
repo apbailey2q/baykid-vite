@@ -116,11 +116,11 @@ export default function LiveAuditLogPage() {
 
       const [scansRes, inspRes, contribRes, payoutRes, fraudRes, notifRes] = await Promise.all([
         supabase.from('bag_scans')
-          .select('id, scan_time, location, scanned_by, bags(bag_code, status)')
+          .select('id, scan_time, location, scanned_by, qr_bags(bag_code, status)')
           .order('scan_time', { ascending: false })
           .limit(40),
         supabase.from('inspections')
-          .select('id, status, created_at, bags(bag_code)')
+          .select('id, status, created_at, qr_bags(bag_code)')
           .order('created_at', { ascending: false })
           .limit(40),
         supabase.from('fundraiser_contributions')

@@ -118,6 +118,8 @@ export default function RealLoginPage() {
 
     if (mode === 'signin') {
       try {
+        console.log('[RealLogin] sign-in attempt, selected role:', selectedRole)
+
         // Step 1 — authenticate
         const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
         if (authErr || !data.user) {
@@ -138,6 +140,10 @@ export default function RealLoginPage() {
           return
         }
 
+        const realRole = (profile.role as string | null)?.toLowerCase() ?? ''
+        const isAdmin  = realRole === 'admin'
+        console.log('[RealLogin] profile.role:', profile.role, '| realRole:', realRole, '| isAdmin:', isAdmin)
+
         // Step 3 — approval gate (before role check)
         if (profile.approval_status !== 'approved') {
           navigate('/pending-approval', { replace: true })
@@ -145,9 +151,6 @@ export default function RealLoginPage() {
         }
 
         // Step 4 — role check; admins bypass entirely
-        const realRole = (profile.role as string).toLowerCase()
-        const isAdmin  = realRole === 'admin'
-
         if (!isAdmin && !roleMatches(selectedRole, realRole)) {
           await supabase.auth.signOut()
           setError('Selected role does not match this account. Please choose the correct role and try again.')
@@ -158,6 +161,7 @@ export default function RealLoginPage() {
         localStorage.setItem('baykid-last-email', email)
         const targetRole = isAdmin ? ACCESS_ROLE_TO_DB[selectedRole] : (realRole as Role)
         const path = getRoleDashboardPath(targetRole)
+        console.log('[RealLogin] navigating to:', path, '(targetRole:', targetRole, ')')
         path
           ? navigate(path, { replace: true })
           : setError(`Unrecognized role "${targetRole}". Please contact support.`)

@@ -191,10 +191,22 @@ export default function RealLoginPage() {
          * Step 1:
          * Authenticate with Supabase.
          */
-        const { data, error: authErr } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
+
+const signInPromise = supabase.auth.signInWithPassword({
+  email,
+  password,
+})
+
+const timeoutPromise = new Promise<never>((_, reject) =>
+  setTimeout(() => reject(new Error('Login timed out. Supabase did not respond.')), 30000)
+)
+
+const { data, error: authErr } = await Promise.race([
+  signInPromise,
+  timeoutPromise,
+])
+
+console.log('[AUTH RESULT]', { data, authErr })
 
         if (authErr || !data.user) {
           setError(authErr?.message ?? 'Sign in failed. Please try again.')

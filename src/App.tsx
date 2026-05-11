@@ -125,27 +125,27 @@ function App() {
           }
         />
 
-        {/* Role dashboards */}
-        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved allowedRoles={['consumer', 'admin']}><ConsumerDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/driver" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/warehouse" element={<ProtectedRoute requireApproved allowedRoles={['warehouse_employee', 'warehouse_supervisor', 'admin']}><WarehouseDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/warehouse-supervisor" element={<ProtectedRoute requireApproved allowedRoles={['warehouse_supervisor', 'admin']}><WarehouseSupervisorDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/partner" element={<ProtectedRoute requireApproved allowedRoles={['partner', 'admin']}><PartnerDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/admin" element={<ProtectedRoute requireApproved allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/fundraiser" element={<ProtectedRoute requireApproved allowedRoles={['fundraiser', 'admin']}><FundraiserDashboard /></ProtectedRoute>} />
+        {/* Role dashboards — access controlled by routePermissions.ts */}
+        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved><ConsumerDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/driver" element={<ProtectedRoute requireApproved><DriverDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/warehouse" element={<ProtectedRoute requireApproved><WarehouseDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/warehouse-supervisor" element={<ProtectedRoute requireApproved><WarehouseSupervisorDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/partner" element={<ProtectedRoute requireApproved><PartnerDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/admin" element={<ProtectedRoute requireApproved><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/fundraiser" element={<ProtectedRoute requireApproved><FundraiserDashboard /></ProtectedRoute>} />
 
         {/* Driver route flow */}
-        <Route path="/dashboard/driver/route" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/routes" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route-map" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route/stop/:stopId" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><RouteStopPage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/warehouse-checkin" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><WarehouseCheckinPage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/scan" element={<ProtectedRoute requireApproved allowedRoles={['driver', 'admin']}><DriverScanScreen /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/routes" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route-map" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route/stop/:stopId" element={<ProtectedRoute requireApproved><RouteStopPage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckinPage /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/scan" element={<ProtectedRoute requireApproved><DriverScanScreen /></ProtectedRoute>} />
 
         {/* Bag lifecycle */}
         <Route path="/scan" element={<ProtectedRoute requireApproved><ScannerScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId" element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
-        <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved allowedRoles={['warehouse_employee', 'warehouse_supervisor', 'admin']}><InspectionScreen /></ProtectedRoute>} />
+        <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
 
         {/* Fundraisers — no auth required */}
         <Route path="/fundraisers" element={<FundraisersPage />} />

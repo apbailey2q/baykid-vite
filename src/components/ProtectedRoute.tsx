@@ -1,13 +1,12 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { DEV_BYPASS_AUTH } from '../lib/devBypass'
 import { getRoleDashboardPath } from '../lib/auth'
-import type { Role } from '../types'
+import { canAccessRoute } from '../lib/routePermissions'
 
 interface Props {
   children: React.ReactNode
   requireApproved?: boolean
-  allowedRoles?: Role[]
 }
 
 function Spinner() {
@@ -18,19 +17,24 @@ function Spinner() {
   )
 }
 
-export function ProtectedRoute({ children, requireApproved = false, allowedRoles }: Props) {
+export function ProtectedRoute({ children, requireApproved = false }: Props) {
   if (DEV_BYPASS_AUTH) return <>{children}</>
 
   const { user, role, approvalStatus, isLoading } = useAuthStore()
+  const { pathname } = useLocation()
 
   if (isLoading) return <Spinner />
   if (!user) return <Navigate to="/real-login" replace />
+
+  // User authenticated but profile not yet hydrated — wait for onAuthStateChange
+  if (!role) return <Spinner />
+
   if (requireApproved && approvalStatus !== 'approved') {
     return <Navigate to="/pending-approval" replace />
   }
 
-  if (allowedRoles && (!role || !allowedRoles.includes(role))) {
-    const ownPath = role ? getRoleDashboardPath(role) : '/real-login'
+  if (!canAccessRoute(role, pathname)) {
+    const ownPath = getRoleDashboardPath(role)
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center px-6 text-center"

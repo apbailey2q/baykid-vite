@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAllBags } from '../../lib/bags'
 import { supabase } from '../../lib/supabase'
 import { DEV_BYPASS_AUTH } from '../../lib/devBypass'
@@ -135,15 +134,35 @@ function BagRow({ bag }: { bag: Bag }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function LiveBagsPage() {
-  const queryClient = useQueryClient()
   const [filter, setFilter] = useState<FilterStatus>('all')
+  const [bags, setBags] = useState<Bag[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isError, setIsError] = useState(false)
   const [liveConnected, setLiveConnected] = useState(false)
 
-  const { data: bags = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['live-bags'],
-    queryFn: DEV_BYPASS_AUTH ? async () => MOCK_BAGS : () => getAllBags(),
-    refetchInterval: DEV_BYPASS_AUTH ? false : 30_000,
-  })
+  const loadBags = useCallback(async () => {
+    setIsLoading(true)
+    setIsError(false)
+    try {
+      if (DEV_BYPASS_AUTH) {
+        setBags(MOCK_BAGS)
+        return
+      }
+      const data = await getAllBags()
+      console.log('[LiveBags] rows', data)
+      setBags(data ?? [])
+    } catch (error) {
+      console.error('[LiveBags] error', error)
+      setIsError(true)
+      setBags([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadBags()
+  }, [loadBags])
 
   // Realtime subscription (prod only)
   useEffect(() => {
@@ -153,9 +172,9 @@ export default function LiveBagsPage() {
       .channel('live-bags-changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'bags' },
+        { event: '*', schema: 'public', table: 'qr_bags' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['live-bags'] })
+          loadBags()
         },
       )
       .subscribe((status) => {
@@ -165,7 +184,7 @@ export default function LiveBagsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [queryClient])
+  }, [loadBags])
 
   const visible = filterBags(bags, filter)
 
@@ -261,7 +280,7 @@ export default function LiveBagsPage() {
             >
               <p className="text-sm font-semibold" style={{ color: '#FF1744' }}>Failed to load bags</p>
               <button
-                onClick={() => refetch()}
+                onClick={() => loadBags()}
                 className="text-xs font-medium underline"
                 style={{ color: '#FF5252' }}
               >
@@ -276,7 +295,7 @@ export default function LiveBagsPage() {
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,190,255,0.12)' }}
             >
               <p style={{ fontSize: 32, marginBottom: 12 }}>📦</p>
-              <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>No bags found</p>
+              <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>No bags found yet</p>
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
                 {filter === 'all' ? 'No bags in the system yet.' : `No ${filter} bags right now.`}
               </p>

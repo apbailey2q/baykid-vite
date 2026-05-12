@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-
-// Real DB table: `bags`      columns: id, bag_code, status, consumer_id
-// Real DB table: `bag_scans` columns: id, bag_id, scanned_by, location, scan_time, fundraiser_id (Phase 3)
+import { QrScanner } from '../components/QrScanner'
 
 type ScanMode = 'personal' | 'fundraiser'
 
@@ -23,10 +21,9 @@ type MembershipRow = {
 export default function LiveScanPage() {
   const navigate = useNavigate()
 
-  const [animate, setAnimate]                     = useState(false)
-  const [bagCode, setBagCode]                     = useState('')
-  // Auto-set to 'fundraiser' when navigated from fundraiser list via "Donate Bags"
-  const [scanMode, setScanMode]                   = useState<ScanMode>(() => {
+  const [animate, setAnimate]                       = useState(false)
+  const [bagCode, setBagCode]                       = useState('')
+  const [scanMode, setScanMode]                     = useState<ScanMode>(() => {
     const stored = localStorage.getItem('live_scan_mode')
     if (stored === 'fundraiser') {
       localStorage.removeItem('live_scan_mode')
@@ -34,17 +31,18 @@ export default function LiveScanPage() {
     }
     return 'personal'
   })
-  const [loading, setLoading]                     = useState(false)
-  const [error, setError]                         = useState<string | null>(null)
-  const [saved, setSaved]                         = useState(false)
+  const [loading, setLoading]                       = useState(false)
+  const [error, setError]                           = useState<string | null>(null)
+  const [saved, setSaved]                           = useState(false)
+  const [showCamera, setShowCamera]                 = useState(false)
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false)
 
   // Fundraiser picker state
-  const [userId, setUserId]                       = useState<string | null>(null)
-  const [fundraiserId, setFundraiserId]           = useState<string | null>(null)
-  const [joinedFundraisers, setJoinedFundraisers] = useState<JoinedFundraiser[]>([])
+  const [userId, setUserId]                         = useState<string | null>(null)
+  const [fundraiserId, setFundraiserId]             = useState<string | null>(null)
+  const [joinedFundraisers, setJoinedFundraisers]   = useState<JoinedFundraiser[]>([])
   const [fundraisersLoading, setFundraisersLoading] = useState(false)
-  // ID pre-selected from fundraiser list; consumed on first fundraiser load
-  const [prefillFundraiserId]                     = useState<string | null>(() => {
+  const [prefillFundraiserId]                       = useState<string | null>(() => {
     const id = localStorage.getItem('selected_live_fundraiser_id')
     if (id) localStorage.removeItem('selected_live_fundraiser_id')
     return id
@@ -55,14 +53,12 @@ export default function LiveScanPage() {
     return () => cancelAnimationFrame(id)
   }, [])
 
-  // Fetch current user ID on mount (needed for fundraiser dropdown)
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) setUserId(user.id)
     })
   }, [])
 
-  // Fetch joined active fundraisers when mode switches to fundraiser
   useEffect(() => {
     if (scanMode !== 'fundraiser' || !userId) {
       setJoinedFundraisers([])
@@ -92,9 +88,8 @@ export default function LiveScanPage() {
           })
           .map(m => ({ id: m.fundraisers!.id, name: m.fundraisers!.name }))
         setJoinedFundraisers(active)
-        // Auto-select: prefer the pre-chosen fundraiser; fallback to single-item
         const prefill = prefillFundraiserId && active.find(f => f.id === prefillFundraiserId)
-        if (prefill)              setFundraiserId(prefill.id)
+        if (prefill)                  setFundraiserId(prefill.id)
         else if (active.length === 1) setFundraiserId(active[0].id)
         setFundraisersLoading(false)
       })
@@ -108,9 +103,21 @@ export default function LiveScanPage() {
     transition: `opacity 0.4s ease ${d}ms, transform 0.4s ease ${d}ms`,
   })
 
+  const handleQrScan = useCallback((decoded: string) => {
+    console.log('[LiveScan] qrData', decoded)
+    // Accept raw bag code or extract last path segment from a URL
+    const raw  = decoded.trim()
+    const code = raw.includes('/')
+      ? (raw.split('/').pop()?.toUpperCase() ?? raw.toUpperCase())
+      : raw.toUpperCase()
+    setBagCode(code)
+    setShowCamera(false)
+    setError(null)
+  }, [])
+
   async function handleSave() {
     const code = bagCode.trim().toUpperCase()
-    if (!code) { setError('Enter a bag code first.'); return }
+    if (!code) { setError('Enter or scan a bag code first.'); return }
 
     if (scanMode === 'fundraiser' && joinedFundraisers.length > 0 && !fundraiserId) {
       setError('Select a fundraiser to donate this bag to.')
@@ -120,82 +127,74 @@ export default function LiveScanPage() {
     setError(null)
     setLoading(true)
 
-    const { data: { user }, error: userErr } = await supabase.auth.getUser()
-    if (userErr || !user) {
-      setError('Not authenticated. Please sign in.')
-      setLoading(false)
-      return
-    }
+    try {
+      const { data: { user }, error: userErr } = await supabase.auth.getUser()
+      if (userErr || !user) {
+        setError('Not authenticated. Please sign in.')
+        return
+      }
 
-    // 1. Look up or create the bag
-    let bagId: string
-
-    const { data: existing, error: lookupErr } = await supabase
-      .from('qr_bags')
-      .select('id, consumer_id')
-      .eq('bag_code', code)
-      .maybeSingle()
-
-    if (lookupErr) {
-      setError(`Bag lookup failed: ${lookupErr.message}`)
-      setLoading(false)
-      return
-    }
-
-    if (existing) {
-      bagId = existing.id
-    } else {
-      const { data: created, error: createErr } = await supabase
+      // 1. Look up bag — real bags only, no auto-creation
+      const { data: bag, error: lookupErr } = await supabase
         .from('qr_bags')
-        .insert({ bag_code: code, consumer_id: user.id, status: 'pending' })
+        .select('id, consumer_id')
+        .eq('bag_code', code)
+        .maybeSingle()
+
+      console.log('[LiveScan] bag lookup', bag)
+
+      if (lookupErr) {
+        setError(`Bag lookup failed: ${lookupErr.message}`)
+        return
+      }
+
+      if (!bag) {
+        setError('Bag not found.')
+        return
+      }
+
+      // 2. Insert scan record
+      const scanRow: Record<string, unknown> = {
+        bag_id:     bag.id,
+        scanned_by: user.id,
+        location:   scanMode,
+      }
+      if (scanMode === 'fundraiser' && fundraiserId) {
+        scanRow.fundraiser_id = fundraiserId
+      }
+
+      const { data: scan, error: scanErr } = await supabase
+        .from('bag_scans')
+        .insert(scanRow)
         .select('id')
         .single()
 
-      if (createErr || !created) {
-        setError(`Could not register bag: ${createErr?.message ?? 'Unknown error'}`)
-        setLoading(false)
+      if (scanErr || !scan) {
+        setError(`Could not save scan: ${scanErr?.message ?? 'Unknown error'}`)
         return
       }
-      bagId = created.id
-    }
 
-    // 2. Insert scan — include fundraiser_id when in fundraiser mode
-    const scanRow: Record<string, unknown> = {
-      bag_id:     bagId,
-      scanned_by: user.id,
-      location:   scanMode,
-    }
-    if (scanMode === 'fundraiser' && fundraiserId) {
-      scanRow.fundraiser_id = fundraiserId
-    }
+      // 3. Persist IDs for inspection page
+      localStorage.setItem('live_scan_id', scan.id)
+      localStorage.setItem('live_bag_id',  bag.id)
 
-    const { data: scan, error: scanErr } = await supabase
-      .from('bag_scans')
-      .insert(scanRow)
-      .select('id')
-      .single()
+      if (scanMode === 'fundraiser' && fundraiserId) {
+        const fname = joinedFundraisers.find(f => f.id === fundraiserId)?.name ?? ''
+        localStorage.setItem('live_fundraiser_id',   fundraiserId)
+        localStorage.setItem('live_fundraiser_name', fname)
+      } else {
+        localStorage.removeItem('live_fundraiser_id')
+        localStorage.removeItem('live_fundraiser_name')
+      }
 
-    if (scanErr || !scan) {
-      setError(`Could not save scan: ${scanErr?.message ?? 'Unknown error'}`)
+      setSaved(true)
+      setTimeout(() => navigate('/live-inspection'), 700)
+    } catch (err: unknown) {
+      console.error('[LiveScan] error', err)
+      setError(err instanceof Error ? err.message : 'Scan failed.')
+    } finally {
       setLoading(false)
-      return
     }
-
-    // 3. Persist IDs for inspection page
-    localStorage.setItem('live_scan_id', scan.id)
-    localStorage.setItem('live_bag_id', bagId)
-
-    if (scanMode === 'fundraiser' && fundraiserId) {
-      const fname = joinedFundraisers.find(f => f.id === fundraiserId)?.name ?? ''
-      localStorage.setItem('live_fundraiser_id',   fundraiserId)
-      localStorage.setItem('live_fundraiser_name', fname)
-    } else {
-      localStorage.removeItem('live_fundraiser_id')
-      localStorage.removeItem('live_fundraiser_name')
-    }
-
-    setSaved(true)
-    setTimeout(() => navigate('/live-inspection'), 700)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -253,8 +252,53 @@ export default function LiveScanPage() {
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Live QR Bag Scan</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Scan or enter a real QR bag code connected to the backend.
+              Scan a bag QR code or enter the code manually.
             </p>
+          </div>
+
+          {/* Camera scanner */}
+          <div className="mb-5" style={fade(30)}>
+            {showCamera ? (
+              <div className="flex flex-col gap-3">
+                <QrScanner
+                  onScan={handleQrScan}
+                  onPermissionDenied={() => {
+                    setCameraPermissionDenied(true)
+                    setShowCamera(false)
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCamera(false)}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                >
+                  Cancel Camera
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setShowCamera(true); setCameraPermissionDenied(false) }}
+                disabled={loading || saved}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                style={{
+                  background: 'rgba(0,200,255,0.1)',
+                  border:     '1px solid rgba(0,200,255,0.35)',
+                  color:      '#00c8ff',
+                  cursor:     (loading || saved) ? 'not-allowed' : 'pointer',
+                  opacity:    (loading || saved) ? 0.6 : 1,
+                }}
+              >
+                📷 Open Camera Scanner
+              </button>
+            )}
+
+            {cameraPermissionDenied && (
+              <p className="mt-2 text-[11px] text-center" style={{ color: '#f87171' }}>
+                Camera access denied. Enter the bag code manually below.
+              </p>
+            )}
           </div>
 
           {/* Bag code input */}
@@ -275,7 +319,7 @@ export default function LiveScanPage() {
               spellCheck={false}
             />
             <p className="mt-2 text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              Format: CB-[CITY]-[6 digits] · New codes are created automatically.
+              Scan with the camera above or type the code manually.
             </p>
           </div>
 
@@ -310,7 +354,7 @@ export default function LiveScanPage() {
             </div>
           </div>
 
-          {/* ── Fundraiser picker (shown only in fundraiser mode) ── */}
+          {/* Fundraiser picker (fundraiser mode only) */}
           {scanMode === 'fundraiser' && (
             <div className="mb-5" style={fade(130)}>
               <label
@@ -335,7 +379,7 @@ export default function LiveScanPage() {
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                 >
                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
-                    You haven't joined any active fundraisers.
+                    You haven&apos;t joined any active fundraisers.
                   </p>
                   <Link
                     to="/live-fundraisers"
@@ -433,7 +477,6 @@ export default function LiveScanPage() {
             <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
             <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
               <strong style={{ color: 'rgba(255,255,255,0.65)' }}>Saved to Supabase:</strong> one row in{' '}
-              <code style={{ color: '#00c8ff' }}>bags</code> (created or reused) and one row in{' '}
               <code style={{ color: '#00c8ff' }}>bag_scans</code>{' '}
               {scanMode === 'fundraiser' && fundraiserId ? (
                 <>with <code style={{ color: '#4ade80' }}>fundraiser_id</code> linked.</>

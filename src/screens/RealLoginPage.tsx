@@ -6,8 +6,6 @@ import { useAuth, type AccessRole } from '../context/AuthProvider'
 import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
 
-type Mode = 'signin' | 'signup'
-
 const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'consumer', label: 'Consumer' },
   { value: 'driver', label: 'Driver' },
@@ -59,21 +57,21 @@ function normalizeRole(role: string | null | undefined): AccessRole | null {
   return null
 }
 
-/**
- * This is the main RBAC permission check for the login screen.
- *
- * Rule:
- * - Admin can access every role dashboard.
- * - Non-admin users can only access their own dashboard.
- */
-function canAccessSelectedRole(realRole: AccessRole, selectedRole: AccessRole): boolean {
-  if (realRole === 'admin') return true
-  return realRole === selectedRole
-}
-
 function getDashboardPath(role: AccessRole | null): string | null {
   if (!role) return null
   return ROLE_DASHBOARD_PATHS[role] ?? null
+}
+
+// Accepts PromiseLike so it works with both Promise and PostgrestBuilder
+function withTimeout<T>(promise: PromiseLike<T>, ms = 10000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error('Login request timed out. Please check your Supabase connection.'))
+    }, ms)
+    Promise.resolve(promise)
+      .then(value => { window.clearTimeout(timer); resolve(value) })
+      .catch(error => { window.clearTimeout(timer); reject(error) })
+  })
 }
 
 export default function RealLoginPage() {
@@ -81,7 +79,6 @@ export default function RealLoginPage() {
   const { login } = useAuth()
 
   const [animate, setAnimate] = useState(false)
-  const [mode] = useState<Mode>('signin')
   const [selectedRole, setSelectedRole] = useState<AccessRole>('consumer')
   const [email, setEmail] = useState(() => localStorage.getItem('baykid-last-email') ?? '')
   const [password, setPassword] = useState('')
@@ -169,105 +166,114 @@ return
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setSuccess(null)
 
     if (loading) return
 
-    if (!isSupabaseConfigured) {
-      setError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
-      return
-    }
+    setError(null)
+    setSuccess(null)
+    setLoading(true)
 
     try {
-      setLoading(true)
-      console.log('[1] sign-in attempt', { email, selectedRole })
+      console.log('[1] submit started', { email, selectedRole })
 
-      if (mode === 'signin') {
-        // Step 1 — Authenticate
-        const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
-        console.log('[2] auth result', { userId: data?.user?.id, authErr })
-
-        if (authErr || !data?.user) {
-          setError(authErr?.message ?? 'Sign in failed. Please try again.')
-          return
-        }
-
-        // Step 2 — Fetch real DB profile (source of truth for role)
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('id, email, role, approval_status')
-          .eq('id', data.user.id)
-          .maybeSingle()
-        console.log('[3] profile', profile)
-
-        if (profileErr || !profile) {
-          await supabase.auth.signOut()
-          setError('Profile not found. Please contact support.')
-          return
-        }
-
-        // Step 3 — Approval gate
-        if (profile.approval_status !== 'approved') {
-          navigate('/pending-approval', { replace: true })
-          return
-        }
-
-        // Step 4 — Normalize role (warehouse_employee → warehouse, etc.)
-        const realRole = normalizeRole(profile.role as string)
-        const isAdmin  = realRole === 'admin'
-        console.log('[4] databaseRole', profile.role, '→ normalizedRole', realRole, '| isAdmin', isAdmin)
-
-        if (!realRole) {
-          await supabase.auth.signOut()
-          setError(`Unrecognized account role "${profile.role}". Please contact support.`)
-          return
-        }
-
-        // Step 5 — RBAC: admin passes everything, non-admin must match their role
-        if (!canAccessSelectedRole(realRole, selectedRole)) {
-          setError('Selected role does not match this account. Please choose the correct role and try again.')
-          return
-        }
-
-        // Step 6 — Navigate to correct dashboard
-        const targetRole: AccessRole = isAdmin ? selectedRole : realRole
-        const path = getDashboardPath(targetRole)
-        console.log('[5] targetRole', targetRole, '→ path', path)
-
-        if (!path) {
-          setError(`No dashboard route found for role "${targetRole}". Please contact support.`)
-          return
-        }
-
-        localStorage.setItem('baykid-last-email', email)
-        login(email, targetRole)
-        console.log('[6] navigating to', path)
-        navigate(path, { replace: true })
+      if (!isSupabaseConfigured) {
+        setError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.')
         return
       }
 
-      // Sign-up mode
-      const { data, error: authErr } = await supabase.auth.signUp({ email, password })
+      console.log('[2] before supabase sign in')
 
-      if (authErr) {
-        setError(authErr.message)
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        10000
+      )
+
+      console.log('[3] after supabase sign in', { data, error })
+
+      if (error) {
+        setError(error.message)
         return
       }
 
-      if (data.user && data.session) {
-        await createProfile(data.user.id)
+      const userId = data.user?.id
+
+      if (!userId) {
+        setError('No user ID returned from Supabase.')
+        return
+      }
+
+      console.log('[4] before profile fetch', { userId })
+
+      let { data: profile, error: profileError } = await withTimeout(
+        supabase.from('profiles').select('role, approval_status').eq('id', userId).single(),
+        10000
+      )
+
+      console.log('[5] after profile fetch', { profile, profileError })
+
+      if (profileError || !profile) {
+        console.log('[6] profile missing, attempting createProfile')
+        await createProfile(userId)
+
+        const retry = await withTimeout(
+          supabase.from('profiles').select('role, approval_status').eq('id', userId).single(),
+          10000
+        )
+        profile = retry.data
+        profileError = retry.error
+
+        console.log('[7] after profile retry', { profile, profileError })
+      }
+
+      if (profileError || !profile) {
+        setError(profileError?.message ?? 'Profile not found. Please contact support.')
+        return
+      }
+
+      // Approval gate
+      if (profile.approval_status !== 'approved') {
         navigate('/pending-approval', { replace: true })
         return
       }
 
-      if (data.user) {
-        setSuccess('Account created! Check your email to confirm, then sign in.')
+      // Normalize: maps warehouse_employee → warehouse, etc.
+      const databaseRole = normalizeRole(profile.role) as AccessRole | null
+      const selected = selectedRole
+
+      console.log('[8] role check', { databaseRole, selected })
+
+      if (!databaseRole) {
+        setError('Unable to load account role. Please try again.')
+        return
       }
+
+      const isAdmin = databaseRole === 'admin'
+
+      if (!isAdmin && databaseRole !== selected) {
+        setError('Selected role does not match this account.')
+        return
+      }
+
+      const targetRole: AccessRole = isAdmin ? selected : databaseRole
+      const dashboardPath = getDashboardPath(targetRole)
+
+      console.log('[9] target dashboard', { targetRole, dashboardPath })
+
+      if (!dashboardPath) {
+        setError(`No dashboard route found for role: ${targetRole}`)
+        return
+      }
+
+      login(email, targetRole)
+      localStorage.setItem('baykid-last-email', email)
+
+      console.log('[10] navigating', dashboardPath)
+      navigate(dashboardPath)
     } catch (err: unknown) {
       console.error('[RealLogin] error', err)
-      setError(err instanceof Error ? err.message : 'An unexpected login error occurred.')
+      setError(err instanceof Error ? err.message : 'Login failed.')
     } finally {
+      console.log('[11] finally stopping loading')
       setLoading(false)
     }
   }

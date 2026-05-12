@@ -172,59 +172,46 @@ return
     setError(null)
     setSuccess(null)
 
+    // Prevent duplicate submits while already in flight
+    if (loading) return
+
     if (!isSupabaseConfigured) {
       setError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
       return
     }
 
-    setLoading(true)
-
+    // setLoading INSIDE try so finally always pairs with it
     try {
+      setLoading(true)
+
       if (mode === 'signin') {
-        console.log('[RealLogin] sign-in attempt', {
-          email,
-          selectedRole,
-        })
+        console.log('[RealLogin] sign-in attempt', { email, selectedRole })
 
-        /**
-         * Step 1:
-         * Authenticate with Supabase.
-         */
+        // Step 1 — Authenticate (10-second timeout)
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 10_000)
+        let authResult: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>
+        try {
+          authResult = await supabase.auth.signInWithPassword({ email, password })
+        } finally {
+          clearTimeout(timer)
+        }
+        const { data, error: authErr } = authResult
+        console.log('[RealLogin] auth result', { user: data?.user?.id, authErr })
 
-const signInPromise = supabase.auth.signInWithPassword({
-  email,
-  password,
-})
-
-const timeoutPromise = new Promise<never>((_, reject) =>
-  setTimeout(
-    () => reject(new Error("Login timed out. Supabase did not respond")),
-    60000
-  )
-)
-
-const { data, error: authErr } = await Promise.race([
-  signInPromise,
-  timeoutPromise,
-])
-
-console.log('[AUTH RESULT]', { data, authErr })
-
-        if (authErr || !data.user) {
+        if (authErr || !data?.user) {
           setError(authErr?.message ?? 'Sign in failed. Please try again.')
           return
         }
 
-        /**
-         * Step 2:
-         * Fetch the real database profile.
-         * This is the source of truth for role permissions.
-         */
+        // Step 2 — Fetch real DB profile (source of truth for role)
         const { data: profile, error: profileErr } = await supabase
           .from('profiles')
           .select('id, email, role, approval_status')
           .eq('id', data.user.id)
           .maybeSingle()
+
+        console.log('[RealLogin] profile', profile)
 
         if (profileErr || !profile) {
           await supabase.auth.signOut()
@@ -232,78 +219,48 @@ console.log('[AUTH RESULT]', { data, authErr })
           return
         }
 
-        const realRole = normalizeRole(profile.role as string)
-        const isAdmin = realRole === 'admin'
-
-        console.log('[RBAC DEBUG]', {
-          email,
-          selectedRole,
-          profileRole: profile.role,
-          normalizedRealRole: realRole,
-          isAdmin,
-          approvalStatus: profile.approval_status,
-        })
-
-        /**
-         * Step 3:
-         * Approval check.
-         */
+        // Step 3 — Approval gate
         if (profile.approval_status !== 'approved') {
           navigate('/pending-approval', { replace: true })
           return
         }
 
-        /**
-         * Step 4:
-         * Make sure the profile has a valid role.
-         */
+        // Step 4 — Normalize role (maps warehouse_employee → warehouse, etc.)
+        const realRole = normalizeRole(profile.role as string)
+        const isAdmin  = realRole === 'admin'
+        console.log('[RealLogin] databaseRole', profile.role, '→ normalizedRole', realRole, '| isAdmin', isAdmin)
+
         if (!realRole) {
           await supabase.auth.signOut()
           setError(`Unrecognized account role "${profile.role}". Please contact support.`)
           return
         }
 
-        /**
-         * Step 5:
-         * RBAC check using the normalized realRole.
-         * Admin can access all dashboards.
-         * Non-admin users can only access their matching dashboard.
-         */
+        // Step 5 — RBAC: admin passes everything, non-admin must match their role
         if (!canAccessSelectedRole(realRole, selectedRole)) {
           setError('Selected role does not match this account. Please choose the correct role and try again.')
           return
         }
 
-        /**
-         * Step 6:
-         * Decide where to send the user.
-         * Admin goes to the selected dashboard.
-         * Non-admin goes to their own dashboard.
-         */
+        // Step 6 — Navigate to correct dashboard
         const targetRole: AccessRole = isAdmin ? selectedRole : realRole
         const path = getDashboardPath(targetRole)
+        console.log('[RealLogin] targetRole', targetRole, '→ path', path)
 
         if (!path) {
-          setError(`Unrecognized dashboard route for role "${targetRole}". Please contact support.`)
+          setError(`No dashboard route found for role "${targetRole}". Please contact support.`)
           return
         }
 
         localStorage.setItem('baykid-last-email', email)
         login(email, targetRole)
-
-        console.log('[RealLogin] navigating to:', path, { targetRole, realRole, selectedRole, isAdmin })
-
+        console.log('[RealLogin] navigating to', path)
         navigate(path, { replace: true })
         return
       }
 
-      /**
-       * Sign-up mode.
-       */
-      const { data, error: authErr } = await supabase.auth.signUp({
-        email,
-        password,
-      })
+      // Sign-up mode
+      const { data, error: authErr } = await supabase.auth.signUp({ email, password })
 
       if (authErr) {
         setError(authErr.message)
@@ -311,27 +268,20 @@ console.log('[AUTH RESULT]', { data, authErr })
       }
 
       if (data.user && data.session) {
-        /**
-         * Email confirmation disabled.
-         * Session is live immediately.
-         */
         await createProfile(data.user.id)
         navigate('/pending-approval', { replace: true })
         return
       }
 
       if (data.user) {
-        /**
-         * Email confirmation required.
-         * Profile will be created on first sign-in.
-         */
         setSuccess('Account created! Check your email to confirm, then sign in.')
-        return
       }
-    } catch (err) {
-      console.error('[signin]', err)
-      setError('An unexpected error occurred. Please try again.')
+    } catch (err: unknown) {
+      console.error('[RealLogin] error', err)
+      const message = err instanceof Error ? err.message : 'An unexpected login error occurred.'
+      setError(message)
     } finally {
+      // Always reset spinner — runs even after navigate() triggers unmount
       setLoading(false)
     }
   }

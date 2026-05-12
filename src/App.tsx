@@ -1,7 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useAuthInit } from './hooks/useAuthInit'
-import { getRoleDashboardPath } from './lib/auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
@@ -73,33 +72,20 @@ import ReadinessChecklistPage from './screens/ReadinessChecklistPage'
 import LaunchChecklistPage from './screens/LaunchChecklistPage'
 
 function HomeRedirect() {
-  const { user, role, approvalStatus, isLoading } = useAuthStore()
+  const { user, isLoading } = useAuthStore()
 
+  // Prevent infinite spinner
   if (isLoading) {
-    return (
-      <div
-        className="flex min-h-screen items-center justify-center"
-        style={{ background: '#060e24' }}
-      >
-        <div
-          className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          style={{ borderColor: '#00c8ff', borderTopColor: 'transparent' }}
-        />
-      </div>
-    )
+    return <Navigate to="/real-login" replace />
   }
 
   // Not logged in
-  if (!user) return <WelcomePage />
+  if (!user) {
+    return <Navigate to="/real-login" replace />
+  }
 
-  // Logged in but no profile row (e.g. account created before profile insert completed)
-  if (!role) return <Navigate to="/real-login" replace />
-
-  // Profile exists but not yet approved
-  if (approvalStatus !== 'approved') return <Navigate to="/pending-approval" replace />
-
-  // Approved — go to role dashboard
-  return <Navigate to={getRoleDashboardPath(role)} replace />
+  // Logged in
+  return <Navigate to="/live-dashboard" replace />
 }
 
 function App() {

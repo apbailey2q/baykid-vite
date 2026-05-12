@@ -2,18 +2,11 @@ import { useState, useEffect, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { fetchProfile } from '../lib/auth'
+import { useAuth, type AccessRole } from '../context/AuthProvider'
 import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
 
 type Mode = 'signin' | 'signup'
-
-type AccessRole =
-  | 'consumer'
-  | 'driver'
-  | 'warehouse'
-  | 'fundraiser'
-  | 'partner'
-  | 'admin'
 
 const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'consumer', label: 'Consumer' },
@@ -85,6 +78,7 @@ function getDashboardPath(role: AccessRole | null): string | null {
 
 export default function RealLoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   const [animate, setAnimate] = useState(false)
   const [mode] = useState<Mode>('signin')
@@ -203,7 +197,10 @@ const signInPromise = supabase.auth.signInWithPassword({
 })
 
 const timeoutPromise = new Promise<never>((_, reject) =>
-  setTimeout(() => reject(new Error('Login timed out. Supabase did not respond.')), 30000)
+  setTimeout(
+    () => reject(new Error("Login timed out. Supabase did not respond")),
+    60000
+  )
 )
 
 const { data, error: authErr } = await Promise.race([
@@ -268,25 +265,18 @@ console.log('[AUTH RESULT]', { data, authErr })
 
         /**
          * Step 5:
-         * RBAC check.
-         *
+         * RBAC check using the normalized realRole.
          * Admin can access all dashboards.
          * Non-admin users can only access their matching dashboard.
          */
-        const databaseRole = profile.role?.toLowerCase();
-const selected = selectedRole?.toLowerCase();
-
-
-
-if (!canAccessSelectedRole(databaseRole as AccessRole, selected as AccessRole)) {
-  setError("Selected role does not match this account");
-  return;
-}
+        if (!canAccessSelectedRole(realRole, selectedRole)) {
+          setError('Selected role does not match this account. Please choose the correct role and try again.')
+          return
+        }
 
         /**
          * Step 6:
          * Decide where to send the user.
-         *
          * Admin goes to the selected dashboard.
          * Non-admin goes to their own dashboard.
          */
@@ -299,13 +289,9 @@ if (!canAccessSelectedRole(databaseRole as AccessRole, selected as AccessRole)) 
         }
 
         localStorage.setItem('baykid-last-email', email)
+        login(email, targetRole)
 
-        console.log('[RealLogin] navigating to:', path, {
-          targetRole,
-          realRole,
-          selectedRole,
-          isAdmin,
-        })
+        console.log('[RealLogin] navigating to:', path, { targetRole, realRole, selectedRole, isAdmin })
 
         navigate(path, { replace: true })
         return

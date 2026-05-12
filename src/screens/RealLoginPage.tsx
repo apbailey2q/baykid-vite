@@ -25,12 +25,12 @@ const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
 ]
 
 const ROLE_DASHBOARD_PATHS: Record<AccessRole, string> = {
-  admin: '/admin',
-  consumer: '/consumer',
-  driver: '/driver',
-  warehouse: '/warehouse',
-  fundraiser: '/fundraiser',
-  partner: '/partner',
+  admin: '/live-admin',
+  consumer: '/live-dashboard',
+  driver: '/live-bags',
+  warehouse: '/live-inspection',
+  fundraiser: '/live-fundraisers',
+  partner: '/live-wallet',
 }
 
 /**
@@ -121,10 +121,15 @@ export default function RealLoginPage() {
          * Admins stay on the login page so they can choose which dashboard
          * they want to enter from the role dropdown.
          */
-        if (realRole === 'admin') return
+        const targetRole =
+  realRole === 'admin'
+    ? selectedRole
+    : realRole
 
-        const path = getDashboardPath(realRole)
-        if (path) navigate(path, { replace: true })
+const path = getDashboardPath(targetRole as AccessRole)
+
+if (path) navigate(path, { replace: true })
+return
       } catch {
         /**
          * Silently ignore here.
@@ -268,11 +273,15 @@ console.log('[AUTH RESULT]', { data, authErr })
          * Admin can access all dashboards.
          * Non-admin users can only access their matching dashboard.
          */
-        if (!canAccessSelectedRole(realRole, selectedRole)) {
-          await supabase.auth.signOut()
-          setError('Selected role does not match this account. Please choose the correct role and try again.')
-          return
-        }
+        const databaseRole = profile.role?.toLowerCase();
+const selected = selectedRole?.toLowerCase();
+
+
+
+if (!canAccessSelectedRole(databaseRole as AccessRole, selected as AccessRole)) {
+  setError("Selected role does not match this account");
+  return;
+}
 
         /**
          * Step 6:

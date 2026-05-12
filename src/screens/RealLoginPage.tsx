@@ -172,7 +172,6 @@ return
     setError(null)
     setSuccess(null)
 
-    // Prevent duplicate submits while already in flight
     if (loading) return
 
     if (!isSupabaseConfigured) {
@@ -180,24 +179,14 @@ return
       return
     }
 
-    // setLoading INSIDE try so finally always pairs with it
     try {
       setLoading(true)
+      console.log('[1] sign-in attempt', { email, selectedRole })
 
       if (mode === 'signin') {
-        console.log('[RealLogin] sign-in attempt', { email, selectedRole })
-
-        // Step 1 — Authenticate (10-second timeout)
-        const controller = new AbortController()
-        const timer = setTimeout(() => controller.abort(), 10_000)
-        let authResult: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>
-        try {
-          authResult = await supabase.auth.signInWithPassword({ email, password })
-        } finally {
-          clearTimeout(timer)
-        }
-        const { data, error: authErr } = authResult
-        console.log('[RealLogin] auth result', { user: data?.user?.id, authErr })
+        // Step 1 — Authenticate
+        const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+        console.log('[2] auth result', { userId: data?.user?.id, authErr })
 
         if (authErr || !data?.user) {
           setError(authErr?.message ?? 'Sign in failed. Please try again.')
@@ -210,8 +199,7 @@ return
           .select('id, email, role, approval_status')
           .eq('id', data.user.id)
           .maybeSingle()
-
-        console.log('[RealLogin] profile', profile)
+        console.log('[3] profile', profile)
 
         if (profileErr || !profile) {
           await supabase.auth.signOut()
@@ -225,10 +213,10 @@ return
           return
         }
 
-        // Step 4 — Normalize role (maps warehouse_employee → warehouse, etc.)
+        // Step 4 — Normalize role (warehouse_employee → warehouse, etc.)
         const realRole = normalizeRole(profile.role as string)
         const isAdmin  = realRole === 'admin'
-        console.log('[RealLogin] databaseRole', profile.role, '→ normalizedRole', realRole, '| isAdmin', isAdmin)
+        console.log('[4] databaseRole', profile.role, '→ normalizedRole', realRole, '| isAdmin', isAdmin)
 
         if (!realRole) {
           await supabase.auth.signOut()
@@ -245,7 +233,7 @@ return
         // Step 6 — Navigate to correct dashboard
         const targetRole: AccessRole = isAdmin ? selectedRole : realRole
         const path = getDashboardPath(targetRole)
-        console.log('[RealLogin] targetRole', targetRole, '→ path', path)
+        console.log('[5] targetRole', targetRole, '→ path', path)
 
         if (!path) {
           setError(`No dashboard route found for role "${targetRole}". Please contact support.`)
@@ -254,7 +242,7 @@ return
 
         localStorage.setItem('baykid-last-email', email)
         login(email, targetRole)
-        console.log('[RealLogin] navigating to', path)
+        console.log('[6] navigating to', path)
         navigate(path, { replace: true })
         return
       }
@@ -278,10 +266,8 @@ return
       }
     } catch (err: unknown) {
       console.error('[RealLogin] error', err)
-      const message = err instanceof Error ? err.message : 'An unexpected login error occurred.'
-      setError(message)
+      setError(err instanceof Error ? err.message : 'An unexpected login error occurred.')
     } finally {
-      // Always reset spinner — runs even after navigate() triggers unmount
       setLoading(false)
     }
   }

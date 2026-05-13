@@ -8,16 +8,14 @@ import { QrScanner } from '../components/QrScanner'
 // QR210050541835 → 2100-5054-1835
 // 210050541835   → 2100-5054-1835
 // 2100-5054-1835 → 2100-5054-1835 (already correct)
-function normalizeBagCode(input: string): string {
-  let raw = input.trim().toUpperCase()
-  // Strip URL path segment
-  if (raw.includes('/')) raw = raw.split('/').pop() ?? raw
-  // Extract digits only (strips QR prefix, dashes, spaces, etc.)
-  const digits = raw.replace(/^QR/, '').replace(/\D/g, '')
-  if (digits.length === 12) {
-    return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8)}`
+function normalizeBagCode(rawCode: string): string {
+  let code = rawCode.trim().toUpperCase()
+  if (code.startsWith('QR')) code = code.slice(2)
+  code = code.replace(/[^0-9]/g, '')
+  if (code.length === 12) {
+    return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}`
   }
-  return input.trim()
+  return code
 }
 
 type ScanMode = 'personal' | 'fundraiser'
@@ -206,7 +204,7 @@ export default function LiveScanPage() {
           }
 
           setSaved(true)
-          setTimeout(() => navigate('/dashboard/consumer'), 500)
+          setTimeout(() => navigate('/live-inspection'), 500)
         } catch (err: unknown) {
           console.error('[LiveScan] save error', err)
           setError(err instanceof Error ? err.message : 'Scan failed. Try again.')
@@ -287,7 +285,7 @@ export default function LiveScanPage() {
       }
 
       setSaved(true)
-      setTimeout(() => navigate('/dashboard/consumer'), 700)
+      setTimeout(() => navigate('/live-inspection'), 700)
     } catch (err: unknown) {
       console.error('[LiveScan] error', err)
       setError(err instanceof Error ? err.message : 'Scan failed.')

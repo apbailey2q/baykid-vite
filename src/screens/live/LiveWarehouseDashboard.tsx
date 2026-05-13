@@ -321,12 +321,11 @@ export default function LiveWarehouseDashboard() {
                 onClick={() => setTab(t.key)}
                 className="flex-1 py-3 text-xs font-bold transition-all"
                 style={{
-                  color:       tab === t.key ? t.color : 'rgba(255,255,255,0.35)',
-                  borderBottom: tab === t.key ? `2px solid ${t.color}` : '2px solid transparent',
+                  color:        tab === t.key ? t.color : 'rgba(255,255,255,0.35)',
                   background:   'none',
                   border:       'none',
                   borderBottom: tab === t.key ? `2px solid ${t.color}` : '2px solid transparent',
-                  cursor: 'pointer',
+                  cursor:       'pointer',
                 }}
               >
                 {t.label}

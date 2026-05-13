@@ -4,6 +4,22 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuthStore } from '../store/authStore'
 import { QrScanner } from '../components/QrScanner'
 
+// Converts any scan format to the DB format used in qr_bags.bag_code (XXXX-XXXX-XXXX).
+// QR210050541835 → 2100-5054-1835
+// 210050541835   → 2100-5054-1835
+// 2100-5054-1835 → 2100-5054-1835 (already correct)
+function normalizeBagCode(input: string): string {
+  let raw = input.trim().toUpperCase()
+  // Strip URL path segment
+  if (raw.includes('/')) raw = raw.split('/').pop() ?? raw
+  // Extract digits only (strips QR prefix, dashes, spaces, etc.)
+  const digits = raw.replace(/^QR/, '').replace(/\D/g, '')
+  if (digits.length === 12) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8)}`
+  }
+  return input.trim()
+}
+
 type ScanMode = 'personal' | 'fundraiser'
 
 type JoinedFundraiser = { id: string; name: string }
@@ -121,10 +137,7 @@ export default function LiveScanPage() {
         return
       }
 
-      const raw  = decoded.trim()
-      const code = raw.includes('/')
-        ? (raw.split('/').pop()?.toUpperCase() ?? raw.toUpperCase())
-        : raw.toUpperCase()
+      const code = normalizeBagCode(decoded)
 
       setBagCode(code)
       setError(null)
@@ -153,26 +166,12 @@ export default function LiveScanPage() {
             .eq('bag_code', code)
             .maybeSingle()
 
-          console.log('[LiveScan] bag lookup', bag)
+          console.log('[BAG LOOKUP]', { scannedCode: decoded, normalizedBagCode: code, bag, error: lookupErr })
 
           if (lookupErr) { setError(`Bag lookup failed: ${lookupErr.message}`); return }
+          if (!bag)      { setError('Bag not found. Check the code and try again.'); return }
 
-          let bagId: string
-          if (bag) {
-            bagId = bag.id
-          } else {
-            // Bag code not in DB yet — register it now so physical bags always work
-            const { data: newBag, error: createErr } = await supabase
-              .from('qr_bags')
-              .insert({ bag_code: code, status: 'issued', owner_id: currentUser.id })
-              .select('id')
-              .single()
-            if (createErr || !newBag) {
-              setError(`Could not register bag: ${createErr?.message ?? 'Unknown error'}`)
-              return
-            }
-            bagId = newBag.id
-          }
+          const bagId = bag.id
 
           const scanRow: Record<string, unknown> = {
             bag_id:     bagId,
@@ -222,7 +221,7 @@ export default function LiveScanPage() {
   }, [navigate])
 
   async function handleSave() {
-    const code = bagCode.trim().toUpperCase()
+    const code = normalizeBagCode(bagCode)
     if (!code) { setError('Enter or scan a bag code first.'); return }
 
     if (scanMode === 'fundraiser' && joinedFundraisers.length > 0 && !fundraiserId) {
@@ -246,29 +245,12 @@ export default function LiveScanPage() {
         .eq('bag_code', code)
         .maybeSingle()
 
-      console.log('[LiveScan] bag lookup', bag)
+      console.log('[BAG LOOKUP]', { scannedCode: bagCode, normalizedBagCode: code, bag, error: lookupErr })
 
-      if (lookupErr) {
-        setError(`Bag lookup failed: ${lookupErr.message}`)
-        return
-      }
+      if (lookupErr) { setError(`Bag lookup failed: ${lookupErr.message}`); return }
+      if (!bag)      { setError('Bag not found. Check the code and try again.'); return }
 
-      let bagId: string
-      if (bag) {
-        bagId = bag.id
-      } else {
-        // Bag code not in DB yet — register it now so physical bags always work
-        const { data: newBag, error: createErr } = await supabase
-          .from('qr_bags')
-          .insert({ bag_code: code, status: 'issued', owner_id: user.id })
-          .select('id')
-          .single()
-        if (createErr || !newBag) {
-          setError(`Could not register bag: ${createErr?.message ?? 'Unknown error'}`)
-          return
-        }
-        bagId = newBag.id
-      }
+      const bagId = bag.id
 
       // 2. Insert scan record
       const scanRow: Record<string, unknown> = {

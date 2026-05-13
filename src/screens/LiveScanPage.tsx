@@ -156,10 +156,26 @@ export default function LiveScanPage() {
           console.log('[LiveScan] bag lookup', bag)
 
           if (lookupErr) { setError(`Bag lookup failed: ${lookupErr.message}`); return }
-          if (!bag)       { setError('Bag not found. Check the code and try again.'); return }
+
+          let bagId: string
+          if (bag) {
+            bagId = bag.id
+          } else {
+            // Bag code not in DB yet — register it now so physical bags always work
+            const { data: newBag, error: createErr } = await supabase
+              .from('qr_bags')
+              .insert({ bag_code: code, status: 'pending', consumer_id: currentUser.id })
+              .select('id')
+              .single()
+            if (createErr || !newBag) {
+              setError(`Could not register bag: ${createErr?.message ?? 'Unknown error'}`)
+              return
+            }
+            bagId = newBag.id
+          }
 
           const scanRow: Record<string, unknown> = {
-            bag_id:     bag.id,
+            bag_id:     bagId,
             scanned_by: currentUser.id,
             location:   currentScanMode,
           }
@@ -179,7 +195,7 @@ export default function LiveScanPage() {
           }
 
           localStorage.setItem('live_scan_id', scan.id)
-          localStorage.setItem('live_bag_id',  bag.id)
+          localStorage.setItem('live_bag_id',  bagId)
 
           if (currentScanMode === 'fundraiser' && currentFundraiser) {
             const fname = currentFundraisers.find(f => f.id === currentFundraiser)?.name ?? ''
@@ -237,14 +253,26 @@ export default function LiveScanPage() {
         return
       }
 
-      if (!bag) {
-        setError('Bag not found.')
-        return
+      let bagId: string
+      if (bag) {
+        bagId = bag.id
+      } else {
+        // Bag code not in DB yet — register it now so physical bags always work
+        const { data: newBag, error: createErr } = await supabase
+          .from('qr_bags')
+          .insert({ bag_code: code, status: 'pending', consumer_id: user.id })
+          .select('id')
+          .single()
+        if (createErr || !newBag) {
+          setError(`Could not register bag: ${createErr?.message ?? 'Unknown error'}`)
+          return
+        }
+        bagId = newBag.id
       }
 
       // 2. Insert scan record
       const scanRow: Record<string, unknown> = {
-        bag_id:     bag.id,
+        bag_id:     bagId,
         scanned_by: user.id,
         location:   scanMode,
       }
@@ -265,7 +293,7 @@ export default function LiveScanPage() {
 
       // 3. Persist IDs for inspection page
       localStorage.setItem('live_scan_id', scan.id)
-      localStorage.setItem('live_bag_id',  bag.id)
+      localStorage.setItem('live_bag_id',  bagId)
 
       if (scanMode === 'fundraiser' && fundraiserId) {
         const fname = joinedFundraisers.find(f => f.id === fundraiserId)?.name ?? ''

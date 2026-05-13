@@ -10,12 +10,11 @@ type AiOutcome = 'CLEAN' | 'NEEDS_REVIEW' | 'CONTAMINATED'
 type AiPhase   = 'idle' | 'analyzing' | 'done' | 'error'
 
 interface AiResult {
-  result:                AiOutcome
-  confidence:            number
-  estimated_recyclables: string[]
+  result:                 AiOutcome
+  confidence:             number
+  detected_objects:       string[]
   contamination_detected: string[]
-  bag_condition:         string
-  notes:                 string
+  notes:                  string
 }
 
 type Bag = {
@@ -178,7 +177,7 @@ export default function LiveInspectionPage() {
     setSuggestedRag(null)
 
     try {
-      const res = await fetch('/api/analyze-bag', {
+      const res = await fetch('/api/google-inspect', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ imageBase64: dataUrl }),
@@ -525,13 +524,13 @@ export default function LiveInspectionPage() {
 
                   {/* Details grid */}
                   <div className="flex flex-col gap-2 mb-4">
-                    {aiResult.estimated_recyclables.length > 0 && (
+                    {aiResult.detected_objects.length > 0 && (
                       <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}>
                         <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#4ade80', marginBottom: 4 }}>
-                          ♻️ Recyclables detected
+                          🔍 Materials detected
                         </p>
                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                          {aiResult.estimated_recyclables.join(' · ')}
+                          {aiResult.detected_objects.join(' · ')}
                         </p>
                       </div>
                     )}
@@ -546,13 +545,6 @@ export default function LiveInspectionPage() {
                         </p>
                       </div>
                     )}
-
-                    <div className="flex gap-2">
-                      <div className="flex-1 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Bag condition</p>
-                        <p style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>{aiResult.bag_condition}</p>
-                      </div>
-                    </div>
 
                     {aiResult.notes && (
                       <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>

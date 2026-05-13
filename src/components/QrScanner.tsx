@@ -29,6 +29,7 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
         (decoded) => {
           if (scanned) return
           scanned = true
+          console.log('[SCAN SUCCESS]', decoded)
           // Don't stop here — let cleanup handle it to avoid double-stop DOM conflict
           try {
             onScanRef.current(decoded)
@@ -61,7 +62,11 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
 
     return () => {
       if (started) {
-        scanner.stop().catch(() => {})
+        try {
+          scanner.stop().catch(() => {})
+        } catch (_) {
+          // html5-qrcode may throw synchronously if already stopped
+        }
       }
     }
   }, [])

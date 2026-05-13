@@ -104,14 +104,14 @@ export default function LiveScanPage() {
 
   const handleQrScan = useCallback((decoded: string) => {
     console.log('[LiveScan] qrData', decoded)
-    // Accept raw bag code or extract last path segment from a URL
     const raw  = decoded.trim()
     const code = raw.includes('/')
       ? (raw.split('/').pop()?.toUpperCase() ?? raw.toUpperCase())
       : raw.toUpperCase()
     setBagCode(code)
-    setShowCamera(false)
     setError(null)
+    // Defer unmount by one frame so html5-qrcode can finish its internal stop
+    requestAnimationFrame(() => setShowCamera(false))
   }, [])
 
   async function handleSave() {

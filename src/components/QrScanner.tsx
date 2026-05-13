@@ -20,6 +20,7 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
   useEffect(() => {
     const scanner = new Html5Qrcode(CONTAINER_ID)
     let scanned = false
+    let started = false
 
     scanner
       .start(
@@ -28,12 +29,17 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
         (decoded) => {
           if (scanned) return
           scanned = true
-          scanner.stop().catch(() => {})
-          onScanRef.current(decoded)
+          // Don't stop here — let cleanup handle it to avoid double-stop DOM conflict
+          try {
+            onScanRef.current(decoded)
+          } catch (e) {
+            console.error('[QrScanner] onScan callback error', e)
+          }
         },
         () => {}, // suppress per-frame scan errors
       )
       .then(() => {
+        started = true
         setStatus('active')
       })
       .catch((err: unknown) => {
@@ -54,7 +60,9 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
       })
 
     return () => {
-      scanner.stop().catch(() => {})
+      if (started) {
+        scanner.stop().catch(() => {})
+      }
     }
   }, [])
 

@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <p className="mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
             An unexpected error occurred. Please reload the page.
           </p>
-          {import.meta.env.DEV && this.state.message && (
+          {this.state.message && (
             <p
               className="mt-3 rounded-lg px-4 py-2 font-mono text-xs"
               style={{ background: 'rgba(255,23,68,0.08)', color: 'rgba(255,23,68,0.8)' }}

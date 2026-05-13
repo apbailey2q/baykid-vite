@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuthStore } from '../store/authStore'
 import { QrScanner } from '../components/QrScanner'
@@ -21,11 +21,14 @@ type MembershipRow = {
 
 export default function LiveScanPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuthStore()
   const userId = user?.id ?? null
 
   const [animate, setAnimate]                       = useState(false)
-  const [bagCode, setBagCode]                       = useState('')
+  const [bagCode, setBagCode]                       = useState(
+    () => (location.state as { bagCode?: string } | null)?.bagCode ?? ''
+  )
   const [scanMode, setScanMode]                     = useState<ScanMode>(() => {
     const stored = localStorage.getItem('live_scan_mode')
     if (stored === 'fundraiser') {

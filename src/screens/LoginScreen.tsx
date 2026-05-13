@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import DemoMode from '../components/DemoMode'
+import { Link, useNavigate } from 'react-router-dom'
 import { DEV_BYPASS_AUTH } from '../lib/devBypass'
 import { GlassCard } from '../components/ui/GlassCard'
 
-// ── Role selector (UI only — does not affect signIn) ──────────────────────────
-type RoleTab = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
+type DemoRole = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'fundraiser' | 'admin'
 
-const ROLES: { id: RoleTab; label: string; icon: string }[] = [
+const ROLES: { id: DemoRole; label: string; icon: string }[] = [
   { id: 'consumer',   label: 'Consumer',    icon: '♻️' },
   { id: 'driver',     label: 'Driver',      icon: '🚐' },
   { id: 'warehouse',  label: 'Warehouse',   icon: '🏭' },
@@ -16,15 +14,31 @@ const ROLES: { id: RoleTab; label: string; icon: string }[] = [
   { id: 'admin',      label: 'Admin',       icon: '⚙️' },
 ]
 
+const DEMO_ROLE_ROUTES: Record<DemoRole, string> = {
+  consumer:   '/consumer',
+  driver:     '/driver',
+  warehouse:  '/warehouse',
+  partner:    '/partner',
+  fundraiser: '/fundraiser',
+  admin:      '/admin',
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function LoginScreen() {
-  const [demoMode, setDemoMode] = useState(false)
-  const [role, setRole]           = useState<RoleTab>('consumer')
+  const navigate = useNavigate()
+  const [role, setRole] = useState<DemoRole>('consumer')
   const [fundraiserGlow, setFundraiserGlow] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const roleLabel = ROLES.find((r) => r.id === role)?.label ?? 'Account'
+
+  function enterDemoRole(r: DemoRole) {
+    localStorage.setItem('baykid-demo-mode', 'true')
+    localStorage.setItem('baykid-demo-role', r)
+    const path = DEMO_ROLE_ROUTES[r]
+    if (!path) { console.error('[Demo Login] No route found for role:', r); return }
+    navigate(path)
+  }
 
   // Nudge scroll once on mount to hint at more roles
   useEffect(() => {
@@ -43,7 +57,6 @@ export default function LoginScreen() {
 
   return (
     <>
-      {demoMode && <DemoMode onClose={() => setDemoMode(false)} />}
       <div
         className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-12"
         style={{ background: '#03162f' }}
@@ -127,7 +140,7 @@ export default function LoginScreen() {
                     <button
                       key={r.id}
                       type="button"
-                      onClick={() => setRole(r.id)}
+                      onClick={() => { setRole(r.id); enterDemoRole(r.id) }}
                       className="flex shrink-0 snap-start flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 text-center transition-all duration-150"
                       style={active ? {
                         background: 'rgba(0, 120, 230, 0.12)',
@@ -173,7 +186,7 @@ export default function LoginScreen() {
 
             <button
               type="button"
-              onClick={() => setDemoMode(true)}
+              onClick={() => enterDemoRole(role)}
               className="flex w-full items-center justify-center gap-2 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
               style={{
                 background: 'linear-gradient(135deg, #0057e7, #00c8ff)',

@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
-import { useAuthInit } from './hooks/useAuthInit'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
@@ -74,23 +73,20 @@ import LaunchChecklistPage from './screens/LaunchChecklistPage'
 function HomeRedirect() {
   const { user, isLoading } = useAuthStore()
 
-  // Prevent infinite spinner
   if (isLoading) {
-    return <Navigate to="/real-login" replace />
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: '#060e24' }}>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: '#00c8ff', borderTopColor: 'transparent' }} />
+      </div>
+    )
   }
 
-  // Not logged in
-  if (!user) {
-    return <Navigate to="/real-login" replace />
-  }
+  if (!user) return <Navigate to="/real-login" replace />
 
-  // Logged in
   return <Navigate to="/live-dashboard" replace />
 }
 
 function App() {
-  useAuthInit()
-
   return (
     <ErrorBoundary>
       <ToastProvider>
@@ -156,6 +152,14 @@ function App() {
         <Route path="/fraud-detection" element={<FraudDetectionPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/fundraiser-admin" element={<FundraiserAdminPage />} />
+
+        {/* Demo role shortcuts — no auth required */}
+        <Route path="/consumer"   element={<ConsumerDashboard />} />
+        <Route path="/driver"     element={<DriverDashboard />} />
+        <Route path="/warehouse"  element={<WarehouseDashboard />} />
+        <Route path="/partner"    element={<PartnerDashboard />} />
+        <Route path="/fundraiser" element={<FundraiserDashboard />} />
+        <Route path="/admin"      element={<AdminDashboard />} />
 
         {/* ── Live mode routes (Supabase-backed, guarded by RequireAuth) ── */}
         <Route path="/live-dashboard"   element={<RequireAuth><LiveDashboardPage /></RequireAuth>} />

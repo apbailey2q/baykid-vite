@@ -8,39 +8,25 @@ export function useAuthInit() {
   const { setUser, setProfile, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
-  if (DEV_BYPASS_AUTH) { setLoading(false); return }
+    if (DEV_BYPASS_AUTH) { setLoading(false); return }
 
-  // Resolve loading on initial page load
-  supabase.auth.getSession().then(async ({ data: { session } }) => {
-    if (session?.user) {
-      setUser(session.user)
-      try {
-        const profile = await fetchProfile(session.user.id)
-        profile ? setProfile(profile) : setProfile(null)
-      } catch {
-        setProfile(null)
+    // onAuthStateChange fires INITIAL_SESSION immediately with the current session —
+    // no separate getSession() call needed (that caused a Web Lock conflict in v2).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+        try {
+          const profile = await fetchProfile(session.user.id)
+          profile ? setProfile(profile) : setProfile(null)
+        } catch {
+          setProfile(null)
+        }
+      } else {
+        clearAuth()
       }
-    } else {
-      clearAuth()
-    }
-    setLoading(false)
-  })
+      setLoading(false)
+    })
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (session?.user) {
-      setUser(session.user)
-      try {
-        const profile = await fetchProfile(session.user.id)
-        profile ? setProfile(profile) : setProfile(null)
-      } catch {
-        setProfile(null)
-      }
-    } else {
-      clearAuth()
-    }
-    setLoading(false)
-  })
-
-  return () => subscription.unsubscribe()
-}, [])
+    return () => subscription.unsubscribe()
+  }, [])
 }

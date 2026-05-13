@@ -1,8 +1,8 @@
 import { useState, useEffect, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
-import { fetchProfile } from '../lib/auth'
 import { useAuth, type AccessRole } from '../context/AuthProvider'
+import { useAuthStore } from '../store/authStore'
 import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
 
@@ -93,42 +93,23 @@ export default function RealLoginPage() {
     return () => cancelAnimationFrame(id)
   }, [])
 
+  // Read auth state from the central store (set by useAuthInit in App) —
+  // avoids a redundant getSession() call that conflicts with the Web Lock.
+  const { user: storeUser, role: storeRole, approvalStatus, isLoading: authLoading } = useAuthStore()
+
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) return
+    if (authLoading || !storeUser) return
 
-      try {
-        const profile = await fetchProfile(data.session.user.id)
-        if (!profile) return
+    if (approvalStatus !== 'approved') {
+      navigate('/pending-approval', { replace: true })
+      return
+    }
 
-        if (profile.approval_status !== 'approved') {
-          navigate('/pending-approval', { replace: true })
-          return
-        }
-
-        const realRole = normalizeRole(profile.role as string)
-
-        /**
-         * Admins stay on the login page so they can choose which dashboard
-         * they want to enter from the role dropdown.
-         */
-        const targetRole =
-  realRole === 'admin'
-    ? selectedRole
-    : realRole
-
-const path = getDashboardPath(targetRole as AccessRole)
-
-if (path) navigate(path, { replace: true })
-return
-      } catch {
-        /**
-         * Silently ignore here.
-         * User can still sign in manually.
-         */
-      }
-    })
-  }, [navigate])
+    const realRole = normalizeRole(storeRole)
+    const targetRole = realRole === 'admin' ? selectedRole : realRole
+    const path = getDashboardPath(targetRole as AccessRole)
+    if (path) navigate(path, { replace: true })
+  }, [authLoading, storeUser, storeRole, approvalStatus, navigate])
 
   const fade = (delay = 0): CSSProperties => ({
     opacity: animate ? 1 : 0,

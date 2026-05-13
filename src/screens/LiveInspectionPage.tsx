@@ -1,35 +1,70 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuthStore } from '../store/authStore'
 
-// Real table: `bags`       columns: id, bag_code, status, consumer_id
-// Real table: `bag_scans`  columns: id, bag_id, scanned_by, scan_time, location
-// Real table: `inspections` columns: id, bag_id, inspector_id, status, notes, created_at
-// New tables (migration): wallet_transactions, bag_lifecycle_events
-// Existing: alerts — columns: driver_id, alert_type, status, notes
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type RagStatus = 'green' | 'yellow' | 'red'
+type AiOutcome = 'CLEAN' | 'NEEDS_REVIEW' | 'CONTAMINATED'
+type AiPhase   = 'idle' | 'analyzing' | 'done' | 'error'
+
+interface AiResult {
+  result:                AiOutcome
+  confidence:            number
+  estimated_recyclables: string[]
+  contamination_detected: string[]
+  bag_condition:         string
+  notes:                 string
+}
 
 type Bag = {
-  id:          string
-  bag_code:    string
-  status:      string
-  consumer_id: string | null
+  id:       string
+  bag_code: string
+  status:   string
+  owner_id: string | null
 }
 
 type BagScan = {
   id:        string
-  scan_time: string        // real timestamp column (not created_at)
-  location:  string | null // scan_mode stored here (real location column repurposed)
+  scan_time: string
+  location:  string | null
 }
 
+// ── AI System Prompt ─────────────────────────────────────────────────────────
+
+const AI_SYSTEM_PROMPT = `You are the AI Visual Inspection Assistant for Cyan's Brooklynn Recycling Enterprise.
+Your job is to analyze uploaded recycling bag images from warehouse workers and determine the contamination level and recyclability of the bag contents.
+You must inspect the image carefully and identify:
+1. Visible recyclable materials (plastic bottles, aluminum cans, cardboard, paper, glass containers)
+2. Contamination indicators (food residue, liquids, biohazards, trash, organic waste, hazardous materials, excessive dirt or mold, mixed non-recyclables)
+3. Bag condition (torn bag, leaking bag, overfilled bag, properly sealed bag)
+4. Estimated quality rating — return ONE of: CLEAN, NEEDS_REVIEW, CONTAMINATED
+
+Decision Rules:
+CLEAN: Mostly recyclable materials, minimal contamination, safe for processing, no hazardous waste visible.
+NEEDS_REVIEW: Some contamination visible, unclear contents, requires human verification, mixed recyclables/non-recyclables.
+CONTAMINATED: Heavy trash contamination, food/liquid saturation, biohazard risk, hazardous materials present, unsafe for recycling stream.
+
+Return JSON ONLY in this exact format:
+{"result":"CLEAN","confidence":92,"estimated_recyclables":["plastic bottles","aluminum cans"],"contamination_detected":["minor food residue"],"bag_condition":"sealed","notes":"Bag appears mostly recyclable with minor contamination."}
+
+Important: Do not invent materials not visible in the image. Confidence must be 0-100. Be conservative when contamination is unclear. Prioritize warehouse safety. If image quality is poor, return NEEDS_REVIEW. Never output markdown. Never explain outside the JSON response.`
+
+const AI_TO_RAG: Record<AiOutcome, RagStatus> = {
+  CLEAN:       'green',
+  NEEDS_REVIEW:'yellow',
+  CONTAMINATED:'red',
+}
+
+// ── RAG config ───────────────────────────────────────────────────────────────
+
 const RAG: Record<RagStatus, {
-  label:     string
-  icon:      string
-  color:     string
-  bg:        string
-  border:    string
+  label:        string
+  icon:         string
+  color:        string
+  bg:           string
+  border:       string
   newBagStatus: string
 }> = {
   green:  { label: 'Clean Bag',    icon: '✅', color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.35)',  newBagStatus: 'inspected'    },
@@ -37,27 +72,60 @@ const RAG: Record<RagStatus, {
   red:    { label: 'Contaminated', icon: '🚫', color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', newBagStatus: 'at_warehouse' },
 }
 
-// Standard defaults — bags table does not store these
-const ESTIMATED_VALUE  = 2.85  // personal mode earnings
-const USER_SHARE       = 2.00  // user keeps in fundraiser mode
-const FUNDRAISER_SHARE = 0.85  // donated to fundraiser
+const ESTIMATED_VALUE  = 2.85
+const USER_SHARE       = 2.00
+const FUNDRAISER_SHARE = 0.85
 const CO2_SAVED_LBS    = 4.2
 const POINTS_EARNED    = 285
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function confidenceColor(c: number): string {
+  if (c >= 80) return '#4ade80'
+  if (c >= 55) return '#fbbf24'
+  return '#f87171'
+}
+
+async function compressImage(dataUrl: string, maxPx = 1024): Promise<string> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width  = img.width  * scale
+      canvas.height = img.height * scale
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.82))
+    }
+    img.src = dataUrl
+  })
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function LiveInspectionPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const [animate, setAnimate]         = useState(false)
-  const [bag, setBag]                 = useState<Bag | null>(null)
-  const [scan, setScan]               = useState<BagScan | null>(null)
-  const [loading, setLoading]         = useState(true)
-  const [loadError, setLoadError]     = useState<string | null>(null)
-  const [submitting, setSubmitting]   = useState<RagStatus | null>(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [result, setResult]           = useState<RagStatus | null>(null)
+
+  const [animate, setAnimate]               = useState(false)
+  const [bag, setBag]                       = useState<Bag | null>(null)
+  const [scan, setScan]                     = useState<BagScan | null>(null)
+  const [loading, setLoading]               = useState(true)
+  const [loadError, setLoadError]           = useState<string | null>(null)
+  const [submitting, setSubmitting]         = useState<RagStatus | null>(null)
+  const [submitError, setSubmitError]       = useState<string | null>(null)
+  const [result, setResult]                 = useState<RagStatus | null>(null)
   const [fundraiserId, setFundraiserId]     = useState<string | null>(null)
   const [fundraiserName, setFundraiserName] = useState<string | null>(null)
   const [warnings, setWarnings]             = useState<string[]>([])
+
+  // AI state
+  const [aiPhase, setAiPhase]             = useState<AiPhase>('idle')
+  const [aiResult, setAiResult]           = useState<AiResult | null>(null)
+  const [aiError, setAiError]             = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl]           = useState<string | null>(null)
+  const [suggestedRag, setSuggestedRag]   = useState<RagStatus | null>(null)
+  const fileInputRef                       = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true))
@@ -66,12 +134,11 @@ export default function LiveInspectionPage() {
 
   useEffect(() => {
     let mounted = true
-
     async function load() {
-      const scanId      = localStorage.getItem('live_scan_id')
-      const bagId       = localStorage.getItem('live_bag_id')
-      const fId         = localStorage.getItem('live_fundraiser_id')
-      const fName       = localStorage.getItem('live_fundraiser_name')
+      const scanId = localStorage.getItem('live_scan_id')
+      const bagId  = localStorage.getItem('live_bag_id')
+      const fId    = localStorage.getItem('live_fundraiser_id')
+      const fName  = localStorage.getItem('live_fundraiser_name')
       if (fId)   setFundraiserId(fId)
       if (fName) setFundraiserName(fName)
 
@@ -80,33 +147,22 @@ export default function LiveInspectionPage() {
         setLoading(false)
         return
       }
-
       if (!user) { navigate('/real-login', { replace: true }); return }
 
-      // Fetch real tables with real column names
       const [bagRes, scanRes] = await Promise.all([
-        supabase
-          .from('qr_bags')
-          .select('id, bag_code, status, consumer_id')
-          .eq('id', bagId)
-          .maybeSingle(),
-        supabase
-          .from('bag_scans')
-          .select('id, scan_time, location')
-          .eq('id', scanId)
-          .maybeSingle(),
+        supabase.from('qr_bags').select('id, bag_code, status, owner_id').eq('id', bagId).maybeSingle(),
+        supabase.from('bag_scans').select('id, scan_time, location').eq('id', scanId).maybeSingle(),
       ])
 
       if (!mounted) return
-      if (bagRes.data)  setBag(bagRes.data   as Bag)
-      if (scanRes.data) setScan(scanRes.data  as BagScan)
+      if (bagRes.data)  setBag(bagRes.data  as Bag)
+      if (scanRes.data) setScan(scanRes.data as BagScan)
       if (bagRes.error) setLoadError(`Could not load bag: ${bagRes.error.message}`)
       setLoading(false)
     }
-
     load()
     return () => { mounted = false }
-  }, [navigate])
+  }, [navigate, user])
 
   const fade = (d = 0): React.CSSProperties => ({
     opacity:    animate ? 1 : 0,
@@ -114,21 +170,103 @@ export default function LiveInspectionPage() {
     transition: `opacity 0.4s ease ${d}ms, transform 0.4s ease ${d}ms`,
   })
 
+  // ── AI photo analysis ─────────────────────────────────────────────────────
+
+  function handleCameraClick() {
+    fileInputRef.current?.click()
+  }
+
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''   // allow re-selecting the same file
+
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const raw = reader.result as string
+      const compressed = await compressImage(raw)
+      setPhotoUrl(compressed)
+      await runAiAnalysis(compressed)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function runAiAnalysis(dataUrl: string) {
+    setAiPhase('analyzing')
+    setAiError(null)
+    setAiResult(null)
+    setSuggestedRag(null)
+
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
+    if (!apiKey) {
+      setAiError('OpenAI key not set — add VITE_OPENAI_API_KEY to your Vercel environment variables.')
+      setAiPhase('error')
+      return
+    }
+
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model:      'gpt-4o',
+          max_tokens: 512,
+          messages: [
+            { role: 'system', content: AI_SYSTEM_PROMPT },
+            {
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+              ],
+            },
+          ],
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`OpenAI ${res.status}: ${body.slice(0, 200)}`)
+      }
+
+      const json   = await res.json()
+      const text   = (json.choices?.[0]?.message?.content ?? '').trim()
+      const parsed = JSON.parse(text) as AiResult
+
+      setAiResult(parsed)
+      setSuggestedRag(AI_TO_RAG[parsed.result] ?? 'yellow')
+      setAiPhase('done')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // JSON parse failures from markdown-wrapped responses
+      if (msg.includes('JSON')) {
+        setAiError('AI returned unexpected format. Use manual buttons below.')
+      } else {
+        setAiError(msg)
+      }
+      setAiPhase('error')
+    }
+  }
+
+  // ── Save inspection ───────────────────────────────────────────────────────
+
   async function handleInspect(rag: RagStatus) {
     if (!bag || !user) return
     setSubmitError(null)
     setSubmitting(rag)
 
-    // ── 1. Insert inspection ────────────────────────────────────
-    // Real inspections columns: bag_id, inspector_id, status, notes
-    // status is the green/yellow/red value (not rag_status — wrong column)
+    // 1. Insert inspection
     const { data: inspection, error: inspErr } = await supabase
       .from('inspections')
       .insert({
         bag_id:       bag.id,
         inspector_id: user.id,
         status:       rag,
-        notes:        'Live inspection via BayKid app',
+        notes:        aiResult
+          ? `AI: ${aiResult.result} (${aiResult.confidence}% confidence). ${aiResult.notes}`
+          : 'Manual inspection via BayKid app',
       })
       .select('id')
       .single()
@@ -139,14 +277,14 @@ export default function LiveInspectionPage() {
       return
     }
 
-    // ── 2. Update bags.status ───────────────────────────────────
+    // 2. Update bag status
     const { error: bagErr } = await supabase
       .from('qr_bags')
       .update({ status: RAG[rag].newBagStatus })
       .eq('id', bag.id)
     if (bagErr) console.error('[qr_bags update]', bagErr.message)
 
-    // ── 3. GREEN: wallet credit + lifecycle event + fundraiser ──
+    // 3. GREEN: wallet + lifecycle + fundraiser
     if (rag === 'green') {
       const newWarnings: string[] = []
       const isFundraiserMode = !!fundraiserId
@@ -166,31 +304,24 @@ export default function LiveInspectionPage() {
         console.error('[wallet_transactions]', walletErr.message)
         newWarnings.push('Wallet credit could not be recorded.')
       } else {
-        // Non-fatal — wallet earning notification
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: user.id,
-            type:    'payout',
-            title:   'Reward Earned',
-            body:    'Your approved QR bag earned a recycling reward.',
-            read:    false,
-          })
+        await supabase.from('notifications').insert({
+          user_id: user.id, type: 'payout', title: 'Reward Earned',
+          body: 'Your approved QR bag earned a recycling reward.', read: false,
+        })
       }
 
       const { error: lifecycleErr } = await supabase
         .from('bag_lifecycle_events')
         .insert({
-          bag_id:      bag.id,
-          actor_id:    user.id,
-          from_status: bag.status,
-          to_status:   'inspected',
-          notes:       `Bag ${bag.bag_code} approved after live inspection`,
-          metadata:    {
+          bag_id: bag.id, actor_id: user.id,
+          from_status: bag.status, to_status: 'inspected',
+          notes: `Bag ${bag.bag_code} approved after live inspection`,
+          metadata: {
             rag_status:    'green',
             source:        'live_inspection',
             co2_saved_lbs: CO2_SAVED_LBS,
             inspection_id: inspection?.id,
+            ai_result:     aiResult ?? null,
           },
         })
       if (lifecycleErr) {
@@ -199,94 +330,54 @@ export default function LiveInspectionPage() {
       }
 
       if (isFundraiserMode && fundraiserId) {
-        // Columns used: fundraiser_id, contributor_id (NOT user_id), bag_id, type, amount, notes, recorded_by
-        // type CHECK: 'bag' | 'cash' | 'bonus'   —   no bag_scan_id or contribution_type column exists
         const contribRow = {
-          fundraiser_id:  fundraiserId,
-          contributor_id: user.id,
-          bag_id:         bag.id,
-          type:           'bag' as const,
-          amount:         FUNDRAISER_SHARE,
-          notes:          `Bag ${bag.bag_code} donated via live inspection`,
-          recorded_by:    user.id,
+          fundraiser_id: fundraiserId, contributor_id: user.id,
+          bag_id: bag.id, type: 'bag' as const,
+          amount: FUNDRAISER_SHARE,
+          notes:  `Bag ${bag.bag_code} donated via live inspection`,
+          recorded_by: user.id,
         }
-        const { error: contribErr } = await supabase
-          .from('fundraiser_contributions')
-          .insert(contribRow)
+        const { error: contribErr } = await supabase.from('fundraiser_contributions').insert(contribRow)
         if (contribErr) {
-          console.error('[fundraiser_contributions] insert failed', {
-            code:    contribErr.code,
-            message: contribErr.message,
-            details: contribErr.details,
-            hint:    contribErr.hint,
-            row:     contribRow,
-          })
-          newWarnings.push(`Fundraiser contribution failed (${contribErr.code ?? 'ERR'}): ${contribErr.message}`)
+          newWarnings.push(`Fundraiser contribution failed: ${contribErr.message}`)
         } else {
-          // Non-fatal — fundraiser donation notification
-          await supabase
-            .from('notifications')
-            .insert({
-              user_id: user.id,
-              type:    'fundraiser',
-              title:   'Recycling Donation Recorded',
-              body:    `$${FUNDRAISER_SHARE.toFixed(2)} was donated to your selected fundraiser.`,
-              read:    false,
-            })
-        }
-
-        const { error: rpcErr } = await supabase
-          .rpc('increment_fundraiser_raised', { fid: fundraiserId, delta: FUNDRAISER_SHARE })
-        if (rpcErr) {
-          console.error('[increment_fundraiser_raised] rpc failed', {
-            code:    rpcErr.code,
-            message: rpcErr.message,
-            hint:    rpcErr.hint,
+          await supabase.from('notifications').insert({
+            user_id: user.id, type: 'fundraiser',
+            title: 'Recycling Donation Recorded',
+            body:  `$${FUNDRAISER_SHARE.toFixed(2)} was donated to your selected fundraiser.`,
+            read:  false,
           })
-          newWarnings.push(`Fundraiser total update failed (${rpcErr.code ?? 'ERR'}): ${rpcErr.message}`)
         }
+        const { error: rpcErr } = await supabase.rpc('increment_fundraiser_raised', { fid: fundraiserId, delta: FUNDRAISER_SHARE })
+        if (rpcErr) newWarnings.push(`Fundraiser total update failed: ${rpcErr.message}`)
       }
 
       if (newWarnings.length > 0) setWarnings(newWarnings)
     }
 
-    // ── 4. RED: open a hazardous material alert ─────────────────
-    // alerts columns: driver_id (FK profiles), alert_type, status, notes
+    // 4. RED: hazardous alert
     if (rag === 'red') {
       const { error: alertErr } = await supabase
         .from('alerts')
         .insert({
-          driver_id:  user.id,
-          alert_type: 'hazardous_material',
-          status:     'open',
-          notes:      `Contaminated bag detected: ${bag.bag_code}. Inspection: RED.`,
+          driver_id: user.id, alert_type: 'hazardous_material',
+          status: 'open', notes: `Contaminated bag: ${bag.bag_code}. Inspection: RED.`,
         })
-      if (alertErr) {
-        console.error('[alerts]', alertErr.message)
-      } else {
-        // Non-fatal — contamination alert notification
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: user.id,
-            type:    'alert',
-            title:   'Bag Needs Attention',
-            body:    'A QR bag was flagged for contamination review.',
-            read:    false,
-          })
+      if (!alertErr) {
+        await supabase.from('notifications').insert({
+          user_id: user.id, type: 'alert', title: 'Bag Needs Attention',
+          body: 'A QR bag was flagged for contamination review.', read: false,
+        })
       }
     }
 
-    // Clear fundraiser from localStorage after any inspection outcome
     localStorage.removeItem('live_fundraiser_id')
     localStorage.removeItem('live_fundraiser_name')
-
     setResult(rag)
     setSubmitting(null)
   }
 
   function rescanBag() {
-    // Keep bag ID, clear scan ID + fundraiser so user selects fresh on next scan
     localStorage.removeItem('live_scan_id')
     localStorage.removeItem('live_fundraiser_id')
     localStorage.removeItem('live_fundraiser_name')
@@ -296,19 +387,32 @@ export default function LiveInspectionPage() {
   const scanMode = scan?.location ?? 'personal'
   const scanTime = scan?.scan_time ? new Date(scan.scan_time).toLocaleString() : '—'
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div
       className="relative min-h-screen flex flex-col overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}
     >
       <style>{`
-        @keyframes spinLI { to { transform: rotate(360deg); } }
-        @keyframes liPop  { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes spinLI  { to { transform: rotate(360deg); } }
+        @keyframes liPop   { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes aiPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
       `}</style>
 
       <div className="pointer-events-none absolute inset-0 grid-bg" />
       <div className="pointer-events-none absolute" style={{ top: -80, left: -60, width: 280, height: 280, background: 'rgba(74,222,128,0.15)', filter: 'blur(72px)', borderRadius: '50%' }} />
       <div className="pointer-events-none absolute" style={{ bottom: -60, right: -40, width: 200, height: 200, background: 'rgba(0,200,255,0.07)', filter: 'blur(60px)', borderRadius: '50%' }} />
+
+      {/* Hidden file input — camera on mobile */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={handlePhotoSelected}
+      />
 
       {/* Header */}
       <header
@@ -318,7 +422,7 @@ export default function LiveInspectionPage() {
         <div className="flex items-center gap-3">
           <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
-          <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Live Inspection</span>
+          <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>AI Inspection</span>
         </div>
         <Link to="/live-scan" className="text-sm transition-opacity hover:opacity-70" style={{ color: 'rgba(255,255,255,0.4)' }}>
           ← Scan
@@ -334,31 +438,25 @@ export default function LiveInspectionPage() {
               className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest mb-3 inline-block"
               style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}
             >
-              Live Mode
+              Live Mode · AI-Assisted
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Live Bag Inspection</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Record inspection result for the scanned QR bag.
+              Take a photo to get an AI quality rating, then confirm the result.
             </p>
           </div>
 
           {/* Loading */}
           {loading && (
             <div className="flex items-center gap-3 py-10 justify-center" style={fade(60)}>
-              <span
-                className="w-5 h-5 rounded-full border-2"
-                style={{ borderColor: 'rgba(0,200,255,0.2)', borderTopColor: '#00c8ff', animation: 'spinLI 0.7s linear infinite' }}
-              />
+              <span className="w-5 h-5 rounded-full border-2" style={{ borderColor: 'rgba(0,200,255,0.2)', borderTopColor: '#00c8ff', animation: 'spinLI 0.7s linear infinite' }} />
               <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading bag data…</span>
             </div>
           )}
 
           {/* Load error */}
           {!loading && loadError && (
-            <div
-              className="rounded-xl px-4 py-4 mb-4 text-sm"
-              style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', ...fade(60) }}
-            >
+            <div className="rounded-xl px-4 py-4 mb-4 text-sm" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', ...fade(60) }}>
               {loadError}
               <Link to="/live-scan" className="block mt-3 font-semibold" style={{ color: '#00c8ff' }}>
                 → Go back to scan a bag
@@ -368,32 +466,23 @@ export default function LiveInspectionPage() {
 
           {/* Bag info card */}
           {!loading && bag && (
-            <div
-              className="rounded-2xl p-5 mb-6"
-              style={{ background: 'rgba(0,87,231,0.1)', border: '1px solid rgba(0,200,255,0.25)', ...fade(60) }}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Bag Details
-              </p>
+            <div className="rounded-2xl p-5 mb-5" style={{ background: 'rgba(0,87,231,0.1)', border: '1px solid rgba(0,200,255,0.25)', ...fade(60) }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>Bag Details</p>
               <div className="flex flex-col">
                 {[
-                  { label: 'Bag Code',       value: bag.bag_code,                         color: '#00c8ff'               },
-                  { label: 'Estimated Value',value: `$${ESTIMATED_VALUE.toFixed(2)}`,     color: '#ffffff'               },
-                  { label: 'CO₂ Saved',      value: `${CO2_SAVED_LBS.toFixed(1)} lbs`,   color: '#4ade80'               },
-                  { label: 'Points Earned',  value: `${POINTS_EARNED} pts`,               color: '#fbbf24'               },
-                  { label: 'Scan Mode',      value: scanMode,                             color: 'rgba(255,255,255,0.6)' },
+                  { label: 'Bag Code',        value: bag.bag_code,                         color: '#00c8ff'               },
+                  { label: 'Estimated Value', value: `$${ESTIMATED_VALUE.toFixed(2)}`,     color: '#ffffff'               },
+                  { label: 'CO₂ Saved',       value: `${CO2_SAVED_LBS.toFixed(1)} lbs`,   color: '#4ade80'               },
+                  { label: 'Points Earned',   value: `${POINTS_EARNED} pts`,               color: '#fbbf24'               },
+                  { label: 'Scan Mode',       value: scanMode,                             color: 'rgba(255,255,255,0.6)' },
                   ...(fundraiserName ? [{ label: 'Fundraiser', value: fundraiserName, color: '#4ade80' }] : []),
-                  { label: 'Bag Status',     value: bag.status.replace(/_/g, ' '),        color: '#5eead4'               },
-                  { label: 'Scanned At',     value: scanTime,                             color: 'rgba(255,255,255,0.45)'},
+                  { label: 'Bag Status',      value: bag.status.replace(/_/g, ' '),        color: '#5eead4'               },
+                  { label: 'Scanned At',      value: scanTime,                             color: 'rgba(255,255,255,0.45)'},
                 ].map((row, i, arr) => (
                   <div
                     key={row.label}
                     className="flex items-center justify-between"
-                    style={{
-                      paddingTop:    i > 0 ? 10 : 0,
-                      paddingBottom: i < arr.length - 1 ? 10 : 0,
-                      borderBottom:  i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                    }}
+                    style={{ paddingTop: i > 0 ? 10 : 0, paddingBottom: i < arr.length - 1 ? 10 : 0, borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
                   >
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>{row.label}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: row.color }}>{row.value}</span>
@@ -403,91 +492,220 @@ export default function LiveInspectionPage() {
             </div>
           )}
 
-          {/* Inspection buttons — only shown before result */}
+          {/* ── AI Photo Analysis Section ─────────────────────────────── */}
           {!loading && bag && !result && (
-            <div className="mb-6" style={fade(120)}>
+            <div className="mb-5" style={fade(90)}>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Select Inspection Result
+                Step 1 — AI Photo Scan
               </p>
-              <div className="flex flex-col gap-3">
-                {(Object.entries(RAG) as [RagStatus, typeof RAG.green][]).map(([rag, meta]) => (
-                  <button
-                    key={rag}
-                    type="button"
-                    onClick={() => handleInspect(rag)}
-                    disabled={submitting !== null}
-                    className="flex items-center gap-4 p-4 rounded-2xl text-sm transition-all hover:brightness-110 active:scale-[0.98]"
-                    style={{
-                      background: meta.bg,
-                      border:     `1px solid ${meta.border}`,
-                      color:      meta.color,
-                      cursor:     submitting !== null ? 'not-allowed' : 'pointer',
-                      opacity:    submitting !== null && submitting !== rag ? 0.45 : 1,
-                    }}
-                  >
-                    {submitting === rag ? (
-                      <span
-                        className="w-6 h-6 rounded-full border-2 shrink-0"
-                        style={{ borderColor: `${meta.color}33`, borderTopColor: meta.color, animation: 'spinLI 0.7s linear infinite' }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 22, flexShrink: 0 }}>{meta.icon}</span>
-                    )}
-                    <div className="text-left flex-1">
-                      <p style={{ fontWeight: 700, fontSize: 14 }}>{meta.label}</p>
-                      <p style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>
-                        {rag === 'green'  && (fundraiserId
-                          ? `Clean & recyclable. You earn $${USER_SHARE.toFixed(2)}, $${FUNDRAISER_SHARE.toFixed(2)} goes to fundraiser.`
-                          : `Clean & recyclable. Earns $${ESTIMATED_VALUE.toFixed(2)} wallet credit.`)}
-                        {rag === 'yellow' && 'Some contamination. Flagged for warehouse review.'}
-                        {rag === 'red'    && 'High contamination. Alert will be created.'}
+
+              {/* Photo preview */}
+              {photoUrl && (
+                <div className="mb-3 rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(0,200,255,0.2)', maxHeight: 220 }}>
+                  <img src={photoUrl} alt="Bag photo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+              )}
+
+              {/* Camera button */}
+              {aiPhase !== 'analyzing' && (
+                <button
+                  type="button"
+                  onClick={handleCameraClick}
+                  disabled={submitting !== null}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                  style={{
+                    background: 'rgba(0,200,255,0.08)',
+                    border:     '1px solid rgba(0,200,255,0.35)',
+                    color:      '#00c8ff',
+                    cursor:     submitting !== null ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  📸 {photoUrl ? 'Retake Photo' : 'Take Photo of Bag Contents'}
+                </button>
+              )}
+
+              {/* Analyzing spinner */}
+              {aiPhase === 'analyzing' && (
+                <div
+                  className="w-full flex flex-col items-center justify-center gap-3 py-8 rounded-2xl"
+                  style={{ background: 'rgba(0,200,255,0.05)', border: '1px solid rgba(0,200,255,0.2)', animation: 'aiPulse 1.8s ease-in-out infinite' }}
+                >
+                  <span className="w-8 h-8 rounded-full border-2" style={{ borderColor: 'rgba(0,200,255,0.2)', borderTopColor: '#00c8ff', animation: 'spinLI 0.8s linear infinite' }} />
+                  <p style={{ fontSize: 13, color: '#00c8ff', fontWeight: 600 }}>AI analyzing bag contents…</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Checking recyclables, contamination, bag condition</p>
+                </div>
+              )}
+
+              {/* AI error */}
+              {aiPhase === 'error' && aiError && (
+                <div className="rounded-xl px-4 py-3 mt-3 text-xs" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', color: '#f87171' }}>
+                  <strong>AI Error:</strong> {aiError}
+                </div>
+              )}
+
+              {/* ── AI Result Card ──────────────────────────────────────── */}
+              {aiPhase === 'done' && aiResult && suggestedRag && (
+                <div
+                  className="rounded-2xl p-5 mt-3"
+                  style={{ background: RAG[suggestedRag].bg, border: `1px solid ${RAG[suggestedRag].border}`, animation: 'liPop 0.4s ease' }}
+                >
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontSize: 22 }}>{RAG[suggestedRag].icon}</span>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 800, color: RAG[suggestedRag].color }}>
+                          AI: {aiResult.result.replace('_', ' ')}
+                        </p>
+                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                          Suggested: <strong style={{ color: RAG[suggestedRag].color }}>{RAG[suggestedRag].label}</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p style={{ fontSize: 22, fontWeight: 900, color: confidenceColor(aiResult.confidence) }}>
+                        {aiResult.confidence}%
+                      </p>
+                      <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        Confidence
                       </p>
                     </div>
-                  </button>
-                ))}
+                  </div>
+
+                  {/* Details grid */}
+                  <div className="flex flex-col gap-2 mb-4">
+                    {aiResult.estimated_recyclables.length > 0 && (
+                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}>
+                        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#4ade80', marginBottom: 4 }}>
+                          ♻️ Recyclables detected
+                        </p>
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                          {aiResult.estimated_recyclables.join(' · ')}
+                        </p>
+                      </div>
+                    )}
+
+                    {aiResult.contamination_detected.length > 0 && (
+                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#f87171', marginBottom: 4 }}>
+                          ⚠️ Contamination detected
+                        </p>
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                          {aiResult.contamination_detected.join(' · ')}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <div className="flex-1 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Bag condition</p>
+                        <p style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>{aiResult.bag_condition}</p>
+                      </div>
+                    </div>
+
+                    {aiResult.notes && (
+                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', lineHeight: 1.55 }}>
+                          "{aiResult.notes}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Inspection buttons ─────────────────────────────────────── */}
+          {!loading && bag && !result && (
+            <div className="mb-6" style={fade(150)}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                Step 2 — {suggestedRag ? 'Confirm or Override' : 'Select Inspection Result'}
+              </p>
+
+              {suggestedRag && (
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>
+                  AI suggests <strong style={{ color: RAG[suggestedRag].color }}>{RAG[suggestedRag].label}</strong>. Tap to confirm or choose a different result.
+                </p>
+              )}
+
+              <div className="flex flex-col gap-3">
+                {(Object.entries(RAG) as [RagStatus, typeof RAG.green][]).map(([rag, meta]) => {
+                  const isAiSuggested = suggestedRag === rag
+                  return (
+                    <button
+                      key={rag}
+                      type="button"
+                      onClick={() => handleInspect(rag)}
+                      disabled={submitting !== null}
+                      className="flex items-center gap-4 p-4 rounded-2xl text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                      style={{
+                        background: isAiSuggested
+                          ? meta.bg.replace('0.12', '0.22')
+                          : 'rgba(255,255,255,0.04)',
+                        border:  `${isAiSuggested ? '2px' : '1px'} solid ${isAiSuggested ? meta.border : 'rgba(255,255,255,0.1)'}`,
+                        color:   isAiSuggested ? meta.color : 'rgba(255,255,255,0.45)',
+                        cursor:  submitting !== null ? 'not-allowed' : 'pointer',
+                        opacity: submitting !== null && submitting !== rag ? 0.4 : 1,
+                      }}
+                    >
+                      {submitting === rag ? (
+                        <span className="w-6 h-6 rounded-full border-2 shrink-0" style={{ borderColor: `${meta.color}33`, borderTopColor: meta.color, animation: 'spinLI 0.7s linear infinite' }} />
+                      ) : (
+                        <span style={{ fontSize: 22, flexShrink: 0 }}>{meta.icon}</span>
+                      )}
+                      <div className="text-left flex-1">
+                        <div className="flex items-center gap-2">
+                          <p style={{ fontWeight: 700, fontSize: 14 }}>{meta.label}</p>
+                          {isAiSuggested && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold" style={{ background: meta.border, color: meta.color }}>
+                              AI PICK
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>
+                          {rag === 'green'  && (fundraiserId
+                            ? `Clean & recyclable. You earn $${USER_SHARE.toFixed(2)}, $${FUNDRAISER_SHARE.toFixed(2)} goes to fundraiser.`
+                            : `Clean & recyclable. Earns $${ESTIMATED_VALUE.toFixed(2)} wallet credit.`)}
+                          {rag === 'yellow' && 'Some contamination. Flagged for warehouse review.'}
+                          {rag === 'red'    && 'High contamination. Alert will be created.'}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
 
               {submitError && (
-                <div
-                  className="rounded-xl px-4 py-3 mt-3 text-sm"
-                  style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}
-                >
+                <div className="rounded-xl px-4 py-3 mt-3 text-sm" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
                   {submitError}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Result card ─────────────────────────────────────────── */}
+          {/* ── Result card ────────────────────────────────────────────── */}
           {result && (
             <div
               className="rounded-2xl p-6 mb-6 text-center"
-              style={{
-                background: RAG[result].bg,
-                border:     `1px solid ${RAG[result].border}`,
-                animation:  'liPop 0.45s cubic-bezier(0.34,1.56,0.64,1)',
-              }}
+              style={{ background: RAG[result].bg, border: `1px solid ${RAG[result].border}`, animation: 'liPop 0.45s cubic-bezier(0.34,1.56,0.64,1)' }}
             >
-              <span style={{ fontSize: 44, display: 'block', marginBottom: 14 }}>
-                {RAG[result].icon}
-              </span>
+              <span style={{ fontSize: 44, display: 'block', marginBottom: 14 }}>{RAG[result].icon}</span>
               <p style={{ fontSize: 17, fontWeight: 800, color: RAG[result].color, marginBottom: 8 }}>
                 {result === 'green'  && 'Inspection Complete!'}
                 {result === 'yellow' && 'Flagged for Review'}
                 {result === 'red'    && 'Bag Rejected'}
               </p>
+              {aiResult && (
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>
+                  AI: {aiResult.result} · {aiResult.confidence}% confidence
+                </p>
+              )}
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.65, marginBottom: 20 }}>
                 {result === 'green' && fundraiserName ? (
                   <>
-                    <p style={{ marginBottom: 6 }}>
-                      You earned{' '}
-                      <span style={{ color: '#4ade80', fontWeight: 700 }}>${USER_SHARE.toFixed(2)}</span>
-                    </p>
-                    <p>
-                      <span style={{ color: '#4ade80', fontWeight: 700 }}>${FUNDRAISER_SHARE.toFixed(2)}</span>
-                      {' '}donated to{' '}
-                      <span style={{ color: '#ffffff', fontWeight: 600 }}>{fundraiserName}</span>
-                    </p>
+                    <p style={{ marginBottom: 6 }}>You earned <span style={{ color: '#4ade80', fontWeight: 700 }}>${USER_SHARE.toFixed(2)}</span></p>
+                    <p><span style={{ color: '#4ade80', fontWeight: 700 }}>${FUNDRAISER_SHARE.toFixed(2)}</span> donated to <span style={{ color: '#ffffff', fontWeight: 600 }}>{fundraiserName}</span></p>
                   </>
                 ) : result === 'green' ? (
                   <p>Bag approved. <span style={{ color: '#4ade80', fontWeight: 700 }}>${ESTIMATED_VALUE.toFixed(2)}</span> added to your wallet.</p>
@@ -500,59 +718,31 @@ export default function LiveInspectionPage() {
 
               <div className="flex flex-col gap-2">
                 {result === 'green' && fundraiserName && (
-                  <Link
-                    to="/live-fundraisers"
-                    className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-                    style={{ background: 'rgba(74,222,128,0.18)', border: '1px solid rgba(74,222,128,0.45)', color: '#4ade80' }}
-                  >
+                  <Link to="/live-fundraisers" className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110" style={{ background: 'rgba(74,222,128,0.18)', border: '1px solid rgba(74,222,128,0.45)', color: '#4ade80' }}>
                     View Live Fundraisers →
                   </Link>
                 )}
                 {result === 'green' && (
-                  <Link
-                    to="/live-dashboard"
-                    className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-                    style={{ background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.25)', color: '#00c8ff' }}
-                  >
-                    View Live Dashboard →
-                  </Link>
-                )}
-                {result === 'green' && (
-                  <Link
-                    to="/live-wallet"
-                    className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-                    style={{ background: 'rgba(94,234,212,0.1)', border: '1px solid rgba(94,234,212,0.25)', color: '#5eead4' }}
-                  >
-                    💳 Live Wallet
-                  </Link>
-                )}
-
-                {result === 'yellow' && (
-                  <button
-                    type="button"
-                    onClick={rescanBag}
-                    className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-                    style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24', cursor: 'pointer' }}
-                  >
-                    🔄 Rescan This Bag
-                  </button>
-                )}
-
-                {result === 'red' && (
-                  <Link
-                    to="/live-dashboard"
-                    className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-                    style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171' }}
-                  >
+                  <Link to="/dashboard/consumer" className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110" style={{ background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.25)', color: '#00c8ff' }}>
                     View Dashboard →
                   </Link>
                 )}
-
-                <Link
-                  to="/live-scan"
-                  className="w-full flex items-center justify-center py-2.5 rounded-xl text-sm font-medium transition-all hover:brightness-110"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}
-                >
+                {result === 'green' && (
+                  <Link to="/live-wallet" className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110" style={{ background: 'rgba(94,234,212,0.1)', border: '1px solid rgba(94,234,212,0.25)', color: '#5eead4' }}>
+                    💳 Live Wallet
+                  </Link>
+                )}
+                {result === 'yellow' && (
+                  <button type="button" onClick={rescanBag} className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110" style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24', cursor: 'pointer' }}>
+                    🔄 Rescan This Bag
+                  </button>
+                )}
+                {result === 'red' && (
+                  <Link to="/dashboard/consumer" className="w-full flex items-center justify-center py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110" style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171' }}>
+                    View Dashboard →
+                  </Link>
+                )}
+                <Link to="/live-scan" className="w-full flex items-center justify-center py-2.5 rounded-xl text-sm font-medium transition-all hover:brightness-110" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
                   Scan Another Bag
                 </Link>
               </div>
@@ -561,13 +751,8 @@ export default function LiveInspectionPage() {
 
           {/* Partial-failure warnings */}
           {warnings.length > 0 && (
-            <div
-              className="rounded-xl px-4 py-4 mb-4"
-              style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)' }}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#fbbf24' }}>
-                Partial Save Warning
-              </p>
+            <div className="rounded-xl px-4 py-4 mb-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#fbbf24' }}>Partial Save Warning</p>
               <ul className="flex flex-col gap-1">
                 {warnings.map(w => (
                   <li key={w} style={{ fontSize: 12, color: 'rgba(251,191,36,0.8)' }}>• {w}</li>

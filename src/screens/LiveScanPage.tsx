@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuthStore } from '../store/authStore'
@@ -102,17 +102,108 @@ export default function LiveScanPage() {
     transition: `opacity 0.4s ease ${d}ms, transform 0.4s ease ${d}ms`,
   })
 
+  // Refs so the scan callback can read latest values without stale closure issues
+  const scanModeRef         = useRef(scanMode)
+  const fundraiserIdRef     = useRef(fundraiserId)
+  const joinedFundraisersRef = useRef(joinedFundraisers)
+  const userRef             = useRef(user)
+  scanModeRef.current          = scanMode
+  fundraiserIdRef.current      = fundraiserId
+  joinedFundraisersRef.current = joinedFundraisers
+  userRef.current              = user
+
   const handleQrScan = useCallback((decoded: string) => {
     console.log('[LiveScan] qrData', decoded)
-    const raw  = decoded.trim()
-    const code = raw.includes('/')
-      ? (raw.split('/').pop()?.toUpperCase() ?? raw.toUpperCase())
-      : raw.toUpperCase()
-    setBagCode(code)
-    setError(null)
-    // Defer unmount by one frame so html5-qrcode can finish its internal stop
-    requestAnimationFrame(() => setShowCamera(false))
-  }, [])
+
+    try {
+      if (!decoded) {
+        setError('No QR code found.')
+        return
+      }
+
+      const raw  = decoded.trim()
+      const code = raw.includes('/')
+        ? (raw.split('/').pop()?.toUpperCase() ?? raw.toUpperCase())
+        : raw.toUpperCase()
+
+      setBagCode(code)
+      setError(null)
+
+      // Defer camera unmount one frame so html5-qrcode finishes internally
+      requestAnimationFrame(() => setShowCamera(false))
+
+      // Auto-save and navigate — run outside React render cycle
+      const currentUser        = userRef.current
+      const currentScanMode    = scanModeRef.current
+      const currentFundraiser  = fundraiserIdRef.current
+      const currentFundraisers = joinedFundraisersRef.current
+
+      if (!currentUser) {
+        setError('Not authenticated. Please sign in.')
+        return
+      }
+
+      setLoading(true)
+
+      ;(async () => {
+        try {
+          const { data: bag, error: lookupErr } = await supabase
+            .from('qr_bags')
+            .select('id, consumer_id')
+            .eq('bag_code', code)
+            .maybeSingle()
+
+          console.log('[LiveScan] bag lookup', bag)
+
+          if (lookupErr) { setError(`Bag lookup failed: ${lookupErr.message}`); return }
+          if (!bag)       { setError('Bag not found. Check the code and try again.'); return }
+
+          const scanRow: Record<string, unknown> = {
+            bag_id:     bag.id,
+            scanned_by: currentUser.id,
+            location:   currentScanMode,
+          }
+          if (currentScanMode === 'fundraiser' && currentFundraiser) {
+            scanRow.fundraiser_id = currentFundraiser
+          }
+
+          const { data: scan, error: scanErr } = await supabase
+            .from('bag_scans')
+            .insert(scanRow)
+            .select('id')
+            .single()
+
+          if (scanErr || !scan) {
+            setError(`Could not save scan: ${scanErr?.message ?? 'Unknown error'}`)
+            return
+          }
+
+          localStorage.setItem('live_scan_id', scan.id)
+          localStorage.setItem('live_bag_id',  bag.id)
+
+          if (currentScanMode === 'fundraiser' && currentFundraiser) {
+            const fname = currentFundraisers.find(f => f.id === currentFundraiser)?.name ?? ''
+            localStorage.setItem('live_fundraiser_id',   currentFundraiser)
+            localStorage.setItem('live_fundraiser_name', fname)
+          } else {
+            localStorage.removeItem('live_fundraiser_id')
+            localStorage.removeItem('live_fundraiser_name')
+          }
+
+          setSaved(true)
+          setTimeout(() => navigate('/dashboard/consumer'), 500)
+        } catch (err: unknown) {
+          console.error('[LiveScan] save error', err)
+          setError(err instanceof Error ? err.message : 'Scan failed. Try again.')
+        } finally {
+          setLoading(false)
+        }
+      })()
+    } catch (err) {
+      console.error('[SCAN ERROR]', err)
+      setError('Scan completed, but the inspection screen could not open.')
+    }
+  }, [navigate])
 
   async function handleSave() {
     const code = bagCode.trim().toUpperCase()
@@ -186,7 +277,7 @@ export default function LiveScanPage() {
       }
 
       setSaved(true)
-      setTimeout(() => navigate('/live-inspection'), 700)
+      setTimeout(() => navigate('/dashboard/consumer'), 700)
     } catch (err: unknown) {
       console.error('[LiveScan] error', err)
       setError(err instanceof Error ? err.message : 'Scan failed.')

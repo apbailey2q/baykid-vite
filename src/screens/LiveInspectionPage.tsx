@@ -31,26 +31,6 @@ type BagScan = {
   location:  string | null
 }
 
-// ── AI System Prompt ─────────────────────────────────────────────────────────
-
-const AI_SYSTEM_PROMPT = `You are the AI Visual Inspection Assistant for Cyan's Brooklynn Recycling Enterprise.
-Your job is to analyze uploaded recycling bag images from warehouse workers and determine the contamination level and recyclability of the bag contents.
-You must inspect the image carefully and identify:
-1. Visible recyclable materials (plastic bottles, aluminum cans, cardboard, paper, glass containers)
-2. Contamination indicators (food residue, liquids, biohazards, trash, organic waste, hazardous materials, excessive dirt or mold, mixed non-recyclables)
-3. Bag condition (torn bag, leaking bag, overfilled bag, properly sealed bag)
-4. Estimated quality rating — return ONE of: CLEAN, NEEDS_REVIEW, CONTAMINATED
-
-Decision Rules:
-CLEAN: Mostly recyclable materials, minimal contamination, safe for processing, no hazardous waste visible.
-NEEDS_REVIEW: Some contamination visible, unclear contents, requires human verification, mixed recyclables/non-recyclables.
-CONTAMINATED: Heavy trash contamination, food/liquid saturation, biohazard risk, hazardous materials present, unsafe for recycling stream.
-
-Return JSON ONLY in this exact format:
-{"result":"CLEAN","confidence":92,"estimated_recyclables":["plastic bottles","aluminum cans"],"contamination_detected":["minor food residue"],"bag_condition":"sealed","notes":"Bag appears mostly recyclable with minor contamination."}
-
-Important: Do not invent materials not visible in the image. Confidence must be 0-100. Be conservative when contamination is unclear. Prioritize warehouse safety. If image quality is poor, return NEEDS_REVIEW. Never output markdown. Never explain outside the JSON response.`
-
 const AI_TO_RAG: Record<AiOutcome, RagStatus> = {
   CLEAN:       'green',
   NEEDS_REVIEW:'yellow',
@@ -197,55 +177,26 @@ export default function LiveInspectionPage() {
     setAiResult(null)
     setSuggestedRag(null)
 
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
-    if (!apiKey) {
-      setAiError('OpenAI key not set — add VITE_OPENAI_API_KEY to your Vercel environment variables.')
-      setAiPhase('error')
-      return
-    }
-
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model:      'gpt-4o',
-          max_tokens: 512,
-          messages: [
-            { role: 'system', content: AI_SYSTEM_PROMPT },
-            {
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
-              ],
-            },
-          ],
-        }),
+      const res = await fetch('/api/analyze-bag', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ imageBase64: dataUrl }),
       })
 
+      const json = await res.json()
+
       if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`OpenAI ${res.status}: ${body.slice(0, 200)}`)
+        throw new Error(json.error ?? `Server error ${res.status}`)
       }
 
-      const json   = await res.json()
-      const text   = (json.choices?.[0]?.message?.content ?? '').trim()
-      const parsed = JSON.parse(text) as AiResult
-
+      const parsed = json as AiResult
       setAiResult(parsed)
       setSuggestedRag(AI_TO_RAG[parsed.result] ?? 'yellow')
       setAiPhase('done')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      // JSON parse failures from markdown-wrapped responses
-      if (msg.includes('JSON')) {
-        setAiError('AI returned unexpected format. Use manual buttons below.')
-      } else {
-        setAiError(msg)
-      }
+      setAiError(msg)
       setAiPhase('error')
     }
   }
@@ -623,6 +574,12 @@ export default function LiveInspectionPage() {
                 Step 2 — {suggestedRag ? 'Confirm or Override' : 'Select Inspection Result'}
               </p>
 
+              {!photoUrl && (
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 12, fontStyle: 'italic' }}>
+                  📸 Take a photo above to enable inspection buttons.
+                </p>
+              )}
+
               {suggestedRag && (
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>
                   AI suggests <strong style={{ color: RAG[suggestedRag].color }}>{RAG[suggestedRag].label}</strong>. Tap to confirm or choose a different result.
@@ -632,12 +589,13 @@ export default function LiveInspectionPage() {
               <div className="flex flex-col gap-3">
                 {(Object.entries(RAG) as [RagStatus, typeof RAG.green][]).map(([rag, meta]) => {
                   const isAiSuggested = suggestedRag === rag
+                  const isDisabled = submitting !== null || !photoUrl
                   return (
                     <button
                       key={rag}
                       type="button"
                       onClick={() => handleInspect(rag)}
-                      disabled={submitting !== null}
+                      disabled={isDisabled}
                       className="flex items-center gap-4 p-4 rounded-2xl text-sm transition-all hover:brightness-110 active:scale-[0.98]"
                       style={{
                         background: isAiSuggested
@@ -645,8 +603,8 @@ export default function LiveInspectionPage() {
                           : 'rgba(255,255,255,0.04)',
                         border:  `${isAiSuggested ? '2px' : '1px'} solid ${isAiSuggested ? meta.border : 'rgba(255,255,255,0.1)'}`,
                         color:   isAiSuggested ? meta.color : 'rgba(255,255,255,0.45)',
-                        cursor:  submitting !== null ? 'not-allowed' : 'pointer',
-                        opacity: submitting !== null && submitting !== rag ? 0.4 : 1,
+                        cursor:  isDisabled ? 'not-allowed' : 'pointer',
+                        opacity: isDisabled && submitting !== rag ? 0.35 : 1,
                       }}
                     >
                       {submitting === rag ? (

@@ -252,19 +252,19 @@ export default function LiveInspectionPage() {
       const isFundraiserMode = !!fundraiserId
       const walletAmount = isFundraiserMode ? USER_SHARE : ESTIMATED_VALUE
 
-      const { error: walletErr } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          user_id:     user.id,
-          bag_id:      bag.id,
-          type:        'earning',
-          amount:      walletAmount,
-          description: `Bag ${bag.bag_code} approved after live inspection`,
-          status:      'completed',
-        })
+      const walletPayload = {
+        user_id:     user.id,
+        bag_id:      bag.id,
+        type:        'earning',
+        amount:      walletAmount,
+        description: `Bag ${bag.bag_code} approved after live inspection`,
+        status:      'completed',
+      }
+      console.log('Saving wallet transaction', walletPayload)
+      const { error: walletErr } = await supabase.from('wallet_transactions').insert(walletPayload)
       if (walletErr) {
         console.error('[wallet_transactions]', walletErr.message)
-        newWarnings.push('Wallet credit could not be recorded.')
+        newWarnings.push(`Wallet credit failed: ${walletErr.message}`)
       } else {
         await supabase.from('notifications').insert({
           user_id: user.id, type: 'payout', title: 'Reward Earned',
@@ -288,7 +288,21 @@ export default function LiveInspectionPage() {
         })
       if (lifecycleErr) {
         console.error('[bag_lifecycle_events]', lifecycleErr.message)
-        newWarnings.push('Lifecycle event could not be recorded.')
+        newWarnings.push(`Lifecycle event failed: ${lifecycleErr.message}`)
+      }
+
+      // Direct insert into point_events
+      const pointPayload = {
+        user_id: user.id,
+        bag_id:  bag.id,
+        points:  POINTS_EARNED,
+        reason:  'clean_bag_approved',
+      }
+      console.log('Saving point event', pointPayload)
+      const { error: pointsErr } = await supabase.from('point_events').insert(pointPayload)
+      if (pointsErr) {
+        console.error('[point_events]', pointsErr.message)
+        newWarnings.push(`Points save failed: ${pointsErr.message}`)
       }
 
       if (isFundraiserMode && fundraiserId) {

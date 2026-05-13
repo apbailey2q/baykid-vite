@@ -63,6 +63,8 @@ import LiveReportsPage from './screens/live/LiveReportsPage'
 import LiveAdminPage from './screens/live/LiveAdminPage'
 import LiveAuditLogPage from './screens/live/LiveAuditLogPage'
 import LiveSettingsPage from './screens/live/LiveSettingsPage'
+import LiveWarehouseDashboard from './screens/live/LiveWarehouseDashboard'
+import LiveWarehouseReviewPage from './screens/live/LiveWarehouseReviewPage'
 import TermsPage from './screens/TermsPage'
 import PrivacyPage from './screens/PrivacyPage'
 import ConsentPage from './screens/ConsentPage'
@@ -195,6 +197,8 @@ function App() {
         <Route path="/live-admin"                 element={<RequireAuth><RequireRole roles={['admin']}><LiveAdminPage /></RequireRole></RequireAuth>} />
         <Route path="/live-audit-log"             element={<RequireAuth><RequireRole roles={['admin']}><LiveAuditLogPage /></RequireRole></RequireAuth>} />
         <Route path="/live-settings"              element={<RequireAuth><RequireRole roles={['admin']}><LiveSettingsPage /></RequireRole></RequireAuth>} />
+        <Route path="/live-warehouse"             element={<RequireAuth><RequireRole roles={['warehouse_employee','warehouse_supervisor']}><LiveWarehouseDashboard /></RequireRole></RequireAuth>} />
+        <Route path="/live-warehouse-review"      element={<RequireAuth><RequireRole roles={['warehouse_employee','warehouse_supervisor']}><LiveWarehouseReviewPage /></RequireRole></RequireAuth>} />
         <Route path="/terms"   element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/consent" element={<ConsentPage />} />

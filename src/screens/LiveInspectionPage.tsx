@@ -47,8 +47,8 @@ const RAG: Record<RagStatus, {
   newBagStatus: string
 }> = {
   green:  { label: 'Clean Bag',    icon: '✅', color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.35)',  newBagStatus: 'inspected'    },
-  yellow: { label: 'Needs Review', icon: '⚠️', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  newBagStatus: 'at_warehouse' },
-  red:    { label: 'Contaminated', icon: '🚫', color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', newBagStatus: 'at_warehouse' },
+  yellow: { label: 'Needs Review', icon: '⚠️', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  newBagStatus: 'needs_review' },
+  red:    { label: 'Contaminated', icon: '🚫', color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', newBagStatus: 'contaminated' },
 }
 
 const ESTIMATED_VALUE  = 2.85
@@ -104,6 +104,7 @@ export default function LiveInspectionPage() {
   const [aiError, setAiError]             = useState<string | null>(null)
   const [photoUrl, setPhotoUrl]           = useState<string | null>(null)
   const [suggestedRag, setSuggestedRag]   = useState<RagStatus | null>(null)
+  const [statusUpdateMsg, setStatusUpdateMsg] = useState<string | null>(null)
   const fileInputRef                       = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -227,12 +228,23 @@ export default function LiveInspectionPage() {
       return
     }
 
-    // 2. Update bag status
+    // 2. Update bag status in qr_bags + refresh local state
+    const newStatus = RAG[rag].newBagStatus
     const { error: bagErr } = await supabase
       .from('qr_bags')
-      .update({ status: RAG[rag].newBagStatus })
+      .update({ status: newStatus })
       .eq('id', bag.id)
-    if (bagErr) console.error('[qr_bags update]', bagErr.message)
+
+    if (bagErr) {
+      // Surface the error so we can diagnose constraint issues
+      console.error('[qr_bags status update]', bagErr.message, '| attempted status:', newStatus)
+      setSubmitError(`Bag status could not be updated: ${bagErr.message}`)
+    } else {
+      // Refresh local bag state so the bag card reflects the new status immediately
+      setBag({ ...bag, status: newStatus })
+      setStatusUpdateMsg('Bag status updated successfully.')
+      console.log('[qr_bags] status updated to', newStatus)
+    }
 
     // 3. GREEN: wallet + lifecycle + fundraiser
     if (rag === 'green') {
@@ -696,6 +708,13 @@ export default function LiveInspectionPage() {
                   Scan Another Bag
                 </Link>
               </div>
+            </div>
+          )}
+
+          {/* Bag status update success */}
+          {statusUpdateMsg && (
+            <div className="rounded-xl px-4 py-3 mb-4 text-sm text-center font-semibold" style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}>
+              ✓ {statusUpdateMsg}
             </div>
           )}
 

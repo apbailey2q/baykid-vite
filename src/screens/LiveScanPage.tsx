@@ -164,7 +164,7 @@ export default function LiveScanPage() {
             // Bag code not in DB yet — register it now so physical bags always work
             const { data: newBag, error: createErr } = await supabase
               .from('qr_bags')
-              .insert({ bag_code: code, status: 'pending', consumer_id: currentUser.id })
+              .insert({ bag_code: code, status: 'issued', owner_id: currentUser.id })
               .select('id')
               .single()
             if (createErr || !newBag) {
@@ -260,7 +260,7 @@ export default function LiveScanPage() {
         // Bag code not in DB yet — register it now so physical bags always work
         const { data: newBag, error: createErr } = await supabase
           .from('qr_bags')
-          .insert({ bag_code: code, status: 'pending', consumer_id: user.id })
+          .insert({ bag_code: code, status: 'issued', owner_id: user.id })
           .select('id')
           .single()
         if (createErr || !newBag) {

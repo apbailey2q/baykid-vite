@@ -1,27 +1,12 @@
-import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { useAuthStore } from '../store/authStore'
 
 interface Props { children: React.ReactNode }
 
-type AuthState = 'loading' | 'authenticated' | 'unauthenticated'
-
 export function RequireAuth({ children }: Props) {
-  const [state, setState] = useState<AuthState>('loading')
+  const { user, isLoading } = useAuthStore()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setState(data.session ? 'authenticated' : 'unauthenticated')
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setState(session ? 'authenticated' : 'unauthenticated')
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  if (state === 'loading') {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center" style={{ background: '#060e24' }}>
         <div
@@ -32,7 +17,7 @@ export function RequireAuth({ children }: Props) {
     )
   }
 
-  if (state === 'unauthenticated') {
+  if (!user) {
     return <Navigate to="/real-login" replace />
   }
 

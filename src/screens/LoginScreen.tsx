@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { DEV_BYPASS_AUTH } from '../lib/devBypass'
+import { DEV_BYPASS_AUTH, getMockUser, getMockProfile, type BypassKey } from '../lib/devBypass'
+import { useAuthStore } from '../store/authStore'
 import { GlassCard } from '../components/ui/GlassCard'
 
 type DemoRole = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'fundraiser' | 'admin'
@@ -15,12 +16,12 @@ const ROLES: { id: DemoRole; label: string; icon: string }[] = [
 ]
 
 const DEMO_ROLE_ROUTES: Record<DemoRole, string> = {
-  consumer:   '/consumer',
-  driver:     '/driver',
-  warehouse:  '/warehouse',
-  partner:    '/partner',
-  fundraiser: '/fundraiser',
-  admin:      '/admin',
+  consumer:   '/dashboard/consumer',
+  driver:     '/dashboard/driver',
+  warehouse:  '/dashboard/warehouse',
+  partner:    '/dashboard/partner',
+  fundraiser: '/dashboard/fundraiser',
+  admin:      '/dashboard/admin',
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -33,10 +34,16 @@ export default function LoginScreen() {
   const roleLabel = ROLES.find((r) => r.id === role)?.label ?? 'Account'
 
   function enterDemoRole(r: DemoRole) {
+    // Inject mock user/profile into the auth store so ProtectedRoute allows access
+    const { setUser, setProfile, setLoading } = useAuthStore.getState()
+    setUser(getMockUser(r as BypassKey))
+    setProfile(getMockProfile(r as BypassKey))
+    setLoading(false)
+
     localStorage.setItem('baykid-demo-mode', 'true')
     localStorage.setItem('baykid-demo-role', r)
+
     const path = DEMO_ROLE_ROUTES[r]
-    if (!path) { console.error('[Demo Login] No route found for role:', r); return }
     navigate(path)
   }
 

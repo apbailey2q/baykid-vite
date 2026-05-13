@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dev Login — Cyan's Brooklynn</title>
+  <style>
+    body { margin: 0; background: #060e24; color: #fff; font-family: system-ui, sans-serif;
+           display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+    h2  { color: #00c8ff; margin-bottom: 8px; }
+    p   { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 24px; }
+    #status { font-size: 15px; color: #fbbf24; }
+    #error  { font-size: 13px; color: #f87171; margin-top: 12px; max-width: 400px; text-align: center; }
+  </style>
+</head>
+<body>
+  <h2>Dev Login</h2>
+  <p>Uses the Supabase SDK to sign in — session stored in the correct format.</p>
+  <div id="status">Signing in…</div>
+  <div id="error"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.105.1'
+
+const params   = new URLSearchParams(location.search)
+const email    = params.get('email')    || 'apbailey2q@yahoo.com'
+const password = params.get('password') || '9016051708'
+const redirect = params.get('redirect') || '/live-dashboard'
+
+const SUPABASE_URL = 'https://huomxfmgpjsiylftisxq.supabase.co'
+const ANON_KEY     = 'sb_publishable_qF6fKmXOSaJSibPn6kmsNg_IgirHVqx'
+
+const supabase = createClient(SUPABASE_URL, ANON_KEY)
+
+try {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+  document.getElementById('status').textContent =
+    `Signed in as ${data.user.email} (${data.user.id.slice(0,8)}…). Redirecting…`
+  setTimeout(() => { location.replace(redirect) }, 600)
+} catch (err) {
+  document.getElementById('status').textContent = 'Sign-in failed.'
+  document.getElementById('error').textContent  = String(err)
+}
+</script>
+</body>
+</html>

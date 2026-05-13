@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { getAllBags } from '../../lib/bags'
 import { supabase } from '../../lib/supabase'
-import { DEV_BYPASS_AUTH } from '../../lib/devBypass'
+import { isDemoModeActive } from '../../lib/devBypass'
+const DEV_BYPASS_AUTH = isDemoModeActive()
 import type { Bag, BagStatus } from '../../types'
 
 // ── Mock data ──────────────────────────────────────────────────────────────────

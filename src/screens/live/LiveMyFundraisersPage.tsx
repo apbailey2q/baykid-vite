@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 
 type MyFundraiser = {
   id:              string
@@ -23,6 +24,7 @@ type MyFundraiser = {
 
 export default function LiveMyFundraisersPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate] = useState(false)
   const [items, setItems]     = useState<MyFundraiser[]>([])
@@ -38,8 +40,6 @@ export default function LiveMyFundraisersPage() {
     let mounted = true
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
 
       const { data, error: fetchErr } = await supabase

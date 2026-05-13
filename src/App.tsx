@@ -70,8 +70,24 @@ import PresentationModePage from './screens/PresentationModePage'
 import ReadinessChecklistPage from './screens/ReadinessChecklistPage'
 import LaunchChecklistPage from './screens/LaunchChecklistPage'
 
+const ROLE_HOME: Record<string, string> = {
+  admin:      '/dashboard/admin',
+  consumer:   '/dashboard/consumer',
+  driver:     '/dashboard/driver',
+  warehouse:  '/dashboard/warehouse',
+  fundraiser: '/dashboard/fundraiser',
+  partner:    '/dashboard/partner',
+}
+
+function normalizeRole(role: string | null | undefined): string | null {
+  if (!role) return null
+  const r = role.toLowerCase().trim()
+  if (r === 'warehouse_employee' || r === 'warehouse_supervisor') return 'warehouse'
+  return r
+}
+
 function HomeRedirect() {
-  const { user, isLoading } = useAuthStore()
+  const { user, role, isLoading } = useAuthStore()
 
   if (isLoading) {
     return (
@@ -83,7 +99,9 @@ function HomeRedirect() {
 
   if (!user) return <Navigate to="/real-login" replace />
 
-  return <Navigate to="/live-dashboard" replace />
+  const normalized = normalizeRole(role)
+  const dest = (normalized && ROLE_HOME[normalized]) ?? '/real-login'
+  return <Navigate to={dest} replace />
 }
 
 function App() {
@@ -153,13 +171,13 @@ function App() {
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/fundraiser-admin" element={<FundraiserAdminPage />} />
 
-        {/* Demo role shortcuts — no auth required */}
-        <Route path="/consumer"   element={<ConsumerDashboard />} />
-        <Route path="/driver"     element={<DriverDashboard />} />
-        <Route path="/warehouse"  element={<WarehouseDashboard />} />
-        <Route path="/partner"    element={<PartnerDashboard />} />
-        <Route path="/fundraiser" element={<FundraiserDashboard />} />
-        <Route path="/admin"      element={<AdminDashboard />} />
+        {/* Legacy demo shortcuts → redirect to canonical dashboard routes */}
+        <Route path="/consumer"   element={<Navigate to="/dashboard/consumer"   replace />} />
+        <Route path="/driver"     element={<Navigate to="/dashboard/driver"     replace />} />
+        <Route path="/warehouse"  element={<Navigate to="/dashboard/warehouse"  replace />} />
+        <Route path="/partner"    element={<Navigate to="/dashboard/partner"    replace />} />
+        <Route path="/fundraiser" element={<Navigate to="/dashboard/fundraiser" replace />} />
+        <Route path="/admin"      element={<Navigate to="/dashboard/admin"      replace />} />
 
         {/* ── Live mode routes (Supabase-backed, guarded by RequireAuth) ── */}
         <Route path="/live-dashboard"   element={<RequireAuth><LiveDashboardPage /></RequireAuth>} />

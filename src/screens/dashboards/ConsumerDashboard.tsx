@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { signOut } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
+import { isDemoModeActive } from '../../lib/devBypass'
 import {
   getConsumerBags,
   getBroadcastsForRole,
@@ -14,6 +15,34 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
 import { SectionLabel } from '../../components/ui/dashboard'
 import QuickActionPage, { type QuickPage } from '../../components/demo/QuickActionPage'
+
+// ── Demo mock data ────────────────────────────────────────────────────────────
+
+const DEMO_WALLET  = { balance: 25.50, totalEarned: 47.00 }
+const DEMO_BAGS = [
+  { id: 'demo-bag-1', status: 'completed',    bag_code: 'CB-DEMO1', co2_saved_lbs: 4.2,  created_at: new Date(Date.now() - 86400000 * 3).toISOString() },
+  { id: 'demo-bag-2', status: 'at_warehouse', bag_code: 'CB-DEMO2', co2_saved_lbs: 0,    created_at: new Date(Date.now() - 86400000).toISOString()     },
+  { id: 'demo-bag-3', status: 'pending',      bag_code: 'CB-DEMO3', co2_saved_lbs: 0,    created_at: new Date().toISOString()                          },
+] as const
+const DEMO_WEEKLY_EARNINGS = [
+  { label: 'Current Week',              amount: 12.50  },
+  { label: 'Apr 28 – May 4, 2025',     amount: 18.75  },
+  { label: 'Apr 21 – Apr 27, 2025',    amount: 8.25   },
+  { label: 'Apr 14 – Apr 20, 2025',    amount: 7.50   },
+]
+const DEMO_WEEKLY_RECYCLED = [
+  { label: 'Current Week',              lbs: 8   },
+  { label: 'Apr 28 – May 4, 2025',     lbs: 12  },
+  { label: 'Apr 21 – Apr 27, 2025',    lbs: 5   },
+  { label: 'Apr 14 – Apr 20, 2025',    lbs: 9   },
+]
+const DEMO_TOP_FUNDRAISER = {
+  id: 'f-demo',
+  name: 'School Garden Project',
+  goal_amount: 500,
+  raised_amount: 127.50,
+  bag_count: 12,
+}
 
 async function fetchWalletBalance(userId: string) {
   const { data } = await supabase
@@ -232,8 +261,9 @@ export default function ConsumerDashboard() {
   const navigate = useNavigate()
   const toast = useToast()
   const ACCENT = '#00c8ff'
-  const firstName = profile?.full_name?.split(' ')[0] ?? 'Friend'
-  const initials  = profile?.full_name ? getInitials(profile.full_name) : '??'
+  const inDemoMode = isDemoModeActive()
+  const firstName = profile?.full_name?.split(' ')[0] ?? (inDemoMode ? 'Explorer' : 'Friend')
+  const initials  = profile?.full_name ? getInitials(profile.full_name) : (inDemoMode ? 'DM' : '??')
 
   const [tab, setTab]               = useState<Tab>('home')
   const [code, setCode]             = useState('')
@@ -254,40 +284,47 @@ export default function ConsumerDashboard() {
   const { data: myBags = [], isLoading: loadingBags } = useQuery({
     queryKey: ['consumer-bags', user?.id],
     queryFn: () => getConsumerBags(user!.id),
-    enabled: !!user,
+    enabled: !!user && !inDemoMode,
+    initialData: inDemoMode ? (DEMO_BAGS as unknown as Awaited<ReturnType<typeof getConsumerBags>>) : undefined,
     staleTime: 30_000,
   })
 
   const { data: broadcasts = [] } = useQuery({
     queryKey: ['consumer-broadcasts'],
     queryFn: () => getBroadcastsForRole('consumer'),
-    refetchInterval: 60_000,
+    enabled: !inDemoMode,
+    refetchInterval: inDemoMode ? false : 60_000,
   })
 
   const { data: walletData } = useQuery({
     queryKey: ['consumer-wallet', user?.id],
     queryFn: () => fetchWalletBalance(user!.id),
-    enabled: !!user,
+    enabled: !!user && !inDemoMode,
+    initialData: inDemoMode ? DEMO_WALLET : undefined,
     staleTime: 30_000,
   })
 
   const { data: WEEKLY_EARNINGS = [{ label: 'Current Week', amount: null }] } = useQuery({
     queryKey: ['consumer-weekly-earnings', user?.id],
     queryFn: () => fetchWeeklyEarnings(user!.id),
-    enabled: !!user,
+    enabled: !!user && !inDemoMode,
+    initialData: inDemoMode ? DEMO_WEEKLY_EARNINGS : undefined,
     staleTime: 60_000,
   })
 
   const { data: WEEKLY_RECYCLED = [{ label: 'Current Week', lbs: null }] } = useQuery({
     queryKey: ['consumer-weekly-lbs', user?.id],
     queryFn: () => fetchWeeklyLbs(user!.id),
-    enabled: !!user,
+    enabled: !!user && !inDemoMode,
+    initialData: inDemoMode ? DEMO_WEEKLY_RECYCLED : undefined,
     staleTime: 60_000,
   })
 
   const { data: topFundraiser } = useQuery({
     queryKey: ['top-fundraiser'],
     queryFn: fetchTopFundraiser,
+    enabled: !inDemoMode,
+    initialData: inDemoMode ? DEMO_TOP_FUNDRAISER : undefined,
     staleTime: 120_000,
   })
 

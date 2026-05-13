@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 import CashDonateModal from '../../components/CashDonateModal'
 
 type Fundraiser = {
@@ -37,11 +38,12 @@ function isJoinable(f: Fundraiser): boolean {
 export default function LiveFundraiserDetailPage() {
   const { id }   = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const userId   = user?.id ?? null
 
   const [animate, setAnimate]       = useState(false)
   const [fundraiser, setFundraiser] = useState<Fundraiser | null>(null)
   const [membership, setMembership] = useState<Membership | null>(null)
-  const [userId, setUserId]         = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
   const [joining, setJoining]       = useState(false)
@@ -58,10 +60,7 @@ export default function LiveFundraiserDetailPage() {
     let mounted = true
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
-      setUserId(user.id)
 
       const [fRes, mRes] = await Promise.all([
         supabase

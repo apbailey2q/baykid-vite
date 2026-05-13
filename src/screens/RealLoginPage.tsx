@@ -16,12 +16,12 @@ const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
 ]
 
 const ROLE_DASHBOARD_PATHS: Record<AccessRole, string> = {
-  admin: '/live-admin',
-  consumer: '/live-dashboard',
-  driver: '/live-bags',
-  warehouse: '/live-inspection',
-  fundraiser: '/live-fundraisers',
-  partner: '/live-wallet',
+  admin:      '/dashboard/admin',
+  consumer:   '/dashboard/consumer',
+  driver:     '/dashboard/driver',
+  warehouse:  '/dashboard/warehouse',
+  fundraiser: '/dashboard/fundraiser',
+  partner:    '/dashboard/partner',
 }
 
 /**
@@ -149,6 +149,10 @@ export default function RealLoginPage() {
     e.preventDefault()
 
     if (loading) return
+
+    // Clear any leftover demo session before real Supabase auth
+    localStorage.removeItem('baykid-demo-mode')
+    localStorage.removeItem('baykid-demo-role')
 
     setError(null)
     setSuccess(null)

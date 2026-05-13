@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 
 type InspRow    = { status: string }
 type ContribRow = { type: string; amount: number }
@@ -28,6 +29,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 export default function LiveReportsPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate]       = useState(false)
   const [stats, setStats]           = useState<Stats | null>(null)
@@ -93,7 +95,6 @@ export default function LiveReportsPage() {
     }
 
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
       if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
       await fetchData()

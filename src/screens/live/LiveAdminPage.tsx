@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
-import type { User } from '@supabase/supabase-js'
+import { useAuthStore } from '../../store/authStore'
 
 // ── Aggregate types ────────────────────────────────────────────
 type InspRow      = { status: string }
@@ -56,9 +56,9 @@ function timeAgo(ts: string): string {
 
 export default function LiveAdminPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate]       = useState(false)
-  const [user, setUser]             = useState<User | null>(null)
   const [stats, setStats]           = useState<AdminStats | null>(null)
   const [loading, setLoading]       = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -178,10 +178,8 @@ export default function LiveAdminPage() {
     }
 
     async function init() {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!mounted) return
-      if (!authUser) { navigate('/real-login', { replace: true }); return }
-      setUser(authUser)
+      if (!user) { navigate('/real-login', { replace: true }); return }
       await fetchData()
     }
 

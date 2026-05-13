@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import type { User } from '@supabase/supabase-js'
+import { useAuthStore } from '../store/authStore'
 
 type RecentScan = {
   id:        string
@@ -36,12 +36,15 @@ const STATUS_META: Record<string, { color: string }> = {
 
 export default function LiveDashboardPage() {
   const navigate = useNavigate()
-  const [animate, setAnimate]           = useState(false)
-  const [user, setUser]                     = useState<User | null>(null)
-  const [profile, setProfile]               = useState<Profile | null>(null)
-  const [profileLoading, setProfileLoading] = useState(true)
-  const [recentScans, setRecentScans]       = useState<RecentScan[]>([])
-  const [signingOut, setSigningOut]         = useState(false)
+  const [animate, setAnimate]     = useState(false)
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([])
+  const [signingOut, setSigningOut]   = useState(false)
+
+  const { user, profile: storeProfile, isLoading } = useAuthStore()
+
+  // Cast store profile to local type (same shape)
+  const profile = storeProfile as Profile | null
+  const profileLoading = isLoading && !profile
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true))
@@ -49,80 +52,33 @@ export default function LiveDashboardPage() {
   }, [])
 
   useEffect(() => {
+    if (!user) return
     let mounted = true
 
-    async function loadUser() {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!mounted) return
-      if (!authUser) {
-        navigate('/real-login', { replace: true })
-        return
-      }
-      setUser(authUser)
-      await loadProfile(authUser.id, authUser.email ?? '')
-    }
-
-    async function loadProfile(userId: string, userEmail: string) {
-      if (!mounted) return
-      setProfileLoading(true)
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, city, role, approval_status')
-        .eq('id', userId)
-        .maybeSingle()
-
-      if (!mounted) return
-
-      if (data) {
-        setProfile(data as Profile)
-      } else {
-        // Profile missing — create it now (handles confirmed-email signup case)
-        const { data: created } = await supabase
-          .from('profiles')
-          .upsert(
-            { id: userId, email: userEmail, role: 'consumer', approval_status: 'pending' },
-            { onConflict: 'id' }
-          )
-          .select('id, email, full_name, city, role, approval_status')
-          .maybeSingle()
-        if (created && mounted) setProfile(created as Profile)
-        if (error) console.error('[loadProfile]', error.message)
-      }
-
-      setProfileLoading(false)
-
-      // Fetch recent scans
+    async function loadScans() {
       const { data: scans } = await supabase
         .from('bag_scans')
         .select('id, scan_time, location, qr_bags(bag_code, status)')
-        .eq('scanned_by', userId)
+        .eq('scanned_by', user!.id)
         .order('scan_time', { ascending: false })
         .limit(5)
       if (scans && mounted) setRecentScans(scans as unknown as RecentScan[])
     }
 
-    loadUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        navigate('/real-login', { replace: true })
-      } else {
-        setUser(session.user)
-      }
-    })
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [navigate])
+    loadScans()
+    return () => { mounted = false }
+  }, [user])
 
   async function handleSignOut() {
     setSigningOut(true)
     await supabase.auth.signOut()
     navigate('/real-login', { replace: true })
   }
+
+  // Redirect to login if not authenticated and not still loading
+  useEffect(() => {
+    if (!isLoading && !user) navigate('/real-login', { replace: true })
+  }, [isLoading, user, navigate])
 
   const fade = (delay = 0): React.CSSProperties => ({
     opacity:    animate ? 1 : 0,

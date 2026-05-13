@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 
 type Fundraiser = {
   id:               string
@@ -107,6 +108,7 @@ function fmtShortDate(ymd: string): string {
 
 export default function LiveFundraiserDashboardPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate]         = useState(false)
   const [now, setNow]                 = useState(() => Date.now())
@@ -136,8 +138,6 @@ export default function LiveFundraiserDashboardPage() {
     let mounted = true
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
 
       const { data, error } = await supabase

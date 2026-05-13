@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
-import { getUserRoles } from '../lib/roles'
+import { useAuthStore } from '../store/authStore'
 
 type Props = {
   roles: string[]
@@ -9,31 +7,9 @@ type Props = {
 }
 
 export function RequireRole({ roles, children }: Props) {
-  const [checking, setChecking]       = useState(true)
-  const [allowed, setAllowed]         = useState(false)
-  const [userRoles, setUserRoles]     = useState<string[]>([])
-  const rolesKey = roles.join(',')
+  const { role, isLoading } = useAuthStore()
 
-  useEffect(() => {
-    let mounted = true
-    async function check() {
-      setChecking(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
-      if (!user) { setAllowed(false); setChecking(false); return }
-      const fetched = await getUserRoles(user.id)
-      if (!mounted) return
-      setUserRoles(fetched)
-      setAllowed(fetched.includes('admin') || roles.some(r => fetched.includes(r)))
-      setChecking(false)
-    }
-    check()
-    return () => { mounted = false }
-    // rolesKey is a stable string dep derived from the roles array
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rolesKey])
-
-  if (checking) {
+  if (isLoading) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"
@@ -47,9 +23,11 @@ export function RequireRole({ roles, children }: Props) {
     )
   }
 
+  const allowed = role === 'admin' || roles.some(r => r === role)
+
   if (!allowed) {
     const required = roles.join(' or ')
-    const current  = userRoles.length > 0 ? userRoles.join(', ') : 'unknown'
+    const current  = role ?? 'unknown'
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
@@ -70,7 +48,7 @@ export function RequireRole({ roles, children }: Props) {
             Your role: <span style={{ color: '#fbbf24', fontWeight: 600 }}>{current}</span>
           </p>
           <Link
-            to="/"
+            to="/live-dashboard"
             className="block py-3 rounded-2xl text-sm font-bold transition-all hover:brightness-110"
             style={{ background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.3)', color: '#00c8ff', textDecoration: 'none' }}
           >

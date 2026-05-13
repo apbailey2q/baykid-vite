@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 import { Skeleton } from '../../components/ui/Skeleton'
 
 type WalletTx = {
@@ -57,9 +58,10 @@ function timeAgo(ts: string): string {
 
 export default function LiveWalletPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const userId = user?.id ?? null
 
   const [animate, setAnimate]         = useState(false)
-  const [userId, setUserId]           = useState<string | null>(null)
   const [txns, setTxns]               = useState<WalletTx[]>([])
   const [payouts, setPayouts]         = useState<PayoutReq[]>([])
   const [loading, setLoading]         = useState(true)
@@ -81,10 +83,7 @@ export default function LiveWalletPage() {
     let mounted = true
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
-      setUserId(user.id)
 
       const [txRes, prRes] = await Promise.all([
         supabase

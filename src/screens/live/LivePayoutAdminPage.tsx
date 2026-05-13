@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 
 type PayoutRequest = {
   id:           string
@@ -38,6 +39,7 @@ function fmtDate(ts: string) {
 
 export default function LivePayoutAdminPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate]   = useState(false)
   const [requests, setRequests] = useState<PayoutRequest[]>([])
@@ -54,8 +56,6 @@ export default function LivePayoutAdminPage() {
     let mounted = true
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
 
       const { data, error: fetchErr } = await supabase

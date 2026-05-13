@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { useAuthStore } from '../store/authStore'
 import { QrScanner } from '../components/QrScanner'
 
 type ScanMode = 'personal' | 'fundraiser'
@@ -20,6 +21,8 @@ type MembershipRow = {
 
 export default function LiveScanPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const userId = user?.id ?? null
 
   const [animate, setAnimate]                       = useState(false)
   const [bagCode, setBagCode]                       = useState('')
@@ -38,7 +41,6 @@ export default function LiveScanPage() {
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false)
 
   // Fundraiser picker state
-  const [userId, setUserId]                         = useState<string | null>(null)
   const [fundraiserId, setFundraiserId]             = useState<string | null>(null)
   const [joinedFundraisers, setJoinedFundraisers]   = useState<JoinedFundraiser[]>([])
   const [fundraisersLoading, setFundraisersLoading] = useState(false)
@@ -51,12 +53,6 @@ export default function LiveScanPage() {
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true))
     return () => cancelAnimationFrame(id)
-  }, [])
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id)
-    })
   }, [])
 
   useEffect(() => {
@@ -128,8 +124,7 @@ export default function LiveScanPage() {
     setLoading(true)
 
     try {
-      const { data: { user }, error: userErr } = await supabase.auth.getUser()
-      if (userErr || !user) {
+      if (!user) {
         setError('Not authenticated. Please sign in.')
         return
       }

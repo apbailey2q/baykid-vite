@@ -23,7 +23,8 @@ import {
   getDriverWalletBalance,
 } from '../../lib/driver'
 import { getBroadcastsForRole } from '../../lib/points'
-import { DEV_BYPASS_AUTH } from '../../lib/devBypass'
+import { isDemoModeActive } from '../../lib/devBypass'
+const DEV_BYPASS_AUTH = isDemoModeActive()
 import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { DriverRouteView } from '../driver/DriverRouteView'
 import { signOut } from '../../lib/auth'

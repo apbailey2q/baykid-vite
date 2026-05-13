@@ -7,7 +7,8 @@ import { lookupOrCreateBag } from '../../lib/bags'
 import { markBagAtWarehouse, getInspectionQueue, getMyStatsToday } from '../../lib/warehouse'
 import { useAuthStore } from '../../store/authStore'
 
-import { DEV_BYPASS_AUTH } from '../../lib/devBypass'
+import { isDemoModeActive } from '../../lib/devBypass'
+const DEV_BYPASS_AUTH = isDemoModeActive()
 import { Spinner } from '../../components/ui'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { SectionLabel } from '../../components/ui/dashboard'

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import type { User } from '@supabase/supabase-js'
+import { useAuthStore } from '../store/authStore'
 
 // Real table: `bags`       columns: id, bag_code, status, consumer_id
 // Real table: `bag_scans`  columns: id, bag_id, scanned_by, scan_time, location
@@ -46,8 +46,8 @@ const POINTS_EARNED    = 285
 
 export default function LiveInspectionPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [animate, setAnimate]         = useState(false)
-  const [user, setUser]               = useState<User | null>(null)
   const [bag, setBag]                 = useState<Bag | null>(null)
   const [scan, setScan]               = useState<BagScan | null>(null)
   const [loading, setLoading]         = useState(true)
@@ -81,10 +81,7 @@ export default function LiveInspectionPage() {
         return
       }
 
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!mounted) return
-      if (!authUser) { navigate('/real-login', { replace: true }); return }
-      setUser(authUser)
+      if (!user) { navigate('/real-login', { replace: true }); return }
 
       // Fetch real tables with real column names
       const [bagRes, scanRes] = await Promise.all([

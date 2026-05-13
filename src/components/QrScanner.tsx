@@ -41,7 +41,11 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
       })
 
     return () => {
-      scanner.stop().catch(() => {})
+      try {
+        scanner.stop().catch(() => {})
+      } catch {
+        // scanner hadn't started yet — nothing to stop
+      }
     }
   }, [])
 

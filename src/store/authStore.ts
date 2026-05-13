@@ -30,8 +30,11 @@ export const useAuthStore = create<AuthState>()(
           role: profile?.role ?? null,
           approvalStatus: profile?.approval_status ?? null,
         }),
-      clearAuth: () =>
-        set({ user: null, profile: null, role: null, approvalStatus: null }),
+      clearAuth: () => {
+        localStorage.removeItem('baykid-demo-mode')
+        localStorage.removeItem('baykid-demo-role')
+        set({ user: null, profile: null, role: null, approvalStatus: null })
+      },
       setLoading: (isLoading) => set({ isLoading }),
     }),
     {

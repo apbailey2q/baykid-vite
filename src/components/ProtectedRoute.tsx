@@ -1,6 +1,6 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { DEV_BYPASS_AUTH } from '../lib/devBypass'
+import { isDemoModeActive } from '../lib/devBypass'
 import { getRoleDashboardPath } from '../lib/auth'
 import { canAccessRoute } from '../lib/routePermissions'
 
@@ -18,7 +18,7 @@ function Spinner() {
 }
 
 export function ProtectedRoute({ children, requireApproved = false }: Props) {
-  if (DEV_BYPASS_AUTH) return <>{children}</>
+  if (isDemoModeActive()) return <>{children}</>
 
   const { user, role, approvalStatus, isLoading } = useAuthStore()
   const { pathname } = useLocation()

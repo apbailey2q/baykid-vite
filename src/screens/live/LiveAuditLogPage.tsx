@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 
 type EntryKind  = 'scan' | 'inspection' | 'contribution' | 'payout' | 'fraud' | 'notification'
 type FilterKind = 'all' | EntryKind
@@ -93,6 +94,7 @@ function timeAgo(ts: string): string {
 
 export default function LiveAuditLogPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate]       = useState(false)
   const [entries, setEntries]       = useState<AuditEntry[]>([])
@@ -284,7 +286,6 @@ export default function LiveAuditLogPage() {
     }
 
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
       if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
       await fetchData()

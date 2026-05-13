@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuthStore } from '../../store/authStore'
 
 type Notif = {
   id:         string
@@ -41,6 +42,7 @@ function timeAgo(ts: string): string {
 
 export default function LiveNotificationsPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [animate, setAnimate]       = useState(false)
   const [notifications, setNotifs]  = useState<Notif[]>([])
@@ -57,8 +59,6 @@ export default function LiveNotificationsPage() {
     let mounted = true
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
       if (!user) { navigate('/real-login', { replace: true }); return }
 
       const { data, error: fetchErr } = await supabase

@@ -252,24 +252,36 @@ export default function LiveInspectionPage() {
       const isFundraiserMode = !!fundraiserId
       const walletAmount = isFundraiserMode ? USER_SHARE : ESTIMATED_VALUE
 
-      const walletPayload = {
-        user_id:     user.id,
-        bag_id:      bag.id,
-        type:        'earning',
-        amount:      walletAmount,
-        description: `Bag ${bag.bag_code} approved after live inspection`,
-        status:      'completed',
-      }
-      console.log('Saving wallet transaction', walletPayload)
-      const { error: walletErr } = await supabase.from('wallet_transactions').insert(walletPayload)
-      if (walletErr) {
-        console.error('[wallet_transactions]', walletErr.message)
-        newWarnings.push(`Wallet credit failed: ${walletErr.message}`)
+      // ── Wallet transaction (deduped by bag_id + type) ────────────────────
+      const { data: existingTx } = await supabase
+        .from('wallet_transactions')
+        .select('id')
+        .eq('bag_id', bag.id)
+        .eq('type', 'earning')
+        .maybeSingle()
+
+      if (existingTx) {
+        console.log('[wallet_transactions] already exists for bag', bag.id, '— skipping duplicate')
       } else {
-        await supabase.from('notifications').insert({
-          user_id: user.id, type: 'payout', title: 'Reward Earned',
-          body: 'Your approved QR bag earned a recycling reward.', read: false,
-        })
+        const walletPayload = {
+          user_id:     user.id,
+          bag_id:      bag.id,
+          type:        'earning',
+          amount:      walletAmount,
+          description: `Bag ${bag.bag_code} approved after live inspection`,
+          status:      'completed',
+        }
+        console.log('Saving wallet transaction', walletPayload)
+        const { error: walletErr } = await supabase.from('wallet_transactions').insert(walletPayload)
+        if (walletErr) {
+          console.error('[wallet_transactions]', walletErr.message)
+          newWarnings.push(`Wallet credit failed: ${walletErr.message}`)
+        } else {
+          await supabase.from('notifications').insert({
+            user_id: user.id, type: 'payout', title: 'Reward Earned',
+            body: 'Your approved QR bag earned a recycling reward.', read: false,
+          })
+        }
       }
 
       const { error: lifecycleErr } = await supabase
@@ -291,18 +303,61 @@ export default function LiveInspectionPage() {
         newWarnings.push(`Lifecycle event failed: ${lifecycleErr.message}`)
       }
 
-      // Direct insert into point_events
-      const pointPayload = {
-        user_id: user.id,
-        bag_id:  bag.id,
-        points:  POINTS_EARNED,
-        reason:  'clean_bag_approved',
+      // ── Point events (deduped by bag_id + reason) ────────────────────────
+      const { data: existingPe } = await supabase
+        .from('point_events')
+        .select('id')
+        .eq('bag_id', bag.id)
+        .eq('reason', 'clean_bag_approved')
+        .maybeSingle()
+
+      if (existingPe) {
+        console.log('[point_events] already exists for bag', bag.id, '— skipping duplicate')
+      } else {
+        const pointPayload = {
+          user_id: user.id,
+          bag_id:  bag.id,
+          points:  POINTS_EARNED,
+          reason:  'clean_bag_approved',
+        }
+        console.log('Saving point event', pointPayload)
+        const { error: pointsErr } = await supabase.from('point_events').insert(pointPayload)
+        if (pointsErr) {
+          console.error('[point_events]', pointsErr.message)
+          newWarnings.push(`Points save failed: ${pointsErr.message}`)
+        }
       }
-      console.log('Saving point event', pointPayload)
-      const { error: pointsErr } = await supabase.from('point_events').insert(pointPayload)
-      if (pointsErr) {
-        console.error('[point_events]', pointsErr.message)
-        newWarnings.push(`Points save failed: ${pointsErr.message}`)
+
+      // ── user_points: always sync after CLEAN (independent of point_events dedup) ──
+      const { data: existingPts, error: ptsReadErr } = await supabase
+        .from('user_points')
+        .select('id, total_points')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (ptsReadErr) {
+        console.error('[user_points read]', ptsReadErr.message)
+        newWarnings.push(`Points balance read failed: ${ptsReadErr.message}`)
+      } else if (existingPts) {
+        const newTotal = existingPts.total_points + POINTS_EARNED
+        console.log('[user_points] updating', { user_id: user.id, newTotal })
+        const { error: ptsUpdateErr } = await supabase
+          .from('user_points')
+          .update({ total_points: newTotal, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+        if (ptsUpdateErr) {
+          console.error('[user_points update]', ptsUpdateErr.message)
+          newWarnings.push(`Points balance update failed: ${ptsUpdateErr.message}`)
+        }
+      } else {
+        console.log('[user_points] inserting new row', { user_id: user.id, total_points: POINTS_EARNED })
+        const { error: ptsInsertErr } = await supabase
+          .from('user_points')
+          .insert({ user_id: user.id, total_points: POINTS_EARNED, updated_at: new Date().toISOString() })
+        if (ptsInsertErr) {
+          console.error('[user_points insert]', ptsInsertErr.message)
+          newWarnings.push(`Points balance create failed: ${ptsInsertErr.message}`)
+        }
       }
 
       if (isFundraiserMode && fundraiserId) {

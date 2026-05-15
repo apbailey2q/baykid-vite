@@ -116,8 +116,14 @@ export default function LiveWalletPage() {
       setTxns((txRes.data ?? []) as WalletTx[])
       setTotalPoints((ptsRes.data as { total_points: number } | null)?.total_points ?? 0)
 
+      // Log the raw Supabase response so we can diagnose RLS / empty-result issues
+      console.log('[wallet] payout_requests raw:', {
+        data:  prRes.data,
+        error: prRes.error?.message ?? null,
+        count: prRes.count ?? null,
+      })
+
       if (prRes.error) {
-        // Surface this — if payout_requests can't load, available balance will be wrong
         setPayoutsErr(`Payout data unavailable: ${prRes.error.message}`)
         setPayouts([])
       } else {
@@ -136,27 +142,61 @@ export default function LiveWalletPage() {
   const completed = txns.filter(t => t.status === 'completed')
   const credits   = completed.filter(t => ['earning','bonus','referral','adjustment'].includes(t.type))
 
-  // Lifetime earned from wallet_transactions credits
-  const lifetimeEarned  = credits.reduce((s, t) => s + t.amount, 0)
+  // Number() coercion guards against Postgres NUMERIC deserializing as string
+  const earnedTotal   = credits.reduce((s, t) => s + Number(t.amount), 0)
+  const pendingTotal  = payouts.filter(p => p.status === 'pending') .reduce((s, p) => s + Number(p.amount), 0)
+  const approvedTotal = payouts.filter(p => p.status === 'approved').reduce((s, p) => s + Number(p.amount), 0)
+  const paidTotal     = payouts.filter(p => p.status === 'paid')    .reduce((s, p) => s + Number(p.amount), 0)
 
-  // Payout request totals by status — payout_requests is the single source of truth
-  const pendingPayouts  = payouts.filter(p => p.status === 'pending') .reduce((s, p) => s + p.amount, 0)
-  const approvedPayouts = payouts.filter(p => p.status === 'approved').reduce((s, p) => s + p.amount, 0)
-  const paidPayoutsAmt  = payouts.filter(p => p.status === 'paid')    .reduce((s, p) => s + p.amount, 0)
+  // Aliases kept for display cards
+  const lifetimeEarned  = earnedTotal
+  const pendingPayouts  = pendingTotal
+  const approvedPayouts = approvedTotal
+  const paidPayoutsAmt  = paidTotal
 
-  // Available = earned minus every payout request that hasn't been denied/rejected
-  const available = Math.max(0, lifetimeEarned - pendingPayouts - approvedPayouts - paidPayoutsAmt)
+  // Available = earned minus every active payout request (pending + approved + paid)
+  const available = Math.max(0, earnedTotal - pendingTotal - approvedTotal - paidTotal)
+
+  console.log({ earnedTotal, pendingTotal, approvedTotal, paidTotal, availableBalance: available })
 
   // ── Payout submit ────────────────────────────────────────────
   async function handlePayoutSubmit() {
     const amt = parseFloat(payoutAmount.replace(/[^0-9.]/g, ''))
     if (!userId || isNaN(amt) || amt <= 0) { setPayoutErr('Enter a valid amount.'); return }
-    if (available <= 0)    { setPayoutErr('No available balance to withdraw.'); return }
-    if (amt > available)   { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return }
     if (payoutPhase === 'submitting') return
 
     setPayoutPhase('submitting')
     setPayoutErr('')
+
+    // ── Fresh balance check — query DB right now, don't trust cached state ──
+    const { data: livePayouts, error: liveErr } = await supabase
+      .from('payout_requests')
+      .select('amount, status')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'approved', 'paid'])
+
+    if (liveErr) {
+      console.error('[wallet] payout_requests live-check failed:', liveErr.message)
+      setPayoutErr(`Cannot verify balance: ${liveErr.message}. Refresh and try again.`)
+      setPayoutPhase('error')
+      return
+    }
+
+    const committed = (livePayouts ?? []).reduce((s, p) => s + Number(p.amount), 0)
+    const liveAvail = Math.max(0, earnedTotal - committed)
+    console.log('[wallet] submit guard:', { earnedTotal, committed, liveAvail, requested: amt, cachedAvailable: available })
+
+    if (liveAvail <= 0) {
+      setPayoutErr('No available balance to request payout.')
+      setPayoutPhase('error')
+      setLoadKey(k => k + 1)   // force re-fetch so UI reflects real state
+      return
+    }
+    if (amt > liveAvail) {
+      setPayoutErr(`Cannot exceed available balance ($${liveAvail.toFixed(2)}).`)
+      setPayoutPhase('error')
+      return
+    }
 
     const { error: prErr } = await supabase
       .from('payout_requests')
@@ -307,23 +347,26 @@ export default function LiveWalletPage() {
                 </div>
 
                 {/* Request Payout button */}
-                {!showPayout && (
-                  <button
-                    type="button"
-                    onClick={() => { setShowPayout(true); setPayoutPhase('idle'); setPayoutAmount(available.toFixed(2)) }}
-                    disabled={available <= 0}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm transition-all hover:brightness-110"
-                    style={{
-                      background: available > 0 ? 'linear-gradient(135deg,#059669,#4ade80)' : 'rgba(255,255,255,0.06)',
-                      border:     available > 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                      color:      available > 0 ? '#ffffff' : 'rgba(255,255,255,0.3)',
-                      cursor:     available > 0 ? 'pointer' : 'not-allowed',
-                      boxShadow:  available > 0 ? '0 4px 20px rgba(74,222,128,0.25)' : 'none',
-                    }}
-                  >
-                    {available > 0 ? '💳 Request Payout' : 'No balance to withdraw'}
-                  </button>
-                )}
+                {!showPayout && (() => {
+                  const canRequest = available > 0 && !payoutsErr
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => { setShowPayout(true); setPayoutPhase('idle'); setPayoutAmount(available.toFixed(2)) }}
+                      disabled={!canRequest}
+                      className="w-full py-3.5 rounded-xl font-bold text-sm transition-all hover:brightness-110"
+                      style={{
+                        background: canRequest ? 'linear-gradient(135deg,#059669,#4ade80)' : 'rgba(255,255,255,0.06)',
+                        border:     canRequest ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                        color:      canRequest ? '#ffffff' : 'rgba(255,255,255,0.3)',
+                        cursor:     canRequest ? 'pointer' : 'not-allowed',
+                        boxShadow:  canRequest ? '0 4px 20px rgba(74,222,128,0.25)' : 'none',
+                      }}
+                    >
+                      {payoutsErr ? 'Payout data unavailable' : available > 0 ? '💳 Request Payout' : 'No balance to withdraw'}
+                    </button>
+                  )
+                })()}
               </div>
 
               {/* ── Payout form ───────────────────────────────────── */}

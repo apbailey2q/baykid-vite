@@ -88,6 +88,7 @@ export default function LiveWalletPage() {
 
     async function load() {
       if (!user) { navigate('/real-login', { replace: true }); return }
+      console.log('[wallet] loading for user_id:', user.id)
 
       const [txRes, prRes, ptsRes] = await Promise.all([
         supabase

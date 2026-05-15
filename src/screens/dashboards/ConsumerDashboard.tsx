@@ -293,6 +293,22 @@ export default function ConsumerDashboard() {
   const [scanSaving, setScanSaving]               = useState(false)
   const [scanError, setScanError]                 = useState<string | null>(null)
 
+  // Payout modal state
+  type PayoutMethod = 'cash_app' | 'paypal' | 'bank_transfer' | 'gift_card'
+  type PayoutPhase  = 'idle' | 'submitting' | 'success' | 'error'
+  const [showPayoutModal, setShowPayoutModal]   = useState(false)
+  const [payoutMethod, setPayoutMethod]         = useState<PayoutMethod>('cash_app')
+  const [payoutAmount, setPayoutAmount]         = useState('')
+  const [payoutPhase, setPayoutPhase]           = useState<PayoutPhase>('idle')
+  const [payoutError, setPayoutError]           = useState<string | null>(null)
+
+  const PAYOUT_METHODS: { id: PayoutMethod; label: string; icon: string }[] = [
+    { id: 'cash_app',      label: 'Cash App',     icon: '💚' },
+    { id: 'paypal',        label: 'PayPal',        icon: '🔵' },
+    { id: 'bank_transfer', label: 'Bank Transfer', icon: '🏦' },
+    { id: 'gift_card',     label: 'Gift Card',     icon: '🎁' },
+  ]
+
   const demoRafRef = useRef<number | null>(null) // kept for cleanup only
 
   // ── Data queries ───────────────────────────────────────────────────────────
@@ -403,18 +419,20 @@ export default function ConsumerDashboard() {
     setScanSaving(true)
     setScanError(null)
     try {
+      // owner_id is the correct column (not consumer_id)
       const { data: bag, error: lookupErr } = await supabase
         .from('qr_bags')
-        .select('id, consumer_id')
+        .select('id, owner_id')
         .eq('bag_code', code)
         .maybeSingle()
       if (lookupErr) { setScanError(`Lookup failed: ${lookupErr.message}`); return }
       if (!bag) { setScanError('Bag not found. Check the code and try again.'); return }
-      if (bag.consumer_id && bag.consumer_id !== user.id) {
+      if (bag.owner_id && bag.owner_id !== user.id) {
         setScanError('This bag is already registered to another account.'); return
       }
-      if (!bag.consumer_id) {
-        await supabase.from('qr_bags').update({ consumer_id: user.id, status: 'pending' }).eq('id', bag.id)
+      if (!bag.owner_id) {
+        // Claim bag for this consumer; pending_pickup = awaiting driver
+        await supabase.from('qr_bags').update({ owner_id: user.id, status: 'pending_pickup' }).eq('id', bag.id)
       }
       await supabase.from('bag_scans').insert({ bag_id: bag.id, scanned_by: user.id, location: 'personal' })
       setShowCameraOverlay(false)
@@ -435,8 +453,46 @@ export default function ConsumerDashboard() {
     e.preventDefault()
     const trimmed = qrModalCode.trim()
     if (!trimmed) return
-    if (inDemoMode) { setShowQrModal(false); setQrModalCode(''); navigate('/scan'); return }
+    if (inDemoMode) {
+      toast.success('Demo: Bag registered! Pickup requested.')
+      setShowQrModal(false)
+      setQrModalCode('')
+      setTab('bags')
+      return
+    }
     await handleConsumerScan(trimmed)
+  }
+
+  // ── Payout submit ──────────────────────────────────────────────────────────
+  async function handlePayoutSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const amt = parseFloat(payoutAmount)
+    if (!amt || amt <= 0) { setPayoutError('Enter a valid amount.'); return }
+    if (amt > balance) { setPayoutError(`Amount exceeds your balance of $${balance.toFixed(2)}.`); return }
+    if (!user) { setPayoutError('Not signed in.'); return }
+    setPayoutPhase('submitting')
+    setPayoutError(null)
+    try {
+      const { error } = await supabase.from('payout_requests').insert({
+        user_id: user.id,
+        amount:  amt,
+        method:  payoutMethod,
+        status:  'pending',
+      })
+      if (error) throw error
+      setPayoutPhase('success')
+      queryClient.invalidateQueries({ queryKey: ['consumer-wallet', user.id] })
+    } catch (err) {
+      setPayoutError(err instanceof Error ? err.message : 'Payout request failed.')
+      setPayoutPhase('error')
+    }
+  }
+
+  function closePayoutModal() {
+    setShowPayoutModal(false)
+    setPayoutAmount('')
+    setPayoutPhase('idle')
+    setPayoutError(null)
   }
 
   const handleSignOut = async () => {
@@ -886,7 +942,7 @@ export default function ConsumerDashboard() {
             {/* ── PAYOUT BUTTON ───────────────────────────────────────────── */}
             <div className="px-5 mt-5 mb-6">
               <button
-                onClick={() => navigate('/live-wallet', { state: { openPayout: true } })}
+                onClick={() => { setPayoutAmount(''); setPayoutPhase('idle'); setPayoutError(null); setShowPayoutModal(true) }}
                 className="w-full py-3.5 rounded-2xl font-bold text-sm text-white transition-all hover:brightness-110 active:scale-[0.97]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
@@ -1448,6 +1504,120 @@ export default function ConsumerDashboard() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ── PAYOUT MODAL ──────────────────────────────────────────────────── */}
+      {showPayoutModal && (
+        <div
+          className="fixed inset-0 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', zIndex: 60 }}
+          onClick={(e) => { if (e.target === e.currentTarget && payoutPhase !== 'submitting') closePayoutModal() }}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl px-6 pt-6 pb-10"
+            style={{ background: 'linear-gradient(180deg,#080f26 0%,#060e24 100%)', border: '1px solid rgba(0,200,255,0.18)', borderBottom: 'none' }}
+          >
+            <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(255,255,255,0.15)' }} />
+
+            {/* ── Success state ── */}
+            {payoutPhase === 'success' ? (
+              <div className="flex flex-col items-center text-center gap-4 py-4">
+                <span style={{ fontSize: 48 }}>✅</span>
+                <div>
+                  <p style={{ fontSize: 17, fontWeight: 800, color: '#4ade80', marginBottom: 6 }}>Payout Requested!</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.55 }}>
+                    Your request for{' '}
+                    <strong style={{ color: '#ffffff' }}>${parseFloat(payoutAmount).toFixed(2)}</strong>{' '}
+                    via <strong style={{ color: '#ffffff' }}>{PAYOUT_METHODS.find(m => m.id === payoutMethod)?.label}</strong>{' '}
+                    has been submitted and is being processed.
+                  </p>
+                </div>
+                <button
+                  onClick={closePayoutModal}
+                  className="w-full py-3.5 rounded-2xl font-bold text-sm text-white mt-2 transition-all hover:brightness-110"
+                  style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 18px rgba(0,190,255,0.35)' }}
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handlePayoutSubmit}>
+                <h3 className="text-lg font-bold mb-1" style={{ color: '#ffffff' }}>Cash Out</h3>
+                <p className="text-xs mb-5" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  Available balance: <strong style={{ color: '#00c8ff' }}>${balance.toFixed(2)}</strong>
+                </p>
+
+                {/* Amount */}
+                <label className="block text-xs font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Amount
+                </label>
+                <div className="relative mb-5">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: '#00c8ff' }}>$</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    max={balance}
+                    value={payoutAmount}
+                    onChange={e => setPayoutAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full rounded-xl pl-8 pr-4 py-3 text-sm font-mono outline-none"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,200,255,0.28)', color: '#ffffff' }}
+                  />
+                </div>
+
+                {/* Payment method */}
+                <label className="block text-xs font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Payment Method
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-5">
+                  {PAYOUT_METHODS.map(m => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPayoutMethod(m.id)}
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      style={{
+                        background: payoutMethod === m.id ? 'rgba(0,200,255,0.14)' : 'rgba(255,255,255,0.04)',
+                        border:     `1px solid ${payoutMethod === m.id ? 'rgba(0,200,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                        color:      payoutMethod === m.id ? '#00c8ff' : 'rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      <span>{m.icon}</span>
+                      <span style={{ fontSize: 12 }}>{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {payoutError && (
+                  <div className="rounded-xl px-3 py-2.5 mb-4" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    <p className="text-xs" style={{ color: '#f87171' }}>{payoutError}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closePayoutModal}
+                    disabled={payoutPhase === 'submitting'}
+                    className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!payoutAmount || payoutPhase === 'submitting'}
+                    className="flex-1 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-110"
+                    style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 18px rgba(0,190,255,0.35)' }}
+                  >
+                    {payoutPhase === 'submitting' ? 'Submitting…' : 'Submit'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
 

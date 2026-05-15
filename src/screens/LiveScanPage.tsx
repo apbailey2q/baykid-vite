@@ -54,8 +54,7 @@ export default function LiveScanPage() {
   const [loading, setLoading]                       = useState(false)
   const [error, setError]                           = useState<string | null>(null)
   const [saved, setSaved]                           = useState(false)
-  const [showCamera, setShowCamera]                 = useState(true)
-  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false)
+  const [cameraActive, setCameraActive]             = useState(true)
 
   // Fundraiser picker state
   const [fundraiserId, setFundraiserId]             = useState<string | null>(null)
@@ -141,7 +140,7 @@ export default function LiveScanPage() {
       setError(null)
 
       // Defer camera unmount one frame so html5-qrcode finishes internally
-      requestAnimationFrame(() => setShowCamera(false))
+      requestAnimationFrame(() => setCameraActive(false))
 
       // Auto-save and navigate — run outside React render cycle
       const currentUser        = userRef.current
@@ -331,9 +330,14 @@ export default function LiveScanPage() {
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Live Scan</span>
         </div>
-        <Link to="/live-dashboard" className="text-sm transition-opacity hover:opacity-70" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          ← Dashboard
-        </Link>
+        <button
+          type="button"
+          onClick={() => navigate('/bags')}
+          className="text-sm transition-opacity hover:opacity-70"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}
+        >
+          ← Back
+        </button>
       </header>
 
       <div className="relative flex-1 overflow-y-auto pb-24" style={{ zIndex: 1 }}>
@@ -353,48 +357,23 @@ export default function LiveScanPage() {
             </p>
           </div>
 
-          {/* Camera scanner */}
+          {/* Camera scanner — auto-opens on mount */}
           <div className="mb-5" style={fade(30)}>
-            {showCamera ? (
+            {cameraActive && !saved && (
               <div className="flex flex-col gap-3">
                 <QrScanner
-                  onScan={handleQrScan}
-                  onPermissionDenied={() => {
-                    setCameraPermissionDenied(true)
-                    setShowCamera(false)
-                  }}
+                  onScan={(code) => { setCameraActive(false); handleQrScan(code) }}
+                  onPermissionDenied={() => navigate('/bags')}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowCamera(false)}
+                  onClick={() => navigate('/bags')}
                   className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
                   style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
                 >
-                  Cancel Camera
+                  ← Cancel
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setShowCamera(true); setCameraPermissionDenied(false) }}
-                disabled={loading || saved}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
-                style={{
-                  background: 'rgba(0,200,255,0.1)',
-                  border:     '1px solid rgba(0,200,255,0.35)',
-                  color:      '#00c8ff',
-                  cursor:     (loading || saved) ? 'not-allowed' : 'pointer',
-                  opacity:    (loading || saved) ? 0.6 : 1,
-                }}
-              >
-                📷 Open Camera Scanner
-              </button>
-            )}
-
-            {cameraPermissionDenied && (
-              <p className="mt-2 text-[11px] text-center" style={{ color: '#f87171' }}>
-                Camera access denied. Enter the bag code manually below.
-              </p>
             )}
           </div>
 

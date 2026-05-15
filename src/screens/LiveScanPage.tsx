@@ -54,7 +54,7 @@ export default function LiveScanPage() {
   const [loading, setLoading]                       = useState(false)
   const [error, setError]                           = useState<string | null>(null)
   const [saved, setSaved]                           = useState(false)
-  const [showCamera, setShowCamera]                 = useState(false)
+  const [showCamera, setShowCamera]                 = useState(true)
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false)
 
   // Fundraiser picker state

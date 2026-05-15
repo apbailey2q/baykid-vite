@@ -18,7 +18,8 @@ import QuickActionPage, { type QuickPage } from '../../components/demo/QuickActi
 
 // ── Demo mock data ────────────────────────────────────────────────────────────
 
-const DEMO_WALLET  = { balance: 25.50, totalEarned: 47.00 }
+// No fake money — wallet always shows real data or $0 empty state
+const DEMO_WALLET  = { balance: 0, totalEarned: 0 }
 const DEMO_BAGS = [
   { id: 'demo-bag-1', status: 'completed',    bag_code: 'CB-DEMO1', co2_saved_lbs: 4.2,  created_at: new Date(Date.now() - 86400000 * 3).toISOString() },
   { id: 'demo-bag-2', status: 'at_warehouse', bag_code: 'CB-DEMO2', co2_saved_lbs: 0,    created_at: new Date(Date.now() - 86400000).toISOString()     },
@@ -45,16 +46,14 @@ const DEMO_TOP_FUNDRAISER = {
 }
 
 async function fetchWalletBalance(userId: string) {
-  const { data } = await supabase
-    .from('wallet_transactions')
-    .select('type, amount')
-    .eq('user_id', userId)
-    .eq('status', 'completed')
-  const txns = data ?? []
-  const earned   = txns.filter(t => ['earning','bonus','referral'].includes(t.type)).reduce((s,t) => s + Number(t.amount), 0)
-  const donated  = txns.filter(t => t.type === 'donation').reduce((s,t) => s + Number(t.amount), 0)
-  const paid_out = txns.filter(t => t.type === 'payout').reduce((s,t) => s + Number(t.amount), 0)
-  return { balance: Math.max(0, earned - donated - paid_out), totalEarned: earned }
+  const [txRes, prRes] = await Promise.all([
+    supabase.from('wallet_transactions').select('type, amount').eq('user_id', userId).eq('status', 'completed'),
+    supabase.from('payout_requests').select('amount, status').eq('user_id', userId).in('status', ['pending','approved','paid']),
+  ])
+  const txns    = txRes.data ?? []
+  const earned  = txns.filter(t => ['earning','bonus','referral'].includes(t.type)).reduce((s,t) => s + Number(t.amount), 0)
+  const committed = (prRes.data ?? []).reduce((s,p) => s + Number(p.amount), 0)
+  return { balance: Math.max(0, earned - committed), totalEarned: earned }
 }
 
 async function fetchWeeklyEarnings(userId: string) {
@@ -338,12 +337,11 @@ export default function ConsumerDashboard() {
   )
 
   // ── Derived stats ──────────────────────────────────────────────────────────
-  const completedBags  = myBags.filter((b) => b.status === 'inspected' || b.status === 'completed').length
   const activeBags     = myBags.filter((b) => !['inspected','completed','recycled'].includes(b.status)).length
   const lbsDiverted    = Math.round(myBags.reduce((s, b) => s + (Number((b as unknown as { co2_saved_lbs?: number }).co2_saved_lbs) || 0), 0))
   const co2Saved       = lbsDiverted
   const balance        = walletData?.balance ?? 0
-  const earnings       = (walletData?.totalEarned ?? completedBags * 3.75).toFixed(2)
+  const earnings       = (walletData?.totalEarned ?? 0).toFixed(2)
   const unreadMsgCount = broadcasts.length
   const realProgress   = Math.min(100, lbsDiverted > 0 ? Math.round((lbsDiverted / 17) * 100) : 0)
 
@@ -428,6 +426,14 @@ export default function ConsumerDashboard() {
             <p style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>Cyan's Brooklynn</p>
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.2, letterSpacing: '0.04em' }}>Recycling Enterprise</p>
           </div>
+          {inDemoMode && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest"
+              style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24' }}
+            >
+              Demo
+            </span>
+          )}
         </div>
 
         {/* Right: logout on account tab, else bell + avatar */}

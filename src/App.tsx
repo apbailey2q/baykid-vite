@@ -128,7 +128,7 @@ function App() {
         />
 
         {/* Role dashboards — access controlled by routePermissions.ts */}
-        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved><ConsumerDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved allowDemo><ConsumerDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/driver" element={<ProtectedRoute requireApproved><DriverDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/warehouse" element={<ProtectedRoute requireApproved><WarehouseDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/warehouse-supervisor" element={<ProtectedRoute requireApproved><WarehouseSupervisorDashboard /></ProtectedRoute>} />

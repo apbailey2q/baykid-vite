@@ -1,12 +1,14 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { isDemoModeActive } from '../lib/devBypass'
+import { ENABLE_DEMO_ACCESS, DEV_BYPASS_AUTH } from '../lib/appMode'
 import { getRoleDashboardPath } from '../lib/auth'
 import { canAccessRoute } from '../lib/routePermissions'
 
 interface Props {
   children: React.ReactNode
   requireApproved?: boolean
+  /** Pass true ONLY on the consumer route — allows demo bypass without real login */
+  allowDemo?: boolean
 }
 
 function Spinner() {
@@ -17,8 +19,11 @@ function Spinner() {
   )
 }
 
-export function ProtectedRoute({ children, requireApproved = false }: Props) {
-  if (isDemoModeActive()) return <>{children}</>
+export function ProtectedRoute({ children, requireApproved = false, allowDemo = false }: Props) {
+  // Consumer demo: only bypasses when the route explicitly opts in
+  if (allowDemo && ENABLE_DEMO_ACCESS) return <>{children}</>
+  // Dev all-role bypass (requires VITE_DEV_BYPASS_AUTH=true — never auto-enabled)
+  if (DEV_BYPASS_AUTH) return <>{children}</>
 
   const { user, role, approvalStatus, isLoading } = useAuthStore()
   const { pathname } = useLocation()

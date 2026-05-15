@@ -6,9 +6,9 @@
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '../types'
 
-export const DEV_BYPASS_AUTH =
-  import.meta.env.DEV &&
-  import.meta.env.VITE_DEV_BYPASS_AUTH !== 'false'
+import { ENABLE_DEMO_ACCESS } from './appMode'
+
+export const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
 
 // Maps demo role keys → app Role values
 export type BypassKey = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
@@ -59,9 +59,9 @@ export function getMockUser(key: BypassKey): User {
   return { id, email: `dev-${key}@demo.local`, role: 'authenticated' } as unknown as User
 }
 
-/** True when either the dev env flag is set OR the user entered demo mode via the UI. */
+/** True when consumer demo access is enabled, dev bypass is set, or user entered demo mode via the UI. */
 export function isDemoModeActive(): boolean {
-  return DEV_BYPASS_AUTH || localStorage.getItem('baykid-demo-mode') === 'true'
+  return ENABLE_DEMO_ACCESS || DEV_BYPASS_AUTH || localStorage.getItem('baykid-demo-mode') === 'true'
 }
 
 /** The currently active demo role, or null if not in demo mode. */

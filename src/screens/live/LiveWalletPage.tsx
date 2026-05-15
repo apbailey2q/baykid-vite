@@ -64,8 +64,11 @@ export default function LiveWalletPage() {
   const [animate, setAnimate]         = useState(false)
   const [txns, setTxns]               = useState<WalletTx[]>([])
   const [payouts, setPayouts]         = useState<PayoutReq[]>([])
+  const [totalPoints, setTotalPoints] = useState<number>(0)
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
+  const [payoutsErr, setPayoutsErr]   = useState<string | null>(null)
+  const [loadKey, setLoadKey]         = useState(0)
 
   // Payout form
   const [showPayout, setShowPayout]         = useState(false)
@@ -73,6 +76,7 @@ export default function LiveWalletPage() {
   const [payoutAmount, setPayoutAmount]     = useState('')
   const [payoutPhase, setPayoutPhase]       = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [payoutErr, setPayoutErr]           = useState('')
+  const [confirmingPayout, setConfirmingPayout] = useState(false)
 
   useEffect(() => {
     const f = requestAnimationFrame(() => setAnimate(true))
@@ -85,7 +89,7 @@ export default function LiveWalletPage() {
     async function load() {
       if (!user) { navigate('/real-login', { replace: true }); return }
 
-      const [txRes, prRes] = await Promise.all([
+      const [txRes, prRes, ptsRes] = await Promise.all([
         supabase
           .from('wallet_transactions')
           .select('id, type, amount, description, status, created_at, bag_id, reference')
@@ -98,39 +102,57 @@ export default function LiveWalletPage() {
           .eq('user_id', user.id)
           .order('requested_at', { ascending: false })
           .limit(20),
+        supabase
+          .from('user_points')
+          .select('total_points')
+          .eq('user_id', user.id)
+          .maybeSingle(),
       ])
 
       if (!mounted) return
       if (txRes.error)  { setError(txRes.error.message); setLoading(false); return }
-      if (prRes.error)  console.error('[payout_requests]', prRes.error.message)
+      if (ptsRes.error) console.error('[user_points]', ptsRes.error.message)
 
-      setTxns((txRes.data  ?? []) as WalletTx[])
-      setPayouts((prRes.data ?? []) as PayoutReq[])
+      setTxns((txRes.data ?? []) as WalletTx[])
+      setTotalPoints((ptsRes.data as { total_points: number } | null)?.total_points ?? 0)
+
+      if (prRes.error) {
+        // Surface this — if payout_requests can't load, available balance will be wrong
+        setPayoutsErr(`Payout data unavailable: ${prRes.error.message}`)
+        setPayouts([])
+      } else {
+        setPayoutsErr(null)
+        setPayouts((prRes.data ?? []) as PayoutReq[])
+      }
+
       setLoading(false)
     }
 
     load()
     return () => { mounted = false }
-  }, [navigate])
+  }, [navigate, loadKey])
 
   // ── Aggregates ───────────────────────────────────────────────
   const completed = txns.filter(t => t.status === 'completed')
   const credits   = completed.filter(t => ['earning','bonus','referral','adjustment'].includes(t.type))
-  const debits    = completed.filter(t => ['payout','donation'].includes(t.type))
 
+  // Lifetime earned from wallet_transactions credits
   const lifetimeEarned  = credits.reduce((s, t) => s + t.amount, 0)
-  const totalOut        = debits.reduce((s, t)  => s + t.amount, 0)
-  const available       = Math.max(0, lifetimeEarned - totalOut)
-  const donations       = completed.filter(t => t.type === 'donation').reduce((s, t) => s + t.amount, 0)
-  const pendingPayouts  = payouts
-    .filter(p => ['pending','approved','processing'].includes(p.status))
-    .reduce((s, p) => s + p.amount, 0)
+
+  // Payout request totals by status — payout_requests is the single source of truth
+  const pendingPayouts  = payouts.filter(p => p.status === 'pending') .reduce((s, p) => s + p.amount, 0)
+  const approvedPayouts = payouts.filter(p => p.status === 'approved').reduce((s, p) => s + p.amount, 0)
+  const paidPayoutsAmt  = payouts.filter(p => p.status === 'paid')    .reduce((s, p) => s + p.amount, 0)
+
+  // Available = earned minus every payout request that hasn't been denied/rejected
+  const available = Math.max(0, lifetimeEarned - pendingPayouts - approvedPayouts - paidPayoutsAmt)
 
   // ── Payout submit ────────────────────────────────────────────
   async function handlePayoutSubmit() {
     const amt = parseFloat(payoutAmount.replace(/[^0-9.]/g, ''))
     if (!userId || isNaN(amt) || amt <= 0) { setPayoutErr('Enter a valid amount.'); return }
-    if (amt > available)                   { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return }
+    if (available <= 0)    { setPayoutErr('No available balance to withdraw.'); return }
+    if (amt > available)   { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return }
     if (payoutPhase === 'submitting') return
 
     setPayoutPhase('submitting')
@@ -157,15 +179,10 @@ export default function LiveWalletPage() {
         read:    false,
       })
 
-    // Reflect new payout request in local state
-    setPayouts(prev => [{
-      id: crypto.randomUUID(),
-      amount: amt, method: payoutMethod,
-      status: 'pending', requested_at: new Date().toISOString(),
-    }, ...prev])
-
     setPayoutPhase('success')
     setPayoutAmount('')
+    // Re-fetch from Supabase so balance reflects the new pending request immediately
+    setLoadKey(k => k + 1)
   }
 
   const fade = (d = 0): React.CSSProperties => ({
@@ -239,6 +256,13 @@ export default function LiveWalletPage() {
             </div>
           )}
 
+          {/* Payout data warning — balance will show as lifetimeEarned if this fires */}
+          {!loading && payoutsErr && (
+            <div className="rounded-xl px-4 py-3 mb-4 text-sm" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', ...fade(60) }}>
+              ⚠️ {payoutsErr}. Available balance may not be accurate.
+            </div>
+          )}
+
           {!loading && !error && (
             <>
               {/* ── Balance card ─────────────────────────────────── */}
@@ -247,18 +271,35 @@ export default function LiveWalletPage() {
                 style={{ background: 'linear-gradient(135deg, rgba(94,234,212,0.12) 0%, rgba(0,200,255,0.06) 100%)', border: '1px solid rgba(94,234,212,0.25)', boxShadow: '0 0 40px rgba(94,234,212,0.08)', ...fade(60) }}
               >
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Available Balance</p>
-                <p style={{ fontSize: 42, fontWeight: 800, color: '#5eead4', lineHeight: 1, marginBottom: 20 }}>
+                <p style={{ fontSize: 42, fontWeight: 800, color: '#5eead4', lineHeight: 1, marginBottom: 12 }}>
                   ${available.toFixed(2)}
                 </p>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-3 gap-2 mb-5">
+                {/* Points badge */}
+                <div className="flex items-center justify-center mb-5">
+                  <div
+                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5"
+                    style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)' }}
+                  >
+                    <span style={{ fontSize: 14 }}>⭐</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>
+                      {totalPoints.toLocaleString()} pts
+                    </span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                      ≈ ${(totalPoints / 100).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-2 mb-5">
                   {[
-                    { label: 'Lifetime Earned',   value: `$${lifetimeEarned.toFixed(2)}`,  color: '#4ade80' },
-                    { label: 'Pending Payouts',   value: `$${pendingPayouts.toFixed(2)}`,  color: '#fbbf24' },
-                    { label: 'Fundraiser Donated',value: `$${donations.toFixed(2)}`,       color: '#00c8ff' },
+                    { label: 'Lifetime Earned',  value: `$${lifetimeEarned.toFixed(2)}`,  color: '#4ade80' },
+                    { label: 'Pending Payouts',  value: `$${pendingPayouts.toFixed(2)}`,  color: '#fbbf24' },
+                    { label: 'Approved Payouts', value: `$${approvedPayouts.toFixed(2)}`, color: '#00c8ff' },
+                    { label: 'Paid Out',         value: `$${paidPayoutsAmt.toFixed(2)}`,  color: '#f87171' },
                   ].map(s => (
-                    <div key={s.label} className="rounded-xl py-2 px-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <div key={s.label} className="rounded-xl py-2 px-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, color: s.color, marginBottom: 2 }}>{s.value}</p>
                       <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
                     </div>
@@ -365,7 +406,13 @@ export default function LiveWalletPage() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={handlePayoutSubmit}
+                          onClick={() => {
+                            const amt = parseFloat(payoutAmount.replace(/[^0-9.]/g, ''))
+                            if (!userId || isNaN(amt) || amt <= 0) { setPayoutErr('Enter a valid amount.'); return }
+                            if (amt > available) { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return }
+                            setPayoutErr('')
+                            setConfirmingPayout(true)
+                          }}
                           disabled={payoutPhase === 'submitting'}
                           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
                           style={{
@@ -382,7 +429,7 @@ export default function LiveWalletPage() {
                               <span className="w-4 h-4 rounded-full border-2 shrink-0" style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#ffffff', animation: 'spinLW 0.7s linear infinite' }} />
                               Processing…
                             </>
-                          ) : 'Submit Request'}
+                          ) : 'Review & Submit'}
                         </button>
                         <button
                           type="button"
@@ -434,6 +481,38 @@ export default function LiveWalletPage() {
                         </div>
                       )
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Bag Reward History ───────────────────────────── */}
+              {txns.filter(t => t.type === 'earning' && t.bag_id).length > 0 && (
+                <div className="mb-4" style={fade(140)}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    Bag Reward History
+                  </p>
+                  <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(74,222,128,0.15)' }}>
+                    {txns.filter(t => t.type === 'earning' && t.bag_id).map((t, i, arr) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center gap-3 px-4 py-3"
+                        style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', background: 'rgba(74,222,128,0.03)' }}
+                      >
+                        <span className="flex items-center justify-center w-8 h-8 rounded-full shrink-0" style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.25)', fontSize: 16 }}>
+                          ♻️
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {t.description ?? 'Bag reward'}
+                          </p>
+                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)' }}>{timeAgo(t.created_at)}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p style={{ fontSize: 13, fontWeight: 800, color: '#4ade80' }}>+${t.amount.toFixed(2)}</p>
+                          <p style={{ fontSize: 10, color: 'rgba(251,191,36,0.7)' }}>+{Math.round(t.amount * 100)} pts</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -517,6 +596,56 @@ export default function LiveWalletPage() {
 
         </div>
       </div>
+
+      {/* ── Confirmation modal ─────────────────────────────────────────── */}
+      {confirmingPayout && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: 'rgba(4,10,26,0.85)', backdropFilter: 'blur(8px)' }}
+        >
+          <div
+            className="w-full rounded-2xl p-6"
+            style={{ maxWidth: 360, background: '#0d1f3c', border: '1px solid rgba(94,234,212,0.3)', boxShadow: '0 0 60px rgba(0,200,255,0.12)' }}
+          >
+            <p style={{ fontSize: 28, textAlign: 'center', marginBottom: 12 }}>💳</p>
+            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#ffffff', textAlign: 'center', marginBottom: 8 }}>
+              Confirm Payout Request
+            </h2>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.6, marginBottom: 20 }}>
+              Request payout of{' '}
+              <span style={{ color: '#5eead4', fontWeight: 800 }}>
+                ${parseFloat(payoutAmount || '0').toFixed(2)}
+              </span>{' '}
+              via{' '}
+              <span style={{ color: '#ffffff', fontWeight: 600 }}>
+                {PAYOUT_METHODS.find(m => m.id === payoutMethod)?.label ?? payoutMethod}
+              </span>
+              ?
+            </p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: 24 }}>
+              This will be held as pending until reviewed by an admin.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmingPayout(false)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirmingPayout(false); handlePayoutSubmit() }}
+                className="flex-1 py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+                style={{ background: 'linear-gradient(135deg,#059669,#4ade80)', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 16px rgba(74,222,128,0.25)' }}
+              >
+                Yes, Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

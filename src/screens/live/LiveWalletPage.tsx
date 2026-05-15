@@ -72,9 +72,8 @@ export default function LiveWalletPage() {
   const [loadKey, setLoadKey]         = useState(0)
 
   // Payout form — auto-open if navigated with { state: { openPayout: true } }
-  const [showPayout, setShowPayout]         = useState(
-    () => (location.state as { openPayout?: boolean } | null)?.openPayout === true
-  )
+  const cashoutMode = (location.state as { openPayout?: boolean } | null)?.openPayout === true
+  const [showPayout, setShowPayout]         = useState(() => cashoutMode)
   const [payoutMethod, setPayoutMethod]     = useState<PayoutMethod>('cash_app')
   const [payoutAmount, setPayoutAmount]     = useState('')
   const [payoutPhase, setPayoutPhase]       = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
@@ -253,11 +252,23 @@ export default function LiveWalletPage() {
         <div className="flex items-center gap-3">
           <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
-          <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Live Wallet</span>
+          <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            {cashoutMode ? 'Cash Out' : 'Live Wallet'}
+          </span>
         </div>
-        <Link to="/live-dashboard" className="text-sm transition-opacity hover:opacity-70" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          ← Dashboard
-        </Link>
+        {cashoutMode ? (
+          <button
+            onClick={() => navigate(-1)}
+            className="text-sm transition-opacity hover:opacity-70"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}
+          >
+            ← Back
+          </button>
+        ) : (
+          <Link to="/live-dashboard" className="text-sm transition-opacity hover:opacity-70" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            ← Dashboard
+          </Link>
+        )}
       </header>
 
       <div className="relative flex-1 overflow-y-auto pb-24" style={{ zIndex: 1 }}>
@@ -309,98 +320,49 @@ export default function LiveWalletPage() {
 
           {!loading && !error && (
             <>
-              {/* ── Balance card ─────────────────────────────────── */}
-              <div
-                className="rounded-2xl p-6 mb-4 text-center"
-                style={{ background: 'linear-gradient(135deg, rgba(94,234,212,0.12) 0%, rgba(0,200,255,0.06) 100%)', border: '1px solid rgba(94,234,212,0.25)', boxShadow: '0 0 40px rgba(94,234,212,0.08)', ...fade(60) }}
-              >
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Available Balance</p>
-                <p style={{ fontSize: 42, fontWeight: 800, color: '#5eead4', lineHeight: 1, marginBottom: 12 }}>
-                  ${available.toFixed(2)}
-                </p>
-
-                {/* Points badge */}
-                <div className="flex items-center justify-center mb-5">
+              {cashoutMode ? (
+                /* ── CASHOUT MODE: skip overview, show payment selection directly ── */
+                <div style={fade(40)}>
+                  {/* Compact balance context */}
                   <div
-                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5"
-                    style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)' }}
+                    className="flex items-center justify-between rounded-2xl px-5 py-4 mb-5"
+                    style={{ background: 'rgba(94,234,212,0.08)', border: '1px solid rgba(94,234,212,0.2)' }}
                   >
-                    <span style={{ fontSize: 14 }}>⭐</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>
-                      {totalPoints.toLocaleString()} pts
-                    </span>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-                      ≈ ${(totalPoints / 100).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Stats grid */}
-                <div className="grid grid-cols-2 gap-2 mb-5">
-                  {[
-                    { label: 'Lifetime Earned',  value: `$${lifetimeEarned.toFixed(2)}`,  color: '#4ade80' },
-                    { label: 'Pending Payouts',  value: `$${pendingPayouts.toFixed(2)}`,  color: '#fbbf24' },
-                    { label: 'Approved Payouts', value: `$${approvedPayouts.toFixed(2)}`, color: '#00c8ff' },
-                    { label: 'Paid Out',         value: `$${paidPayoutsAmt.toFixed(2)}`,  color: '#f87171' },
-                  ].map(s => (
-                    <div key={s.label} className="rounded-xl py-2 px-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: s.color, marginBottom: 2 }}>{s.value}</p>
-                      <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
+                    <div>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Available Balance</p>
+                      <p style={{ fontSize: 28, fontWeight: 800, color: '#5eead4', lineHeight: 1 }}>${available.toFixed(2)}</p>
                     </div>
-                  ))}
-                </div>
+                    {totalPoints > 0 && (
+                      <div className="text-right">
+                        <p style={{ fontSize: 18, fontWeight: 800, color: '#fbbf24' }}>⭐ {totalPoints.toLocaleString()}</p>
+                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>pts earned</p>
+                      </div>
+                    )}
+                  </div>
 
-                {/* Request Payout button */}
-                {!showPayout && (() => {
-                  const canRequest = available > 0 && !payoutsErr
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => { setShowPayout(true); setPayoutPhase('idle'); setPayoutAmount(available.toFixed(2)) }}
-                      disabled={!canRequest}
-                      className="w-full py-3.5 rounded-xl font-bold text-sm transition-all hover:brightness-110"
-                      style={{
-                        background: canRequest ? 'linear-gradient(135deg,#059669,#4ade80)' : 'rgba(255,255,255,0.06)',
-                        border:     canRequest ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        color:      canRequest ? '#ffffff' : 'rgba(255,255,255,0.3)',
-                        cursor:     canRequest ? 'pointer' : 'not-allowed',
-                        boxShadow:  canRequest ? '0 4px 20px rgba(74,222,128,0.25)' : 'none',
-                      }}
-                    >
-                      {payoutsErr ? 'Payout data unavailable' : available > 0 ? '💳 Request Payout' : 'No balance to withdraw'}
-                    </button>
-                  )
-                })()}
-              </div>
-
-              {/* ── Payout form ───────────────────────────────────── */}
-              {showPayout && (
-                <div className="rounded-2xl p-5 mb-4" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)', ...fade(0) }}>
                   {payoutPhase === 'success' ? (
-                    <div className="text-center py-4">
-                      <span style={{ fontSize: 44, display: 'block', marginBottom: 12 }}>🎉</span>
-                      <p style={{ fontSize: 16, fontWeight: 800, color: '#4ade80', marginBottom: 6 }}>Payout Requested!</p>
-                      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 20 }}>
+                    /* ── Success confirmation ── */
+                    <div className="rounded-2xl p-8 text-center" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)' }}>
+                      <span style={{ fontSize: 52, display: 'block', marginBottom: 14 }}>🎉</span>
+                      <p style={{ fontSize: 20, fontWeight: 800, color: '#4ade80', marginBottom: 8 }}>Payout Requested!</p>
+                      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 24 }}>
                         Your request is pending review and will be processed soon.
                       </p>
                       <button
                         type="button"
-                        onClick={() => { setShowPayout(false); setPayoutPhase('idle') }}
-                        className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
-                        style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ade80', cursor: 'pointer' }}
+                        onClick={() => navigate(-1)}
+                        className="w-full py-3.5 rounded-2xl text-sm font-bold transition-all hover:brightness-110"
+                        style={{ background: 'linear-gradient(135deg,#059669,#4ade80)', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(74,222,128,0.25)' }}
                       >
                         Done
                       </button>
                     </div>
                   ) : (
-                    <>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Request Payout
-                      </p>
+                    /* ── Payment method selection + amount ── */
+                    <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,200,255,0.18)' }}>
+                      <p style={{ fontSize: 16, fontWeight: 800, color: '#ffffff', marginBottom: 18 }}>Select Payment Method</p>
 
-                      {/* Method selector */}
-                      <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Payout Method</p>
-                      <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className="grid grid-cols-2 gap-3 mb-5">
                         {PAYOUT_METHODS.map(m => {
                           const active = payoutMethod === m.id
                           return (
@@ -408,89 +370,175 @@ export default function LiveWalletPage() {
                               key={m.id}
                               type="button"
                               onClick={() => setPayoutMethod(m.id)}
-                              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
+                              className="flex items-center gap-2.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all hover:brightness-110"
                               style={{
-                                background: active ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.04)',
-                                border:     `1px solid ${active ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.1)'}`,
-                                color:      active ? '#4ade80' : 'rgba(255,255,255,0.55)',
+                                background: active ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)',
+                                border:     `1.5px solid ${active ? 'rgba(0,200,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                                color:      active ? '#00c8ff' : 'rgba(255,255,255,0.55)',
                                 cursor:     'pointer',
+                                boxShadow:  active ? '0 0 16px rgba(0,200,255,0.12)' : 'none',
                               }}
                             >
-                              {m.icon} {m.label}
+                              <span style={{ fontSize: 18 }}>{m.icon}</span>
+                              {m.label}
                             </button>
                           )
                         })}
                       </div>
 
-                      {/* Amount input */}
                       <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Amount</p>
                       <div
-                        className="flex items-center gap-2 px-4 py-3 rounded-xl mb-1"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(74,222,128,0.3)' }}
+                        className="flex items-center gap-2 px-4 py-3.5 rounded-2xl mb-1"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,200,255,0.25)' }}
                       >
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#4ade80' }}>$</span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: '#00c8ff' }}>$</span>
                         <input
                           type="number"
                           min="0.01"
                           step="0.01"
                           value={payoutAmount}
                           onChange={e => { setPayoutAmount(e.target.value); setPayoutErr('') }}
-                          className="flex-1 outline-none bg-transparent text-sm font-semibold"
-                          style={{ color: '#ffffff', caretColor: '#4ade80' }}
+                          className="flex-1 outline-none bg-transparent text-base font-semibold"
+                          style={{ color: '#ffffff', caretColor: '#00c8ff' }}
                           placeholder={`Max $${available.toFixed(2)}`}
                         />
                       </div>
-                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
                         Available: <span style={{ color: '#5eead4' }}>${available.toFixed(2)}</span>
                       </p>
 
                       {payoutErr && (
-                        <div className="rounded-xl px-3 py-2 mb-3 text-xs" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
+                        <div className="rounded-xl px-3 py-2.5 mb-4 text-xs" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
                           {payoutErr}
                         </div>
                       )}
 
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const amt = parseFloat(payoutAmount.replace(/[^0-9.]/g, ''))
-                            if (!userId || isNaN(amt) || amt <= 0) { setPayoutErr('Enter a valid amount.'); return }
-                            if (amt > available) { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return }
-                            setPayoutErr('')
-                            setConfirmingPayout(true)
-                          }}
-                          disabled={payoutPhase === 'submitting'}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-                          style={{
-                            background: payoutPhase === 'submitting' ? 'rgba(74,222,128,0.1)' : 'linear-gradient(135deg,#059669,#4ade80)',
-                            color:      '#ffffff',
-                            cursor:     payoutPhase === 'submitting' ? 'not-allowed' : 'pointer',
-                            opacity:    payoutPhase === 'submitting' ? 0.7 : 1,
-                            border:     'none',
-                            boxShadow:  payoutPhase !== 'submitting' ? '0 4px 16px rgba(74,222,128,0.25)' : 'none',
-                          }}
-                        >
-                          {payoutPhase === 'submitting' ? (
-                            <>
-                              <span className="w-4 h-4 rounded-full border-2 shrink-0" style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#ffffff', animation: 'spinLW 0.7s linear infinite' }} />
-                              Processing…
-                            </>
-                          ) : 'Review & Submit'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setShowPayout(false); setPayoutPhase('idle'); setPayoutErr('') }}
-                          className="px-4 py-3 rounded-xl text-sm font-medium transition-all hover:brightness-110"
-                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const amt = parseFloat(payoutAmount.replace(/[^0-9.]/g, ''))
+                          if (!userId || isNaN(amt) || amt <= 0) { setPayoutErr('Enter a valid amount.'); return }
+                          if (amt > available) { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return }
+                          setPayoutErr('')
+                          setConfirmingPayout(true)
+                        }}
+                        disabled={payoutPhase === 'submitting' || available <= 0}
+                        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-bold mb-3 transition-all hover:brightness-110"
+                        style={{
+                          background: available > 0 && payoutPhase !== 'submitting' ? 'linear-gradient(135deg,#0057e7,#00c8ff)' : 'rgba(255,255,255,0.06)',
+                          color:      available > 0 ? '#ffffff' : 'rgba(255,255,255,0.3)',
+                          border:     available > 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                          cursor:     available > 0 && payoutPhase !== 'submitting' ? 'pointer' : 'not-allowed',
+                          boxShadow:  available > 0 && payoutPhase !== 'submitting' ? '0 6px 24px rgba(0,190,255,0.35)' : 'none',
+                        }}
+                      >
+                        {payoutPhase === 'submitting' ? (
+                          <>
+                            <span className="w-4 h-4 rounded-full border-2 shrink-0" style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#ffffff', animation: 'spinLW 0.7s linear infinite' }} />
+                            Processing…
+                          </>
+                        ) : available <= 0 ? 'No balance to withdraw' : 'Review & Submit'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        className="w-full py-3 rounded-2xl text-sm font-medium transition-all hover:brightness-110"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   )}
                 </div>
-              )}
+              ) : (
+                /* ── WALLET MODE: full balance overview + history ── */
+                <>
+                  {/* Balance card */}
+                  <div
+                    className="rounded-2xl p-6 mb-4 text-center"
+                    style={{ background: 'linear-gradient(135deg, rgba(94,234,212,0.12) 0%, rgba(0,200,255,0.06) 100%)', border: '1px solid rgba(94,234,212,0.25)', boxShadow: '0 0 40px rgba(94,234,212,0.08)', ...fade(60) }}
+                  >
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Available Balance</p>
+                    <p style={{ fontSize: 42, fontWeight: 800, color: '#5eead4', lineHeight: 1, marginBottom: 12 }}>
+                      ${available.toFixed(2)}
+                    </p>
+                    <div className="flex items-center justify-center mb-5">
+                      <div className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)' }}>
+                        <span style={{ fontSize: 14 }}>⭐</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>{totalPoints.toLocaleString()} pts</span>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>≈ ${(totalPoints / 100).toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-5">
+                      {[
+                        { label: 'Lifetime Earned',  value: `$${lifetimeEarned.toFixed(2)}`,  color: '#4ade80' },
+                        { label: 'Pending Payouts',  value: `$${pendingPayouts.toFixed(2)}`,  color: '#fbbf24' },
+                        { label: 'Approved Payouts', value: `$${approvedPayouts.toFixed(2)}`, color: '#00c8ff' },
+                        { label: 'Paid Out',         value: `$${paidPayoutsAmt.toFixed(2)}`,  color: '#f87171' },
+                      ].map(s => (
+                        <div key={s.label} className="rounded-xl py-2 px-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: s.color, marginBottom: 2 }}>{s.value}</p>
+                          <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {!showPayout && (() => {
+                      const canRequest = available > 0 && !payoutsErr
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => { setShowPayout(true); setPayoutPhase('idle'); setPayoutAmount(available.toFixed(2)) }}
+                          disabled={!canRequest}
+                          className="w-full py-3.5 rounded-xl font-bold text-sm transition-all hover:brightness-110"
+                          style={{ background: canRequest ? 'linear-gradient(135deg,#059669,#4ade80)' : 'rgba(255,255,255,0.06)', border: canRequest ? 'none' : '1px solid rgba(255,255,255,0.1)', color: canRequest ? '#ffffff' : 'rgba(255,255,255,0.3)', cursor: canRequest ? 'pointer' : 'not-allowed', boxShadow: canRequest ? '0 4px 20px rgba(74,222,128,0.25)' : 'none' }}
+                        >
+                          {payoutsErr ? 'Payout data unavailable' : available > 0 ? '💳 Request Payout' : 'No balance to withdraw'}
+                        </button>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Payout form (wallet mode) */}
+                  {showPayout && (
+                    <div className="rounded-2xl p-5 mb-4" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)', ...fade(0) }}>
+                      {payoutPhase === 'success' ? (
+                        <div className="text-center py-4">
+                          <span style={{ fontSize: 44, display: 'block', marginBottom: 12 }}>🎉</span>
+                          <p style={{ fontSize: 16, fontWeight: 800, color: '#4ade80', marginBottom: 6 }}>Payout Requested!</p>
+                          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 20 }}>Your request is pending review and will be processed soon.</p>
+                          <button type="button" onClick={() => { setShowPayout(false); setPayoutPhase('idle') }} className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:brightness-110" style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ade80', cursor: 'pointer' }}>Done</button>
+                        </div>
+                      ) : (
+                        <>
+                          <p style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Request Payout</p>
+                          <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Payout Method</p>
+                          <div className="grid grid-cols-2 gap-2 mb-4">
+                            {PAYOUT_METHODS.map(m => {
+                              const active = payoutMethod === m.id
+                              return (
+                                <button key={m.id} type="button" onClick={() => setPayoutMethod(m.id)} className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110" style={{ background: active ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.1)'}`, color: active ? '#4ade80' : 'rgba(255,255,255,0.55)', cursor: 'pointer' }}>
+                                  {m.icon} {m.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Amount</p>
+                          <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-1" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(74,222,128,0.3)' }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: '#4ade80' }}>$</span>
+                            <input type="number" min="0.01" step="0.01" value={payoutAmount} onChange={e => { setPayoutAmount(e.target.value); setPayoutErr('') }} className="flex-1 outline-none bg-transparent text-sm font-semibold" style={{ color: '#ffffff', caretColor: '#4ade80' }} placeholder={`Max $${available.toFixed(2)}`} />
+                          </div>
+                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>Available: <span style={{ color: '#5eead4' }}>${available.toFixed(2)}</span></p>
+                          {payoutErr && <div className="rounded-xl px-3 py-2 mb-3 text-xs" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>{payoutErr}</div>}
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => { const amt = parseFloat(payoutAmount.replace(/[^0-9.]/g, '')); if (!userId || isNaN(amt) || amt <= 0) { setPayoutErr('Enter a valid amount.'); return } if (amt > available) { setPayoutErr(`Cannot exceed available balance ($${available.toFixed(2)}).`); return } setPayoutErr(''); setConfirmingPayout(true) }} disabled={payoutPhase === 'submitting'} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110" style={{ background: payoutPhase === 'submitting' ? 'rgba(74,222,128,0.1)' : 'linear-gradient(135deg,#059669,#4ade80)', color: '#ffffff', cursor: payoutPhase === 'submitting' ? 'not-allowed' : 'pointer', opacity: payoutPhase === 'submitting' ? 0.7 : 1, border: 'none', boxShadow: payoutPhase !== 'submitting' ? '0 4px 16px rgba(74,222,128,0.25)' : 'none' }}>
+                              {payoutPhase === 'submitting' ? (<><span className="w-4 h-4 rounded-full border-2 shrink-0" style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#ffffff', animation: 'spinLW 0.7s linear infinite' }} />Processing…</>) : 'Review & Submit'}
+                            </button>
+                            <button type="button" onClick={() => { setShowPayout(false); setPayoutPhase('idle'); setPayoutErr('') }} className="px-4 py-3 rounded-xl text-sm font-medium transition-all hover:brightness-110" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>Cancel</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
 
               {/* ── Payout requests history ───────────────────────── */}
               {payouts.length > 0 && (
@@ -639,6 +687,9 @@ export default function LiveWalletPage() {
                 </Link>
               </div>
             </>
+            /* end wallet mode */
+            )}
+          </>
           )}
 
         </div>

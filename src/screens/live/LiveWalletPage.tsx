@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../store/authStore'
 import { Skeleton } from '../../components/ui/Skeleton'
@@ -58,6 +58,7 @@ function timeAgo(ts: string): string {
 
 export default function LiveWalletPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuthStore()
   const userId = user?.id ?? null
 
@@ -70,8 +71,10 @@ export default function LiveWalletPage() {
   const [payoutsErr, setPayoutsErr]   = useState<string | null>(null)
   const [loadKey, setLoadKey]         = useState(0)
 
-  // Payout form
-  const [showPayout, setShowPayout]         = useState(false)
+  // Payout form — auto-open if navigated with { state: { openPayout: true } }
+  const [showPayout, setShowPayout]         = useState(
+    () => (location.state as { openPayout?: boolean } | null)?.openPayout === true
+  )
   const [payoutMethod, setPayoutMethod]     = useState<PayoutMethod>('cash_app')
   const [payoutAmount, setPayoutAmount]     = useState('')
   const [payoutPhase, setPayoutPhase]       = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')

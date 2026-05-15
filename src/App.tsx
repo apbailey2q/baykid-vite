@@ -145,7 +145,7 @@ function App() {
         <Route path="/dashboard/driver/scan" element={<ProtectedRoute requireApproved><DriverScanScreen /></ProtectedRoute>} />
 
         {/* Bag lifecycle */}
-        <Route path="/scan" element={<ProtectedRoute requireApproved><ScannerScreen /></ProtectedRoute>} />
+        <Route path="/scan" element={<ProtectedRoute requireApproved allowDemo><ScannerScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId" element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
 

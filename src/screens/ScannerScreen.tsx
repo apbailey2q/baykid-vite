@@ -109,6 +109,11 @@ export default function ScannerScreen() {
       className="relative min-h-screen flex flex-col overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}
     >
+      {/* Transparent logo watermark — upper-left */}
+      <div className="fixed pointer-events-none" style={{ top: 14, left: 14, zIndex: 200, opacity: 0.13 }}>
+        <img src="/logo.png" alt="" style={{ width: 44, height: 44, objectFit: 'contain' }} />
+      </div>
+
       {/* Camera flash overlay */}
       {showFlash && (
         <div
@@ -154,7 +159,7 @@ export default function ScannerScreen() {
             </span>
           </button>
           <Link
-            to="/"
+            to="/dashboard/consumer"
             className="text-sm transition-opacity hover:opacity-70"
             style={{ color: 'rgba(255,255,255,0.4)' }}
           >
@@ -271,7 +276,7 @@ export default function ScannerScreen() {
                   style={{ background: 'rgba(74,222,128,0.06)', animation: 'fadeIn 0.3s ease' }}
                 >
                   <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center"
+                    className="w-20 h-20 rounded-2xl flex items-center justify-center"
                     style={{
                       background: 'rgba(74,222,128,0.18)',
                       border:     '2px solid rgba(74,222,128,0.55)',
@@ -400,7 +405,7 @@ export default function ScannerScreen() {
                 className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 mb-4"
                 style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.22)' }}
               >
-                <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)' }}>
+                <div className="w-5 h-5 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)' }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>

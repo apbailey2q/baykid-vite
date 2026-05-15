@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { QrScanner } from '../../components/QrScanner'
 import { signOut } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
 import { isDemoModeActive } from '../../lib/devBypass'
@@ -138,12 +139,21 @@ const FOR_YOU_CATEGORIES: { icon: string; label: string; page: QuickPage }[] = [
 ]
 
 const BAG_STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
-  pending:      { label: 'Pending',      bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
-  assigned:     { label: 'Assigned',     bg: 'rgba(139,92,246,0.18)', color: '#a78bfa' },
-  picked_up:    { label: 'Picked Up',    bg: 'rgba(0,190,255,0.15)',  color: '#00c8ff' },
-  at_warehouse: { label: 'At Warehouse', bg: 'rgba(0,190,255,0.12)',  color: '#67e8f9' },
-  inspected:    { label: 'Inspected',    bg: 'rgba(255,214,0,0.15)',  color: '#FFD600' },
-  completed:    { label: 'Delivered',    bg: 'rgba(34,197,94,0.15)',  color: '#4ade80' },
+  pending:            { label: 'Awaiting Dispatch', bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
+  awaiting_dispatch:  { label: 'Awaiting Dispatch', bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
+  assigned:           { label: 'Driver En Route',   bg: 'rgba(139,92,246,0.18)', color: '#a78bfa' },
+  picked_up:          { label: 'Picked Up',          bg: 'rgba(0,190,255,0.15)',  color: '#00c8ff' },
+  at_warehouse:       { label: 'At Warehouse',       bg: 'rgba(0,190,255,0.12)',  color: '#67e8f9' },
+  inspected:          { label: 'Processing',         bg: 'rgba(255,214,0,0.15)',  color: '#FFD600' },
+  completed:          { label: 'Completed',           bg: 'rgba(34,197,94,0.15)',  color: '#4ade80' },
+}
+
+function normalizeBagCode(rawCode: string): string {
+  let code = rawCode.trim().toUpperCase()
+  if (code.startsWith('QR')) code = code.slice(2)
+  const digits = code.replace(/[^0-9]/g, '')
+  if (digits.length === 12) return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 12)}`
+  return rawCode.trim().toUpperCase()
 }
 
 const CONFETTI_COLORS = ['#00c8ff', '#00E676', '#FFD600', '#FF6D00', '#E040FB', '#FF4081']
@@ -259,23 +269,29 @@ export default function ConsumerDashboard() {
   const { user, profile, clearAuth } = useAuthStore()
   const navigate = useNavigate()
   const toast = useToast()
+  const queryClient = useQueryClient()
   const ACCENT = '#00c8ff'
   const inDemoMode = isDemoModeActive()
   const firstName = profile?.full_name?.split(' ')[0] ?? (inDemoMode ? 'Explorer' : 'Friend')
   const initials  = profile?.full_name ? getInitials(profile.full_name) : (inDemoMode ? 'DM' : '??')
 
   const [tab, setTab]               = useState<Tab>('home')
-  const [code, setCode]             = useState('')
   const [celebBadge, setCelebBadge] = useState<(BadgeDef & { unlocked: boolean }) | null>(null)
   const [msgIdx, setMsgIdx]         = useState(0)
   const [signingOut, setSigningOut] = useState(false)
   const [newMsgBanner, setNewMsgBanner] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('Eco Tips')
   const [bagTab, setBagTab]           = useState<'active' | 'history'>('active')
-  const [showManual, setShowManual]   = useState(false)
   const [activePage, setActivePage]   = useState<QuickPage | null>(null)
   const [earningsWeekIdx, setEarningsWeekIdx] = useState(0)
   const [recycledWeekIdx, setRecycledWeekIdx]  = useState(0)
+
+  // Scan state
+  const [showCameraOverlay, setShowCameraOverlay] = useState(false)
+  const [showQrModal, setShowQrModal]             = useState(false)
+  const [qrModalCode, setQrModalCode]             = useState('')
+  const [scanSaving, setScanSaving]               = useState(false)
+  const [scanError, setScanError]                 = useState<string | null>(null)
 
   const demoRafRef = useRef<number | null>(null) // kept for cleanup only
 
@@ -380,14 +396,47 @@ export default function ConsumerDashboard() {
     if (demoRafRef.current !== null) cancelAnimationFrame(demoRafRef.current)
   }, [])
 
-  // ── Manual bag entry → real scanner ──────────────────────────────────────
-  const handleManualRequest = (e: React.FormEvent) => {
+  // ── Bag scan logic (real users) ───────────────────────────────────────────
+  async function handleConsumerScan(rawCode: string) {
+    const code = normalizeBagCode(rawCode)
+    if (!user || !code) { setScanError('Invalid bag code.'); return }
+    setScanSaving(true)
+    setScanError(null)
+    try {
+      const { data: bag, error: lookupErr } = await supabase
+        .from('qr_bags')
+        .select('id, consumer_id')
+        .eq('bag_code', code)
+        .maybeSingle()
+      if (lookupErr) { setScanError(`Lookup failed: ${lookupErr.message}`); return }
+      if (!bag) { setScanError('Bag not found. Check the code and try again.'); return }
+      if (bag.consumer_id && bag.consumer_id !== user.id) {
+        setScanError('This bag is already registered to another account.'); return
+      }
+      if (!bag.consumer_id) {
+        await supabase.from('qr_bags').update({ consumer_id: user.id, status: 'pending' }).eq('id', bag.id)
+      }
+      await supabase.from('bag_scans').insert({ bag_id: bag.id, scanned_by: user.id, location: 'personal' })
+      setShowCameraOverlay(false)
+      setShowQrModal(false)
+      setQrModalCode('')
+      setScanError(null)
+      queryClient.invalidateQueries({ queryKey: ['consumer-bags', user.id] })
+      toast.success('Bag registered! Pickup requested.')
+      setTab('bags')
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : 'Scan failed. Try again.')
+    } finally {
+      setScanSaving(false)
+    }
+  }
+
+  const handleQrModalSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const trimmed = code.trim()
+    const trimmed = qrModalCode.trim()
     if (!trimmed) return
-    setCode('')
-    setShowManual(false)
-    navigate(`/live-scan`, { state: { bagCode: trimmed.toUpperCase() } })
+    if (inDemoMode) { setShowQrModal(false); setQrModalCode(''); navigate('/scan'); return }
+    await handleConsumerScan(trimmed)
   }
 
   const handleSignOut = async () => {
@@ -513,7 +562,7 @@ export default function ConsumerDashboard() {
             {/* ── Scan Bag ── */}
             <div className="px-5 mb-5 mt-20">
               <button
-                onClick={() => navigate('/live-scan')}
+                onClick={() => inDemoMode ? navigate('/scan') : setShowCameraOverlay(true)}
                 className="w-full flex items-center justify-center gap-3 rounded-2xl py-6 text-lg font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
@@ -694,103 +743,31 @@ export default function ConsumerDashboard() {
               </p>
             </div>
 
-            {/* QR Scanner card */}
+            {/* Scan actions */}
             <div className="px-5 mb-5">
-              <div
-                className="rounded-2xl p-5 space-y-4"
-                style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(0,190,255,0.25)', backdropFilter: 'blur(12px)' }}
+              <button
+                onClick={() => inDemoMode ? navigate('/scan') : setShowCameraOverlay(true)}
+                className="w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-base font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 6px 28px rgba(0,190,255,0.45)' }}
               >
-                {/* QR frame visual */}
-                <div className="flex justify-center">
-                  <div className="relative" style={{ width: 180, height: 180 }}>
-                    {/* Dark interior */}
-                    <div className="absolute inset-0 rounded-xl" style={{ background: 'rgba(0,10,30,0.6)' }} />
-
-                    {/* 5×5 faint grid */}
-                    <div
-                      className="absolute grid"
-                      style={{
-                        inset: '24px',
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(5, 1fr)',
-                        gridTemplateRows: 'repeat(5, 1fr)',
-                        gap: '6px',
-                      }}
-                    >
-                      {Array.from({ length: 25 }).map((_, i) => (
-                        <div key={i} className="rounded-sm" style={{ background: 'rgba(0,200,255,0.2)' }} />
-                      ))}
-                    </div>
-
-                    {/* Corner brackets */}
-                    <div className="absolute top-0 left-0" style={{ width: 20, height: 20, borderTop: '3px solid #00c8ff', borderLeft: '3px solid #00c8ff', borderRadius: '4px 0 0 0' }} />
-                    <div className="absolute top-0 right-0" style={{ width: 20, height: 20, borderTop: '3px solid #00c8ff', borderRight: '3px solid #00c8ff', borderRadius: '0 4px 0 0' }} />
-                    <div className="absolute bottom-0 left-0" style={{ width: 20, height: 20, borderBottom: '3px solid #00c8ff', borderLeft: '3px solid #00c8ff', borderRadius: '0 0 0 4px' }} />
-                    <div className="absolute bottom-0 right-0" style={{ width: 20, height: 20, borderBottom: '3px solid #00c8ff', borderRight: '3px solid #00c8ff', borderRadius: '0 0 4px 0' }} />
-
-                    {/* Animated scan line */}
-                    <div
-                      className="absolute left-1 right-1"
-                      style={{
-                        height: '1.5px',
-                        background: 'rgba(0,200,255,0.7)',
-                        boxShadow: '0 0 8px 2px rgba(0,200,255,0.4)',
-                        animation: 'scanLine 2.2s ease-in-out infinite',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <p className="text-center text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  Point camera at your QR-coded bag
-                </p>
-
-                {/* Primary scan button */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+                  <rect x="7" y="7" width="10" height="10" rx="1" />
+                </svg>
+                Scan Bag
+              </button>
+              <div className="flex justify-end mt-2">
                 <button
-                  onClick={() => navigate('/live-scan')}
-                  className="w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-base font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 6px 28px rgba(0,190,255,0.45)' }}
+                  onClick={() => { setScanError(null); setShowQrModal(true) }}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
+                  style={{ background: 'transparent', border: '1px solid rgba(0,200,255,0.35)', color: '#00c8ff', letterSpacing: '0.04em' }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
-                    <rect x="7" y="7" width="10" height="10" rx="1" />
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                    <path d="M14 14h.01M18 14h.01M14 18h.01M18 18h.01"/>
                   </svg>
-                  Scan Bag
+                  QR #
                 </button>
-
-                {/* Manual entry toggle */}
-                <button
-                  onClick={() => { setShowManual((v) => !v); setCode('') }}
-                  className="w-full text-sm font-medium transition-opacity hover:opacity-80"
-                  style={{ color: showManual ? '#00c8ff' : 'rgba(255,255,255,0.45)' }}
-                >
-                  {showManual ? '✕ Close manual entry' : '+ Enter bag code manually'}
-                </button>
-
-                {showManual && (
-                  <form onSubmit={handleManualRequest} className="flex gap-2">
-                    <input
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="Any code — letters, numbers, symbols"
-                      autoFocus
-                      className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
-                      style={{
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(0,200,255,0.25)',
-                        color: '#ffffff',
-                      }}
-                    />
-                    <button
-                      type="submit"
-                      disabled={!code.trim()}
-                      className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 whitespace-nowrap"
-                      style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)' }}
-                    >
-                      Request Pickup
-                    </button>
-                  </form>
-                )}
               </div>
             </div>
 
@@ -830,7 +807,7 @@ export default function ConsumerDashboard() {
                     icon="♻️"
                     title={bagTab === 'history' ? 'No completed bags yet' : 'No active bags'}
                     description={bagTab === 'history' ? 'Completed bags will appear here.' : 'Scan a bag to get started.'}
-                    action={bagTab !== 'history' ? { label: 'Scan Bag', onClick: () => navigate('/live-scan') } : undefined}
+                    action={bagTab !== 'history' ? { label: 'Scan Bag', onClick: () => inDemoMode ? navigate('/scan') : setShowCameraOverlay(true) } : undefined}
                   />
                 ) : (
                   <div className="space-y-2.5">
@@ -906,11 +883,11 @@ export default function ConsumerDashboard() {
               </p>
             </div>
 
-            {/* ── PAYOUT BUTTONS ──────────────────────────────────────────── */}
-            <div className="px-5 flex gap-3 mt-5 mb-6">
+            {/* ── PAYOUT BUTTON ───────────────────────────────────────────── */}
+            <div className="px-5 mt-5 mb-6">
               <button
-                onClick={() => navigate('/live-wallet')}
-                className="flex-1 py-3.5 rounded-2xl font-bold text-sm text-white transition-all hover:brightness-110 active:scale-[0.97]"
+                onClick={() => navigate('/live-wallet', { state: { openPayout: true } })}
+                className="w-full py-3.5 rounded-2xl font-bold text-sm text-white transition-all hover:brightness-110 active:scale-[0.97]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
                   boxShadow: '0 4px 20px rgba(0,190,255,0.45)',
@@ -918,18 +895,6 @@ export default function ConsumerDashboard() {
                 }}
               >
                 Cash out now
-              </button>
-              <button
-                className="flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all hover:brightness-110 active:scale-[0.97]"
-                style={{
-                  background: 'transparent',
-                  border: '1.5px solid rgba(0,200,255,0.5)',
-                  color: '#00c8ff',
-                  boxShadow: '0 0 14px rgba(0,200,255,0.15)',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Payout details
               </button>
             </div>
 
@@ -1378,6 +1343,113 @@ export default function ConsumerDashboard() {
       <BottomNav tab={tab} onTab={setTab} msgCount={unreadMsgCount} />
 
       {activePage && <QuickActionPage page={activePage} onClose={() => setActivePage(null)} />}
+
+      {/* ── CAMERA OVERLAY (real users) ───────────────────────────────────── */}
+      {showCameraOverlay && !inDemoMode && (
+        <div className="fixed inset-0 flex flex-col" style={{ background: '#060e24', zIndex: 60 }}>
+          <div className="pointer-events-none absolute inset-0 grid-bg" />
+          <header
+            className="relative flex items-center justify-between px-5 shrink-0"
+            style={{ paddingTop: 'max(env(safe-area-inset-top,0px),16px)', paddingBottom: 14, background: 'rgba(4,10,24,0.95)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}
+          >
+            <span className="text-base font-bold" style={{ color: '#ffffff' }}>Scan Bag</span>
+            <button
+              onClick={() => { setShowCameraOverlay(false); setScanError(null) }}
+              className="text-sm transition-opacity hover:opacity-70"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              ✕ Cancel
+            </button>
+          </header>
+          <div className="relative flex-1 flex flex-col px-5 pt-6 pb-8 overflow-y-auto" style={{ zIndex: 1 }}>
+            {scanSaving ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-3">
+                <div className="h-8 w-8 rounded-full border-4 animate-spin" style={{ borderColor: 'rgba(0,200,255,0.2)', borderTopColor: '#00c8ff' }} />
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Saving scan…</p>
+              </div>
+            ) : (
+              <QrScanner
+                onScan={(decoded) => { setShowCameraOverlay(false); handleConsumerScan(decoded) }}
+                onPermissionDenied={() => {
+                  setScanError('Camera permission denied. Use QR # to enter the bag code manually.')
+                  setShowCameraOverlay(false)
+                }}
+              />
+            )}
+            {scanError && (
+              <div className="mt-4 rounded-2xl px-4 py-3" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                <p className="text-sm" style={{ color: '#f87171' }}>{scanError}</p>
+              </div>
+            )}
+            <button
+              onClick={() => { setShowCameraOverlay(false); setScanError(null); setShowQrModal(true) }}
+              className="mt-4 w-full py-3 rounded-2xl text-sm font-medium transition-all hover:brightness-110"
+              style={{ background: 'transparent', border: '1px solid rgba(0,200,255,0.3)', color: '#00c8ff' }}
+            >
+              Enter code manually (QR #)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── QR # MANUAL ENTRY MODAL ───────────────────────────────────────── */}
+      {showQrModal && (
+        <div
+          className="fixed inset-0 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', zIndex: 60 }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowQrModal(false); setScanError(null); setQrModalCode('') } }}
+        >
+          <form
+            onSubmit={handleQrModalSubmit}
+            className="w-full max-w-lg rounded-t-3xl px-6 pt-6 pb-10"
+            style={{ background: 'linear-gradient(180deg,#080f26 0%,#060e24 100%)', border: '1px solid rgba(0,200,255,0.18)', borderBottom: 'none' }}
+          >
+            <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: 'rgba(255,255,255,0.15)' }} />
+            <h3 className="text-lg font-bold mb-5" style={{ color: '#ffffff' }}>Bag Code</h3>
+
+            <label className="block text-xs font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Enter Bag Code
+            </label>
+            <input
+              type="text"
+              value={qrModalCode}
+              onChange={(e) => setQrModalCode(e.target.value.toUpperCase())}
+              placeholder="CB-NASH-000421"
+              autoFocus
+              className="w-full rounded-xl px-4 py-3 text-sm font-mono outline-none mb-1"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,200,255,0.28)', color: '#ffffff' }}
+            />
+            <p className="text-[10px] mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              Enter the code printed on your recycling bag
+            </p>
+
+            {scanError && (
+              <div className="rounded-xl px-3 py-2.5 mb-4" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                <p className="text-xs" style={{ color: '#f87171' }}>{scanError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowQrModal(false); setScanError(null); setQrModalCode('') }}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all hover:brightness-110"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!qrModalCode.trim() || scanSaving}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-50 transition-all hover:brightness-110"
+                style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 18px rgba(0,190,255,0.35)' }}
+              >
+                {scanSaving ? 'Saving…' : 'Submit'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* ── CELEBRATION MODAL ─────────────────────────────────────────────── */}
       {celebBadge && (

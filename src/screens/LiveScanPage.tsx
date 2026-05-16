@@ -203,7 +203,7 @@ export default function LiveScanPage() {
           }
 
           setSaved(true)
-          setTimeout(() => navigate('/live-inspection'), 500)
+          setTimeout(() => navigate('/bags'), 500)
         } catch (err: unknown) {
           console.error('[LiveScan] save error', err)
           setError(err instanceof Error ? err.message : 'Scan failed. Try again.')
@@ -213,85 +213,9 @@ export default function LiveScanPage() {
       })()
     } catch (err) {
       console.error('[SCAN ERROR]', err)
-      setError('Scan completed, but the inspection screen could not open.')
+      setError('Scan failed. Please try again.')
     }
   }, [navigate])
-
-  async function handleSave() {
-    const code = normalizeBagCode(bagCode)
-    if (!code) { setError('Enter or scan a bag code first.'); return }
-
-    if (scanMode === 'fundraiser' && joinedFundraisers.length > 0 && !fundraiserId) {
-      setError('Select a fundraiser to donate this bag to.')
-      return
-    }
-
-    setError(null)
-    setLoading(true)
-
-    try {
-      if (!user) {
-        setError('Not authenticated. Please sign in.')
-        return
-      }
-
-      // 1. Look up bag — real bags only, no auto-creation
-      const { data: bag, error: lookupErr } = await supabase
-        .from('qr_bags')
-        .select('id, consumer_id')
-        .eq('bag_code', code)
-        .maybeSingle()
-
-      console.log('[BAG LOOKUP]', { scannedCode: bagCode, normalizedBagCode: code, bag, error: lookupErr })
-
-      if (lookupErr) { setError(`Bag lookup failed: ${lookupErr.message}`); return }
-      if (!bag)      { setError('Bag not found. Check the code and try again.'); return }
-
-      const bagId = bag.id
-
-      // 2. Insert scan record
-      const scanRow: Record<string, unknown> = {
-        bag_id:     bagId,
-        scanned_by: user.id,
-        location:   scanMode,
-      }
-      if (scanMode === 'fundraiser' && fundraiserId) {
-        scanRow.fundraiser_id = fundraiserId
-      }
-
-      const { data: scan, error: scanErr } = await supabase
-        .from('bag_scans')
-        .insert(scanRow)
-        .select('id')
-        .single()
-
-      if (scanErr || !scan) {
-        setError(`Could not save scan: ${scanErr?.message ?? 'Unknown error'}`)
-        return
-      }
-
-      // 3. Persist IDs for inspection page
-      localStorage.setItem('live_scan_id', scan.id)
-      localStorage.setItem('live_bag_id',  bagId)
-
-      if (scanMode === 'fundraiser' && fundraiserId) {
-        const fname = joinedFundraisers.find(f => f.id === fundraiserId)?.name ?? ''
-        localStorage.setItem('live_fundraiser_id',   fundraiserId)
-        localStorage.setItem('live_fundraiser_name', fname)
-      } else {
-        localStorage.removeItem('live_fundraiser_id')
-        localStorage.removeItem('live_fundraiser_name')
-      }
-
-      setSaved(true)
-      setTimeout(() => navigate('/live-inspection'), 700)
-    } catch (err: unknown) {
-      console.error('[LiveScan] error', err)
-      setError(err instanceof Error ? err.message : 'Scan failed.')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const inputStyle: React.CSSProperties = {
     width:         '100%',
@@ -514,53 +438,20 @@ export default function LiveScanPage() {
               className="rounded-xl px-4 py-3 mb-4 text-sm text-center font-semibold"
               style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80', animation: 'lsPop 0.3s ease' }}
             >
-              ✓ Scan saved — opening inspection…
+              ✓ Bag registered! Returning to bags…
             </div>
           )}
 
-          {/* Save button */}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={loading || saved}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98] mb-6"
-            style={{
-              background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
-              color:      '#ffffff',
-              border:     'none',
-              cursor:     (loading || saved) ? 'not-allowed' : 'pointer',
-              opacity:    (loading || saved) ? 0.75 : 1,
-              boxShadow:  '0 4px 24px rgba(0,190,255,0.3)',
-              ...fade(160),
-            }}
-          >
-            {loading ? (
-              <>
-                <span
-                  className="w-4 h-4 rounded-full border-2"
-                  style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#ffffff', animation: 'spinLS 0.7s linear infinite' }}
-                />
-                Saving scan…
-              </>
-            ) : '📦 Save Scan → Go to Inspection'}
-          </button>
-
-          {/* Info card */}
-          <div
-            className="rounded-2xl p-4 flex items-start gap-3"
-            style={{ background: 'rgba(0,200,255,0.05)', border: '1px solid rgba(0,200,255,0.14)', ...fade(200) }}
-          >
-            <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
-            <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              <strong style={{ color: 'rgba(255,255,255,0.65)' }}>Saved to Supabase:</strong> one row in{' '}
-              <code style={{ color: '#00c8ff' }}>bag_scans</code>{' '}
-              {scanMode === 'fundraiser' && fundraiserId ? (
-                <>with <code style={{ color: '#4ade80' }}>fundraiser_id</code> linked.</>
-              ) : (
-                <>linked to your user ID.</>
-              )}
-            </p>
-          </div>
+          {/* Loading indicator while saving */}
+          {loading && (
+            <div className="w-full flex items-center justify-center gap-2 py-4 mb-6">
+              <span
+                className="w-4 h-4 rounded-full border-2"
+                style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#ffffff', animation: 'spinLS 0.7s linear infinite' }}
+              />
+              <span className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>Saving scan…</span>
+            </div>
+          )}
 
         </div>
       </div>

@@ -618,7 +618,7 @@ export default function ConsumerDashboard() {
             {/* ── Scan Bag ── */}
             <div className="px-5 mb-5 mt-20">
               <button
-                onClick={() => inDemoMode ? navigate('/scan') : setShowCameraOverlay(true)}
+                onClick={() => setShowCameraOverlay(true)}
                 className="w-full flex items-center justify-center gap-3 rounded-2xl py-6 text-lg font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
                 style={{
                   background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
@@ -802,7 +802,7 @@ export default function ConsumerDashboard() {
             {/* Scan actions */}
             <div className="px-5 mb-5">
               <button
-                onClick={() => inDemoMode ? navigate('/scan') : setShowCameraOverlay(true)}
+                onClick={() => setShowCameraOverlay(true)}
                 className="w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-base font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
                 style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 6px 28px rgba(0,190,255,0.45)' }}
               >
@@ -863,7 +863,7 @@ export default function ConsumerDashboard() {
                     icon="♻️"
                     title={bagTab === 'history' ? 'No completed bags yet' : 'No active bags'}
                     description={bagTab === 'history' ? 'Completed bags will appear here.' : 'Scan a bag to get started.'}
-                    action={bagTab !== 'history' ? { label: 'Scan Bag', onClick: () => inDemoMode ? navigate('/scan') : setShowCameraOverlay(true) } : undefined}
+                    action={bagTab !== 'history' ? { label: 'Scan Bag', onClick: () => setShowCameraOverlay(true) } : undefined}
                   />
                 ) : (
                   <div className="space-y-2.5">
@@ -1401,7 +1401,7 @@ export default function ConsumerDashboard() {
       {activePage && <QuickActionPage page={activePage} onClose={() => setActivePage(null)} />}
 
       {/* ── CAMERA OVERLAY (real users) ───────────────────────────────────── */}
-      {showCameraOverlay && !inDemoMode && (
+      {showCameraOverlay && (
         <div className="fixed inset-0 flex flex-col" style={{ background: '#060e24', zIndex: 60 }}>
           <div className="pointer-events-none absolute inset-0 grid-bg" />
           <header

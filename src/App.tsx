@@ -186,6 +186,7 @@ function App() {
         <Route path="/live-bags"        element={<RequireAuth><LiveBagsPage /></RequireAuth>} />
         <Route path="/live-fundraisers" element={<RequireAuth><LiveFundraisersPage /></RequireAuth>} />
         <Route path="/live-wallet"      element={<RequireAuth><RequireRole roles={['consumer']}><LiveWalletPage /></RequireRole></RequireAuth>} />
+        <Route path="/cashout"          element={<RequireAuth><RequireRole roles={['consumer']}><LiveWalletPage /></RequireRole></RequireAuth>} />
         <Route path="/live-scan"              element={<RequireAuth><RequireRole roles={['consumer']}><LiveScanPage /></RequireRole></RequireAuth>} />
         <Route path="/live-inspection"        element={<RequireAuth><LiveInspectionPage /></RequireAuth>} />
         <Route path="/live-fundraisers/:id"   element={<RequireAuth><LiveFundraiserDetailPage /></RequireAuth>} />

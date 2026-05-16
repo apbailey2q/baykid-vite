@@ -71,8 +71,8 @@ export default function LiveWalletPage() {
   const [payoutsErr, setPayoutsErr]   = useState<string | null>(null)
   const [loadKey, setLoadKey]         = useState(0)
 
-  // Payout form — auto-open if navigated with { state: { openPayout: true } }
-  const cashoutMode = (location.state as { openPayout?: boolean } | null)?.openPayout === true
+  // cashout mode: either /cashout route or navigated with { state: { openPayout: true } }
+  const cashoutMode = location.pathname === '/cashout' || (location.state as { openPayout?: boolean } | null)?.openPayout === true
   const [showPayout, setShowPayout]         = useState(() => cashoutMode)
   const [payoutMethod, setPayoutMethod]     = useState<PayoutMethod>('cash_app')
   const [payoutAmount, setPayoutAmount]     = useState('')
@@ -253,22 +253,16 @@ export default function LiveWalletPage() {
           <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            {cashoutMode ? 'Cash Out' : 'Live Wallet'}
+            Cash Out
           </span>
         </div>
-        {cashoutMode ? (
-          <button
-            onClick={() => navigate(-1)}
-            className="text-sm transition-opacity hover:opacity-70"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}
-          >
-            ← Back
-          </button>
-        ) : (
-          <Link to="/live-dashboard" className="text-sm transition-opacity hover:opacity-70" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            ← Dashboard
-          </Link>
-        )}
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm transition-opacity hover:opacity-70"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}
+        >
+          ← Back
+        </button>
       </header>
 
       <div className="relative flex-1 overflow-y-auto pb-24" style={{ zIndex: 1 }}>
@@ -321,24 +315,56 @@ export default function LiveWalletPage() {
           {!loading && !error && (
             <>
               {cashoutMode ? (
-                /* ── CASHOUT MODE: skip overview, show payment selection directly ── */
+                /* ── CASHOUT MODE: balance + payout history + payment selection ── */
                 <div style={fade(40)}>
-                  {/* Compact balance context */}
+                  {/* Balance context card */}
                   <div
-                    className="flex items-center justify-between rounded-2xl px-5 py-4 mb-5"
-                    style={{ background: 'rgba(94,234,212,0.08)', border: '1px solid rgba(94,234,212,0.2)' }}
+                    className="rounded-2xl p-5 mb-4"
+                    style={{ background: 'linear-gradient(135deg,rgba(94,234,212,0.1) 0%,rgba(0,200,255,0.05) 100%)', border: '1px solid rgba(94,234,212,0.22)' }}
                   >
-                    <div>
-                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Available Balance</p>
-                      <p style={{ fontSize: 28, fontWeight: 800, color: '#5eead4', lineHeight: 1 }}>${available.toFixed(2)}</p>
+                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Available Balance</p>
+                    <p style={{ fontSize: 36, fontWeight: 800, color: '#5eead4', lineHeight: 1, marginBottom: 12 }}>${available.toFixed(2)}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Pending',  value: `$${pendingPayouts.toFixed(2)}`,  color: '#fbbf24' },
+                        { label: 'Approved', value: `$${approvedPayouts.toFixed(2)}`, color: '#00c8ff' },
+                        { label: 'Paid Out', value: `$${paidPayoutsAmt.toFixed(2)}`,  color: '#4ade80' },
+                      ].map(s => (
+                        <div key={s.label} className="rounded-xl py-2 px-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: s.color, marginBottom: 1 }}>{s.value}</p>
+                          <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
+                        </div>
+                      ))}
                     </div>
-                    {totalPoints > 0 && (
-                      <div className="text-right">
-                        <p style={{ fontSize: 18, fontWeight: 800, color: '#fbbf24' }}>⭐ {totalPoints.toLocaleString()}</p>
-                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>pts earned</p>
-                      </div>
-                    )}
                   </div>
+
+                  {/* Payout history in cashout mode */}
+                  {payouts.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Payout History</p>
+                      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                        {payouts.slice(0, 5).map((p, i) => {
+                          const statusColor = p.status === 'paid' ? '#4ade80' : p.status === 'rejected' ? '#f87171' : p.status === 'approved' ? '#00c8ff' : '#fbbf24'
+                          return (
+                            <div key={p.id} className="flex items-center gap-3 px-4 py-3"
+                              style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.015)', borderBottom: i < Math.min(payouts.length, 5) - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                              <div className="flex-1 min-w-0">
+                                <p style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 2 }}>{PAYOUT_METHODS.find(m => m.id === p.method)?.label ?? p.method}</p>
+                                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)' }}>{timeAgo(p.requested_at)}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p style={{ fontSize: 13, fontWeight: 800, color: '#f87171', marginBottom: 2 }}>−${Number(p.amount).toFixed(2)}</p>
+                                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wide"
+                                  style={{ background: `${statusColor}18`, border: `1px solid ${statusColor}40`, color: statusColor }}>
+                                  {p.status}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {payoutPhase === 'success' ? (
                     /* ── Success confirmation ── */

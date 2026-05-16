@@ -249,6 +249,10 @@ export default function RealLoginPage() {
         return
       }
 
+      // Ensure demo flags are cleared so isDemoModeActive() returns false for real users
+      localStorage.removeItem('baykid-demo-mode')
+      localStorage.removeItem('baykid-demo-role')
+
       login(email, targetRole)
       localStorage.setItem('baykid-last-email', email)
 

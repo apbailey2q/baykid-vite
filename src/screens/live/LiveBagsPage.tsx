@@ -14,16 +14,16 @@ function ts(minsAgo: number) {
 }
 
 const MOCK_BAGS: Bag[] = [
-  { id: 'm1',  bag_code: 'BAG-MRC0001', status: 'completed',    consumer_id: 'c1', partner_id: null, created_at: ts(180), updated_at: ts(15)  },
-  { id: 'm2',  bag_code: 'BAG-TBR0002', status: 'at_warehouse', consumer_id: 'c2', partner_id: null, created_at: ts(160), updated_at: ts(22)  },
-  { id: 'm3',  bag_code: 'BAG-DCT0003', status: 'inspected',    consumer_id: 'c3', partner_id: null, created_at: ts(140), updated_at: ts(10)  },
-  { id: 'm4',  bag_code: 'BAG-RJH0004', status: 'picked_up',    consumer_id: 'c4', partner_id: null, created_at: ts(120), updated_at: ts(35)  },
-  { id: 'm5',  bag_code: 'BAG-AMR0005', status: 'assigned',     consumer_id: 'c5', partner_id: null, created_at: ts(100), updated_at: ts(50)  },
-  { id: 'm6',  bag_code: 'BAG-JHS0006', status: 'pending',      consumer_id: 'c6', partner_id: null, created_at: ts(80),  updated_at: ts(80)  },
-  { id: 'm7',  bag_code: 'BAG-MRC0007', status: 'completed',    consumer_id: 'c7', partner_id: null, created_at: ts(240), updated_at: ts(60)  },
-  { id: 'm8',  bag_code: 'BAG-TBR0008', status: 'picked_up',    consumer_id: 'c8', partner_id: null, created_at: ts(90),  updated_at: ts(45)  },
-  { id: 'm9',  bag_code: 'BAG-DCT0009', status: 'at_warehouse', consumer_id: 'c9', partner_id: null, created_at: ts(75),  updated_at: ts(18)  },
-  { id: 'm10', bag_code: 'BAG-RJH0010', status: 'pending',      consumer_id: null, partner_id: null, created_at: ts(30),  updated_at: ts(30)  },
+  { id: 'm1',  bag_code: 'BAG-MRC0001', status: 'completed',    owner_id: 'c1', partner_id: null, created_at: ts(180), updated_at: ts(15)  },
+  { id: 'm2',  bag_code: 'BAG-TBR0002', status: 'at_warehouse', owner_id: 'c2', partner_id: null, created_at: ts(160), updated_at: ts(22)  },
+  { id: 'm3',  bag_code: 'BAG-DCT0003', status: 'inspected',    owner_id: 'c3', partner_id: null, created_at: ts(140), updated_at: ts(10)  },
+  { id: 'm4',  bag_code: 'BAG-RJH0004', status: 'picked_up',    owner_id: 'c4', partner_id: null, created_at: ts(120), updated_at: ts(35)  },
+  { id: 'm5',  bag_code: 'BAG-AMR0005', status: 'assigned',     owner_id: 'c5', partner_id: null, created_at: ts(100), updated_at: ts(50)  },
+  { id: 'm6',  bag_code: 'BAG-JHS0006', status: 'pending',      owner_id: 'c6', partner_id: null, created_at: ts(80),  updated_at: ts(80)  },
+  { id: 'm7',  bag_code: 'BAG-MRC0007', status: 'completed',    owner_id: 'c7', partner_id: null, created_at: ts(240), updated_at: ts(60)  },
+  { id: 'm8',  bag_code: 'BAG-TBR0008', status: 'picked_up',    owner_id: 'c8', partner_id: null, created_at: ts(90),  updated_at: ts(45)  },
+  { id: 'm9',  bag_code: 'BAG-DCT0009', status: 'at_warehouse', owner_id: 'c9', partner_id: null, created_at: ts(75),  updated_at: ts(18)  },
+  { id: 'm10', bag_code: 'BAG-RJH0010', status: 'pending',      owner_id: null, partner_id: null, created_at: ts(30),  updated_at: ts(30)  },
 ]
 
 // ── Status config ──────────────────────────────────────────────────────────────

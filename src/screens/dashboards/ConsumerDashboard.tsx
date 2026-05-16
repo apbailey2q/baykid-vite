@@ -85,7 +85,7 @@ async function fetchWeeklyLbs(userId: string) {
     const { data } = await supabase
       .from('qr_bags')
       .select('co2_saved_lbs')
-      .eq('consumer_id', userId)
+      .eq('owner_id', userId)
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
     const total = Math.round((data ?? []).reduce((s,b) => s + (Number(b.co2_saved_lbs) || 0), 0))

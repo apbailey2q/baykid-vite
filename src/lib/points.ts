@@ -38,7 +38,7 @@ export async function getConsumerBags(userId: string): Promise<Bag[]> {
   const { data, error } = await supabase
     .from('qr_bags')
     .select('*')
-    .eq('consumer_id', userId)
+    .eq('owner_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as Bag[]
@@ -53,7 +53,7 @@ export async function getConsumerWeeklyActivity(userId: string): Promise<WeeklyA
   const { data } = await supabase
     .from('qr_bags')
     .select('created_at')
-    .eq('consumer_id', userId)
+    .eq('owner_id', userId)
     .gte('created_at', weekAgo.toISOString())
 
   const bags = (data ?? []) as Array<{ created_at: string }>
@@ -82,7 +82,7 @@ export async function getConsumerStreak(userId: string): Promise<number> {
   const { data } = await supabase
     .from('qr_bags')
     .select('created_at')
-    .eq('consumer_id', userId)
+    .eq('owner_id', userId)
     .order('created_at', { ascending: false })
 
   const bags = (data ?? []) as Array<{ created_at: string }>

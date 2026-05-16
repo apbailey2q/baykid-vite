@@ -31,7 +31,7 @@ export interface Bag {
   id: string
   bag_code: string
   status: BagStatus
-  consumer_id: string | null
+  owner_id: string | null
   partner_id: string | null
   created_at: string
   updated_at: string

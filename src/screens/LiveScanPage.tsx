@@ -159,7 +159,7 @@ export default function LiveScanPage() {
         try {
           const { data: bag, error: lookupErr } = await supabase
             .from('qr_bags')
-            .select('id, consumer_id')
+            .select('id, owner_id')
             .eq('bag_code', code)
             .maybeSingle()
 

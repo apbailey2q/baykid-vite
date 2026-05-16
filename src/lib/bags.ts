@@ -28,7 +28,7 @@ export async function lookupOrCreateBag(rawCode: string): Promise<Bag> {
 
   const { data: created, error } = await supabase
     .from('qr_bags')
-    .insert({ bag_code: code, status: 'pending', consumer_id: user?.id ?? null })
+    .insert({ bag_code: code, status: 'issued', owner_id: user?.id ?? null })
     .select()
     .single()
 

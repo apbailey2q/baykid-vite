@@ -39,7 +39,7 @@ async function fetchEarnings(userId: string) {
     supabase
       .from('qr_bags')
       .select('id, co2_saved_lbs, status')
-      .eq('consumer_id', userId),
+      .eq('owner_id', userId),
     supabase
       .from('wallet_transactions')
       .select('amount, created_at')

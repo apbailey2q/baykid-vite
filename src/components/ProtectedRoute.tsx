@@ -1,6 +1,6 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { ENABLE_DEMO_ACCESS, DEV_BYPASS_AUTH } from '../lib/appMode'
+import { ENABLE_DEMO_ACCESS, DEV_BYPASS_AUTH, BYPASS_APPROVAL } from '../lib/appMode'
 import { getRoleDashboardPath } from '../lib/auth'
 import { canAccessRoute } from '../lib/routePermissions'
 import type { Role } from '../types'
@@ -72,7 +72,7 @@ export function ProtectedRoute({ children, requireApproved = false, allowDemo = 
   // User authenticated but profile not yet hydrated — wait for onAuthStateChange
   if (!role) return <Spinner />
 
-  if (requireApproved && approvalStatus !== 'approved') {
+  if (!BYPASS_APPROVAL && requireApproved && approvalStatus !== 'approved') {
     return <Navigate to="/pending-approval" replace />
   }
 

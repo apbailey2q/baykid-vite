@@ -3,6 +3,7 @@ import type { NotificationEvent, NotificationEventType, NotificationRole } from 
 import type { Role, Profile } from '../types/index'
 import { canAccessRoute } from './routePermissions'
 import { getRoleDashboardPath } from './auth'
+import { BYPASS_APPROVAL } from './appMode'
 
 // ── Route table ───────────────────────────────────────────────────────────────
 // Maps notification type → target route per audience role.
@@ -143,8 +144,8 @@ export function navigateFromNotification(
     return
   }
 
-  // Not yet approved → pending screen
-  if (profile.approval_status !== 'approved') {
+  // Not yet approved → pending screen (skipped while approval bypass is active)
+  if (!BYPASS_APPROVAL && profile.approval_status !== 'approved') {
     navigate('/pending-approval')
     return
   }

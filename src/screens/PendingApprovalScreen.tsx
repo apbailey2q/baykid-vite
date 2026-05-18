@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { signOut } from '../lib/auth'
+import { logout } from '../lib/auth'
 import { useAuthStore } from '../store/authStore'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -10,13 +9,10 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export default function PendingApprovalScreen() {
-  const navigate = useNavigate()
-  const { profile, clearAuth } = useAuthStore()
+  const { profile } = useAuthStore()
 
   const handleSignOut = async () => {
-    await signOut()
-    clearAuth()
-    navigate('/real-login')
+    await logout()
   }
 
   const roleLabel = profile?.role ? (ROLE_LABELS[profile.role] ?? profile.role) : ''

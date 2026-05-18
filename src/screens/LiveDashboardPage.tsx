@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuthStore } from '../store/authStore'
+import { logout } from '../lib/auth'
 
 type RecentScan = {
   id:        string
@@ -71,8 +72,7 @@ export default function LiveDashboardPage() {
 
   async function handleSignOut() {
     setSigningOut(true)
-    await supabase.auth.signOut()
-    navigate('/real-login', { replace: true })
+    await logout()
   }
 
   // Redirect to login if not authenticated and not still loading

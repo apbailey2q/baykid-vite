@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
+import { logout } from '../../lib/auth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -208,8 +209,7 @@ export default function CommercialDashboard() {
 
   async function handleSignOut() {
     setSigningOut(true)
-    await supabase.auth.signOut()
-    navigate('/real-login', { replace: true })
+    await logout()
   }
 
   const fade = (d = 0): React.CSSProperties => ({

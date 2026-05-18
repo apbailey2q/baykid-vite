@@ -27,7 +27,7 @@ import { isDemoModeActive } from '../../lib/devBypass'
 const DEV_BYPASS_AUTH = isDemoModeActive()
 import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { DriverRouteView } from '../driver/DriverRouteView'
-import { signOut } from '../../lib/auth'
+import { logout } from '../../lib/auth'
 import { DriverHeader } from '../../components/driver/DriverHeader'
 import { SectionLabel } from '../../components/ui/dashboard'
 
@@ -189,7 +189,7 @@ function DriverBottomNav({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function DriverDashboard() {
-  const { user, profile, clearAuth } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const navigate  = useNavigate()
   const location  = useLocation()
   const ACCENT    = '#3b82f6'
@@ -375,10 +375,7 @@ export default function DriverDashboard() {
   }
 
   const handleSignOut = async () => {
-    try { await signOut() } catch { /* no real session in dev bypass — safe to ignore */ }
-    clearAuth()
-    localStorage.removeItem('baykid-auth')
-    navigate('/real-login', { replace: true })
+    await logout()
   }
 
   const handleStartRoute = async () => {

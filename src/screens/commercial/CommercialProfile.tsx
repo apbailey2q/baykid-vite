@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { logout } from '../../lib/auth'
 import { CommercialLayout } from './CommercialLayout'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
@@ -269,7 +270,7 @@ export default function CommercialProfile() {
 
         {/* ── 9. Sign Out ── */}
         <button
-          onClick={() => navigate('/real-login')}
+          onClick={() => { void logout() }}
           className="w-full rounded-2xl py-3.5 text-sm font-bold transition-all hover:brightness-110 mb-2"
           style={{
             background: 'rgba(248,113,113,0.08)',

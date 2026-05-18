@@ -92,6 +92,24 @@ export async function signOut() {
   if (error) throw error
 }
 
+// Canonical logout. There are three independent auth-persistence layers
+// (zustand `baykid-auth`, demo keys, and AuthProvider's `cb_demo_user`); a
+// partial clear leaves a layer that re-hydrates the user on next load. This
+// clears all of them, then does a HARD redirect so no in-memory state survives
+// (Supabase client, realtime channels, AuthProvider context). Never throws —
+// logout must always complete.
+export async function logout(): Promise<void> {
+  try { await signOut() } catch { /* no real session (dev bypass / demo) — proceed */ }
+  try { useAuthStore.getState().clearAuth() } catch { /* store may be uninitialized */ }
+  try {
+    localStorage.removeItem('baykid-auth')        // zustand persist
+    localStorage.removeItem('baykid-demo-mode')   // demo-mode flag
+    localStorage.removeItem('baykid-demo-role')   // demo-mode role
+    localStorage.removeItem('cb_demo_user')       // AuthProvider (loadUser reads this back)
+  } catch { /* storage unavailable — non-fatal */ }
+  window.location.href = '/real-login'            // hard reload tears down all in-memory state
+}
+
 export async function fetchProfile(userId: string) {
   const { data, error } = await supabase
     .from('profiles')

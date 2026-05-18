@@ -1,5 +1,5 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { signOut } from '../lib/auth'
+import { Link, useLocation } from 'react-router-dom'
+import { logout } from '../lib/auth'
 import { useAuthStore } from '../store/authStore'
 
 // ── Unchanged logic ───────────────────────────────────────────────────────────
@@ -37,15 +37,11 @@ function RecyclingIcon({ size }: { size: number }) {
 }
 
 export function DashboardShell({ title, children }: Props) {
-  const { profile, role, clearAuth } = useAuthStore()
-  const navigate  = useNavigate()
+  const { profile, role } = useAuthStore()
   const location  = useLocation()
 
   const handleSignOut = async () => {
-    try { await signOut() } catch { /* no real session in dev bypass — safe to ignore */ }
-    clearAuth()
-    localStorage.removeItem('baykid-auth')
-    navigate('/real-login', { replace: true })
+    await logout()
   }
 
   // Unchanged

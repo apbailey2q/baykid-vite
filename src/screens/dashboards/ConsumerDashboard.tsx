@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { QrScanner } from '../../components/QrScanner'
-import { signOut } from '../../lib/auth'
+import { logout } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
 import { isDemoModeActive } from '../../lib/devBypass'
 import {
@@ -270,7 +270,7 @@ function BottomNav({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ConsumerDashboard() {
-  const { user, profile, clearAuth } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const navigate = useNavigate()
   const toast = useToast()
   const queryClient = useQueryClient()
@@ -455,10 +455,7 @@ export default function ConsumerDashboard() {
 
   const handleSignOut = async () => {
     setSigningOut(true)
-    try { await signOut() } catch { /* no real session in dev bypass — safe to ignore */ }
-    clearAuth()
-    localStorage.removeItem('baykid-auth')
-    navigate('/real-login', { replace: true })
+    await logout()
   }
 
   return (

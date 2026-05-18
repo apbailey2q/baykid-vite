@@ -1,11 +1,137 @@
 export type Role =
   | 'consumer'
+  | 'commercial'
   | 'driver'
   | 'warehouse_employee'
   | 'warehouse_supervisor'
   | 'partner'
   | 'admin'
   | 'fundraiser'
+  | 'municipal_viewer'
+  | 'municipal_manager'
+  | 'city_admin'
+  | 'executive'
+  | 'investor_viewer'
+  | 'regional_admin'
+  | 'city_manager'
+
+// ── Commercial ───────────────────────────────────────────────────────────────
+
+export type DriverServiceType = 'consumer_only' | 'commercial_only' | 'hybrid'
+
+export type CommercialPickupStatus = 'requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+export type CommercialBinType = 'qr_bin' | 'qr_dumpster' | 'qr_compactor' | 'qr_pallet'
+export type SafetyCheckResult = 'pass' | 'flag' | 'fail'
+
+export interface CommercialAccount {
+  id: string
+  user_id: string | null
+  business_name: string
+  contact_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  billing_address: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  industry_type: string | null
+  notes: string | null
+  plan_name: string | null
+  service_plan: string | null
+  account_status: 'active' | 'suspended' | 'pending'
+  created_at: string
+}
+
+export interface CommercialBin {
+  id: string
+  account_id: string
+  bin_type: CommercialBinType
+  bin_code: string
+  material_type: string
+  location_label: string
+  fill_estimate: number
+  last_pickup: string | null
+  contamination_status: 'clean' | 'flagged' | 'rejected'
+  created_at: string
+}
+
+export interface CommercialPickup {
+  id: string
+  account_id: string
+  driver_id: string | null
+  status: CommercialPickupStatus
+  pickup_type: string
+  material_type: string
+  estimated_volume: string
+  bin_count: number
+  preferred_window: string
+  business_name: string | null
+  pickup_location: string | null
+  building_suite: string | null
+  loading_dock_notes: string | null
+  gate_notes: string | null
+  safety_notes: string | null
+  contact_person: string
+  scheduled_at: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+export interface CommercialInvoice {
+  id: string
+  account_id: string
+  amount: number
+  status: 'pending' | 'paid' | 'overdue'
+  due_date: string
+  issued_at: string
+  paid_at: string | null
+}
+
+export interface CommercialRouteStop {
+  id: string
+  pickup_id: string
+  driver_id: string | null
+  sequence: number
+  status: 'pending' | 'arrived' | 'completed' | 'skipped'
+  arrived_at: string | null
+  completed_at: string | null
+  driver_notes: string | null
+  created_at: string
+}
+
+export interface CommercialInspection {
+  id: string
+  pickup_id: string
+  driver_id: string | null
+  checklist_results: Record<string, SafetyCheckResult>
+  overall_result: SafetyCheckResult
+  notes: string | null
+  created_at: string
+}
+
+export interface CommercialNotification {
+  id: string
+  account_id: string
+  type: string
+  title: string
+  body: string
+  read: boolean
+  created_at: string
+}
+
+export interface ExpectedWarehouseLoad {
+  id: string
+  pickup_id: string
+  account_id: string
+  business_name: string
+  material_type: string
+  estimated_volume: string
+  expected_arrival: string | null
+  status: 'expected' | 'received' | 'rejected'
+  warehouse_notes: string | null
+  created_at: string
+}
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
@@ -14,6 +140,8 @@ export interface Profile {
   full_name: string
   role: Role
   approval_status: ApprovalStatus
+  driver_service_type: DriverServiceType | null
+  account_type: string | null
   created_at: string
 }
 

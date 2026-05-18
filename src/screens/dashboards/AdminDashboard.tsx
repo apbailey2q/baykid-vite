@@ -59,6 +59,13 @@ export default function AdminDashboard() {
             </span>
           )}
         </Link>
+        <Link
+          to="/dashboard/admin/commercial"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.28)', color: '#4ade80', textDecoration: 'none' }}
+        >
+          🏢 Commercial Ops
+        </Link>
       </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"

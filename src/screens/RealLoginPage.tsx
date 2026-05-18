@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { useAuth, type AccessRole } from '../context/AuthProvider'
 import { useAuthStore } from '../store/authStore'
@@ -7,17 +7,19 @@ import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
 
 const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
-  { value: 'consumer', label: 'Consumer' },
-  { value: 'driver', label: 'Driver' },
-  { value: 'warehouse', label: 'Warehouse' },
+  { value: 'consumer',   label: 'Consumer' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'driver',     label: 'Driver' },
+  { value: 'warehouse',  label: 'Warehouse' },
   { value: 'fundraiser', label: 'Fundraiser' },
-  { value: 'partner', label: 'Partner' },
-  { value: 'admin', label: 'Admin' },
+  { value: 'partner',    label: 'Partner' },
+  { value: 'admin',      label: 'Admin' },
 ]
 
 const ROLE_DASHBOARD_PATHS: Record<AccessRole, string> = {
   admin:      '/dashboard/admin',
   consumer:   '/dashboard/consumer',
+  commercial: '/dashboard/commercial',
   driver:     '/dashboard/driver',
   warehouse:  '/dashboard/warehouse',
   fundraiser: '/dashboard/fundraiser',
@@ -46,19 +48,43 @@ function normalizeRole(role: string | null | undefined): AccessRole | null {
   if (
     cleanRole === 'admin' ||
     cleanRole === 'consumer' ||
+    cleanRole === 'commercial' ||
     cleanRole === 'driver' ||
     cleanRole === 'warehouse' ||
     cleanRole === 'fundraiser' ||
     cleanRole === 'partner'
   ) {
-    return cleanRole
+    return cleanRole as AccessRole
   }
 
   return null
 }
 
-function getDashboardPath(role: AccessRole | null): string | null {
+type ProfileShape = {
+  role: string | null
+  account_type?: string | null
+  driver_service_type?: string | null
+}
+
+function getDashboardPath(
+  role: AccessRole | null,
+  profile?: ProfileShape | null,
+): string | null {
   if (!role) return null
+
+  // Commercial accounts regardless of role field
+  if (role === 'commercial' || profile?.account_type === 'commercial') {
+    return '/dashboard/commercial'
+  }
+
+  // Drivers branch by service type
+  if (role === 'driver') {
+    const dst = profile?.driver_service_type
+    if (dst === 'consumer_only')  return '/dashboard/driver/consumer-routes'
+    if (dst === 'commercial_only') return '/dashboard/driver/commercial-routes'
+    return '/dashboard/driver'
+  }
+
   return ROLE_DASHBOARD_PATHS[role] ?? null
 }
 
@@ -77,10 +103,11 @@ function withTimeout<T>(promise: PromiseLike<T>, ms = 10000): Promise<T> {
 export default function RealLoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
+  const [searchParams] = useSearchParams()
 
   const [animate, setAnimate] = useState(false)
   const [selectedRole, setSelectedRole] = useState<AccessRole>('consumer')
-  const [email, setEmail] = useState(() => localStorage.getItem('baykid-last-email') ?? '')
+  const [email, setEmail] = useState(() => searchParams.get('prefill_email') ?? localStorage.getItem('baykid-last-email') ?? '')
   const [password, setPassword] = useState('')
   const [fullName] = useState('')
   const [city] = useState('')
@@ -95,7 +122,7 @@ export default function RealLoginPage() {
 
   // Read auth state from the central store (set by useAuthInit in App) —
   // avoids a redundant getSession() call that conflicts with the Web Lock.
-  const { user: storeUser, role: storeRole, approvalStatus, isLoading: authLoading } = useAuthStore()
+  const { user: storeUser, role: storeRole, profile: storeProfile, approvalStatus, isLoading: authLoading } = useAuthStore()
 
   useEffect(() => {
     if (authLoading || !storeUser) return
@@ -107,9 +134,9 @@ export default function RealLoginPage() {
 
     const realRole = normalizeRole(storeRole)
     const targetRole = realRole === 'admin' ? selectedRole : realRole
-    const path = getDashboardPath(targetRole as AccessRole)
+    const path = getDashboardPath(targetRole as AccessRole, storeProfile)
     if (path) navigate(path, { replace: true })
-  }, [authLoading, storeUser, storeRole, approvalStatus, navigate])
+  }, [authLoading, storeUser, storeRole, storeProfile, approvalStatus, navigate])
 
   const fade = (delay = 0): CSSProperties => ({
     opacity: animate ? 1 : 0,
@@ -190,7 +217,7 @@ export default function RealLoginPage() {
       console.log('[4] before profile fetch', { userId })
 
       let { data: profile, error: profileError } = await withTimeout(
-        supabase.from('profiles').select('role, approval_status').eq('id', userId).single(),
+        supabase.from('profiles').select('role, approval_status, driver_service_type, account_type').eq('id', userId).single(),
         10000
       )
 
@@ -201,7 +228,7 @@ export default function RealLoginPage() {
         await createProfile(userId)
 
         const retry = await withTimeout(
-          supabase.from('profiles').select('role, approval_status').eq('id', userId).single(),
+          supabase.from('profiles').select('role, approval_status, driver_service_type, account_type').eq('id', userId).single(),
           10000
         )
         profile = retry.data
@@ -240,7 +267,7 @@ export default function RealLoginPage() {
       }
 
       const targetRole: AccessRole = isAdmin ? selected : databaseRole
-      const dashboardPath = getDashboardPath(targetRole)
+      const dashboardPath = getDashboardPath(targetRole, profile)
 
       console.log('[9] target dashboard', { targetRole, dashboardPath })
 
@@ -497,50 +524,33 @@ export default function RealLoginPage() {
         </GlassCard>
 
         {/* Legal links */}
-        <div className="flex items-center justify-center gap-3 mt-8" style={fade(260)}>
+        <div className="flex items-center justify-center gap-3 mt-8 flex-wrap" style={fade(260)}>
           <Link
-            to="/terms"
-            style={{
-              fontSize: 10,
-              color: 'rgba(255,255,255,0.28)',
-              textDecoration: 'none',
-              fontWeight: 500,
-            }}
+            to="/legal/terms-of-service"
+            style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', textDecoration: 'none', fontWeight: 500 }}
           >
             Terms
           </Link>
-
-          <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>
-            ·
-          </span>
-
+          <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>·</span>
           <Link
-            to="/privacy"
-            style={{
-              fontSize: 10,
-              color: 'rgba(255,255,255,0.28)',
-              textDecoration: 'none',
-              fontWeight: 500,
-            }}
+            to="/legal/privacy-policy"
+            style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', textDecoration: 'none', fontWeight: 500 }}
           >
             Privacy
           </Link>
-
-          <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>
-            ·
-          </span>
-
+          <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>·</span>
           <Link
-            to="/consent"
-            style={{
-              fontSize: 10,
-              color: '#00c8ff',
-              textDecoration: 'none',
-              fontWeight: 600,
-              opacity: 0.7,
-            }}
+            to="/legal/contact"
+            style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', textDecoration: 'none', fontWeight: 500 }}
           >
-            User Consent
+            Support
+          </Link>
+          <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10 }}>·</span>
+          <Link
+            to="/legal"
+            style={{ fontSize: 10, color: 'rgba(0,200,255,0.55)', textDecoration: 'none', fontWeight: 600 }}
+          >
+            Legal Center
           </Link>
         </div>
       </div>

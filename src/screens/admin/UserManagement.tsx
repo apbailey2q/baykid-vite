@@ -8,6 +8,7 @@ import type { Role, ApprovalStatus, UserRecord } from '../../types'
 
 const ROLES: Role[] = [
   'consumer',
+  'commercial',
   'driver',
   'warehouse_employee',
   'warehouse_supervisor',
@@ -17,13 +18,21 @@ const ROLES: Role[] = [
 ]
 
 const ROLE_LABELS: Record<Role, string> = {
-  consumer: "Consumer",
-  driver: "Driver",
-  warehouse_employee: "Warehouse",
-  warehouse_supervisor: "Warehouse Supervisor",
-  partner: "Partner",
-  admin: "Admin",
-  fundraiser: "Fundraiser",
+  consumer:            'Consumer',
+  commercial:          'Commercial',
+  driver:              'Driver',
+  warehouse_employee:  'Warehouse',
+  warehouse_supervisor:'Warehouse Supervisor',
+  partner:             'Partner',
+  admin:               'Admin',
+  fundraiser:          'Fundraiser',
+  municipal_viewer:    'Municipal Viewer',
+  municipal_manager:   'Municipal Manager',
+  city_admin:          'City Admin',
+  executive:           'Executive',
+  investor_viewer:     'Investor Viewer',
+  regional_admin:      'Regional Admin',
+  city_manager:        'City Manager',
 }
 
 const APPROVAL_BADGE: Record<ApprovalStatus, { bg: string; color: string; label: string }> = {

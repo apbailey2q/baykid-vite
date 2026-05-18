@@ -233,6 +233,14 @@ export default function SignupScreen() {
               </div>
             )}
 
+            {/* Consent notice */}
+            <p className="text-center" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6, marginTop: 4 }}>
+              By creating an account you agree to our{' '}
+              <Link to="/legal/terms-of-service" style={{ color: 'rgba(0,200,255,0.7)', textDecoration: 'none' }}>Terms of Service</Link>
+              {' '}and{' '}
+              <Link to="/legal/privacy-policy" style={{ color: 'rgba(0,200,255,0.7)', textDecoration: 'none' }}>Privacy Policy</Link>.
+            </p>
+
             <button
               type="submit"
               disabled={loading}
@@ -265,6 +273,17 @@ export default function SignupScreen() {
             Sign in
           </Link>
         </p>
+
+        {/* Legal footer */}
+        <div className="flex items-center justify-center gap-3 mt-5 flex-wrap">
+          <Link to="/legal/terms-of-service" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', fontWeight: 500 }}>Terms</Link>
+          <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: 10 }}>·</span>
+          <Link to="/legal/privacy-policy" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', fontWeight: 500 }}>Privacy</Link>
+          <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: 10 }}>·</span>
+          <Link to="/legal/contact" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', fontWeight: 500 }}>Support</Link>
+          <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: 10 }}>·</span>
+          <Link to="/legal" style={{ fontSize: 10, color: 'rgba(0,200,255,0.5)', textDecoration: 'none', fontWeight: 600 }}>Legal Center</Link>
+        </div>
       </div>
     </div>
   )

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 export type AccessRole =
   | 'consumer'
+  | 'commercial'
   | 'driver'
   | 'warehouse'
   | 'partner'

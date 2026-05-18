@@ -12,10 +12,11 @@ import { useAuthStore } from '../store/authStore'
 export const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
 
 // Maps demo role keys → app Role values
-export type BypassKey = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
+export type BypassKey = 'consumer' | 'commercial' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
 
 const ROLE_MAP: Record<BypassKey, Profile['role']> = {
   consumer:   'consumer',
+  commercial: 'commercial',
   driver:     'driver',
   warehouse:  'warehouse_employee',
   partner:    'partner',
@@ -25,6 +26,7 @@ const ROLE_MAP: Record<BypassKey, Profile['role']> = {
 
 const PATH_MAP: Record<BypassKey, string> = {
   consumer:   '/dashboard/consumer',
+  commercial: '/dashboard/commercial',
   driver:     '/dashboard/driver',
   warehouse:  '/dashboard/warehouse',
   partner:    '/dashboard/partner',
@@ -34,6 +36,7 @@ const PATH_MAP: Record<BypassKey, string> = {
 
 const NAME_MAP: Record<BypassKey, string> = {
   consumer:   'Demo Consumer',
+  commercial: 'Demo Commercial',
   driver:     'Demo Driver',
   warehouse:  'Demo Warehouse',
   partner:    'Demo Partner',

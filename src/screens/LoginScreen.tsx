@@ -4,10 +4,11 @@ import { DEV_BYPASS_AUTH, getMockUser, getMockProfile, type BypassKey } from '..
 import { useAuthStore } from '../store/authStore'
 import { GlassCard } from '../components/ui/GlassCard'
 
-type DemoRole = 'consumer' | 'driver' | 'warehouse' | 'partner' | 'fundraiser' | 'admin'
+type DemoRole = 'consumer' | 'commercial' | 'driver' | 'warehouse' | 'partner' | 'fundraiser' | 'admin'
 
 const ROLES: { id: DemoRole; label: string; icon: string }[] = [
   { id: 'consumer',   label: 'Consumer',    icon: '♻️' },
+  { id: 'commercial', label: 'Commercial',  icon: '🏢' },
   { id: 'driver',     label: 'Driver',      icon: '🚐' },
   { id: 'warehouse',  label: 'Warehouse',   icon: '🏭' },
   { id: 'partner',    label: 'Partners',    icon: '🤝' },
@@ -17,6 +18,7 @@ const ROLES: { id: DemoRole; label: string; icon: string }[] = [
 
 const DEMO_ROLE_ROUTES: Record<DemoRole, string> = {
   consumer:   '/dashboard/consumer',
+  commercial: '/dashboard/commercial',
   driver:     '/dashboard/driver',
   warehouse:  '/dashboard/warehouse',
   partner:    '/dashboard/partner',

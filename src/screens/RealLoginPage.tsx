@@ -5,6 +5,9 @@ import { useAuth, type AccessRole } from '../context/AuthProvider'
 import { useAuthStore } from '../store/authStore'
 import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
+import { BYPASS_APPROVAL } from '../lib/appMode'
+import { logMode, isDemoMode, getAppMode } from '../lib/mode'
+import { getMockUser, getMockProfile, type BypassKey } from '../lib/demo'
 
 const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'consumer',   label: 'Consumer' },
@@ -126,17 +129,30 @@ export default function RealLoginPage() {
 
   useEffect(() => {
     if (authLoading || !storeUser) return
+    // Never pre-empt an in-flight sign-in — handleSubmit owns that redirect,
+    // including the selected-vs-DB-role mismatch error. This is the resume-an-
+    // existing-session path only.
+    if (loading) return
 
-    if (approvalStatus !== 'approved') {
+    if (!BYPASS_APPROVAL && approvalStatus !== 'approved') {
       navigate('/pending-approval', { replace: true })
       return
     }
 
     const realRole = normalizeRole(storeRole)
-    const targetRole = realRole === 'admin' ? selectedRole : realRole
+    // Role controls which dashboard opens. Mode controls demo/live behavior and
+    // is kept separate: in DEMO the selected role drives the dashboard (you are
+    // previewing a role); in LIVE the account's real role is authoritative
+    // (admins may still impersonate the selected role).
+    const targetRole = isDemoMode()
+      ? selectedRole
+      : realRole === 'admin' ? selectedRole : realRole
     const path = getDashboardPath(targetRole as AccessRole, storeProfile)
+    console.log('Selected role:', selectedRole)
+    console.log('Current App Mode:', getAppMode())
+    console.log('Redirecting to:', path)
     if (path) navigate(path, { replace: true })
-  }, [authLoading, storeUser, storeRole, storeProfile, approvalStatus, navigate])
+  }, [authLoading, loading, storeUser, storeRole, storeProfile, approvalStatus, selectedRole, navigate])
 
   const fade = (delay = 0): CSSProperties => ({
     opacity: animate ? 1 : 0,
@@ -177,6 +193,44 @@ export default function RealLoginPage() {
 
     if (loading) return
 
+    logMode('login')
+
+    // ── DEMO MODE: mock sign-in as the SELECTED role ───────────────────────
+    // Mode (demo/live) and role are separate concerns. In demo mode the
+    // selected role drives everything — we build a mock user/profile for that
+    // role so the WHOLE app (ProtectedRoute, dashboards) treats the session as
+    // that role with demo data. No Supabase auth, no DB dependency. Live mode
+    // (below) is untouched and remains real + secure.
+    if (isDemoMode()) {
+      const roleDashboardMap: Record<string, string> = {
+        consumer:   '/dashboard/consumer',
+        commercial: '/dashboard/commercial',
+        driver:     '/dashboard/driver',
+        warehouse:  '/dashboard/warehouse',
+        admin:      '/dashboard/admin',
+        partner:    '/dashboard/partner',
+        fundraiser: '/dashboard/fundraiser',
+      }
+      const destination = roleDashboardMap[selectedRole] || '/dashboard/consumer'
+
+      console.log('Selected role:', selectedRole)
+      console.log('Current App Mode:', getAppMode())
+      console.log('Redirecting to:', destination)
+
+      const key = selectedRole as unknown as BypassKey
+      const { setUser, setProfile, setLoading } = useAuthStore.getState()
+      // Keep demo flags so isDemoMode() stays true (mock id is "dev-…").
+      localStorage.setItem('baykid-demo-mode', 'true')
+      localStorage.setItem('baykid-demo-role', selectedRole)
+      setUser(getMockUser(key))
+      setProfile(getMockProfile(key))
+      setLoading(false)
+      login(email || `${selectedRole}@demo.local`, selectedRole)
+      navigate(destination, { replace: true })
+      return
+    }
+
+    // ── LIVE MODE: real Supabase auth, real role from DB (secure) ──────────
     // Clear any leftover demo session before real Supabase auth
     localStorage.removeItem('baykid-demo-mode')
     localStorage.removeItem('baykid-demo-role')
@@ -242,33 +296,47 @@ export default function RealLoginPage() {
         return
       }
 
-      // Approval gate
-      if (profile.approval_status !== 'approved') {
+      // ── Diagnostic logs (live mode) ─────────────────────────────────────────
+      console.log('Auth user id:', data.user?.id)
+      console.log('Auth email:', data.user?.email)
+      console.log('Fetched profile:', profile)
+      console.log('Profile role:', profile?.role)
+      console.log('Profile status:', profile?.approval_status)
+
+      // Approval gate (skipped while approval bypass is active — testing only)
+      if (!BYPASS_APPROVAL && profile.approval_status !== 'approved') {
         navigate('/pending-approval', { replace: true })
         return
       }
 
       // Normalize: maps warehouse_employee → warehouse, etc.
+      // In LIVE mode the DB role is the single source of truth — the role
+      // selected on the login form is only used for admins (who can preview
+      // any dashboard) and for demo mode. It never blocks a real user.
       const databaseRole = normalizeRole(profile.role) as AccessRole | null
-      const selected = selectedRole
+      const demo = isDemoMode()
 
-      console.log('[8] role check', { databaseRole, selected })
+      console.log('Current App Mode:', getAppMode())
+      console.log('[8] role resolved', { databaseRole, demo })
 
       if (!databaseRole) {
-        setError('Unable to load account role. Please try again.')
+        setError('Unable to load account role. Please contact support.')
         return
       }
 
       const isAdmin = databaseRole === 'admin'
 
-      if (!isAdmin && databaseRole !== selected) {
-        setError('Selected role does not match this account.')
-        return
-      }
-
-      const targetRole: AccessRole = isAdmin ? selected : databaseRole
+      // LIVE: DB role wins. Admins may preview any role via the selector.
+      // DEMO: selected role drives the dashboard (previewing a role).
+      // The old "selected role does not match" guard has been removed —
+      // it was blocking real drivers/warehouse users who didn't manually
+      // change the dropdown before signing in.
+      const targetRole: AccessRole = demo
+        ? selectedRole
+        : isAdmin ? selectedRole : databaseRole
       const dashboardPath = getDashboardPath(targetRole, profile)
 
+      console.log('Redirect destination:', dashboardPath)
       console.log('[9] target dashboard', { targetRole, dashboardPath })
 
       if (!dashboardPath) {

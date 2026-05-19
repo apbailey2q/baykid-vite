@@ -1,9 +1,22 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { ENABLE_DEMO_ACCESS, DEV_BYPASS_AUTH, BYPASS_APPROVAL } from '../lib/appMode'
+import { isDemoMode } from '../lib/mode'
 import { getRoleDashboardPath } from '../lib/auth'
 import { canAccessRoute } from '../lib/routePermissions'
 import type { Role } from '../types'
+
+// Maps the baykid-demo-role localStorage key → real app Role value.
+// Must stay in sync with devBypass.ts ROLE_MAP.
+const DEMO_ROLE_MAP: Record<string, Role> = {
+  consumer:   'consumer',
+  commercial: 'commercial',
+  driver:     'driver',
+  warehouse:  'warehouse_employee',
+  partner:    'partner',
+  admin:      'admin',
+  fundraiser: 'fundraiser',
+}
 
 interface Props {
   children: React.ReactNode
@@ -76,14 +89,34 @@ export function ProtectedRoute({ children, requireApproved = false, allowDemo = 
     return <Navigate to="/pending-approval" replace />
   }
 
-  // Role-level check via routePermissions
-  if (!canAccessRoute(role, pathname)) {
-    return <AccessDenied role={role} />
+  // ── Demo-mode role override ────────────────────────────────────────────────
+  // In demo mode the user chose a role on the login screen.  That selection is
+  // stored in localStorage ('baykid-demo-role') and is the authoritative role
+  // for route permission checks.  The authStore role may be stale or null here
+  // because mock users are set synchronously without a real Supabase round-trip.
+  // LIVE mode is completely unaffected — dbRole is always used when !isDemoMode().
+  const mode = isDemoMode() ? 'demo' : 'live'
+  const dbRole = role
+  const selectedDemoRole = isDemoMode() ? (localStorage.getItem('baykid-demo-role') ?? null) : null
+  const effectiveRole: Role | null =
+    isDemoMode() && selectedDemoRole && DEMO_ROLE_MAP[selectedDemoRole]
+      ? DEMO_ROLE_MAP[selectedDemoRole]
+      : dbRole
+
+  console.log('Mode:', mode)
+  console.log('DB Role:', dbRole)
+  console.log('Selected Demo Role:', selectedDemoRole)
+  console.log('Active Role:', effectiveRole)
+  console.log('Allowed Route:', canAccessRoute(effectiveRole, pathname) ? 'ALLOWED' : 'DENIED')
+
+  // Role-level check via routePermissions (uses effectiveRole — demo-aware)
+  if (!canAccessRoute(effectiveRole, pathname)) {
+    return <AccessDenied role={effectiveRole ?? role} />
   }
 
   // Driver service-type enforcement
   // Admins bypass this check (they can see any driver route for support purposes)
-  if (role === 'driver' && profile) {
+  if (effectiveRole === 'driver' && profile) {
     const dst = profile.driver_service_type ?? 'hybrid'
 
     const isCommercialDriverPath = COMMERCIAL_DRIVER_PATHS.some(
@@ -93,12 +126,12 @@ export function ProtectedRoute({ children, requireApproved = false, allowDemo = 
 
     // consumer_only drivers cannot access commercial driver routes
     if (isCommercialDriverPath && dst === 'consumer_only') {
-      return <AccessDenied role={role} />
+      return <AccessDenied role={effectiveRole ?? role} />
     }
 
     // commercial_only drivers cannot access consumer driver routes
     if (isConsumerDriverPath && dst === 'commercial_only') {
-      return <AccessDenied role={role} />
+      return <AccessDenied role={effectiveRole ?? role} />
     }
   }
 

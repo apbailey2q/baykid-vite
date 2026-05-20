@@ -55,6 +55,15 @@ export default function RealLoginPage() {
     return () => cancelAnimationFrame(id)
   }, [])
 
+  // On mount: immediately clear any lingering demo state so isDemoMode()
+  // returns false and downstream components (banners, guards, data fetchers)
+  // all treat this page as live from the first render.
+  // This runs BEFORE handleSubmit, so the banner is already correct on load.
+  useEffect(() => {
+    localStorage.removeItem('baykid-demo-mode')
+    localStorage.removeItem('baykid-demo-role')
+  }, [])
+
   // Read auth state from the central store (set by useAuthInit in App) —
   // avoids a redundant getSession() call that conflicts with the Web Lock.
   const { user: storeUser, role: storeRole, profile: storeProfile, approvalStatus, isLoading: authLoading } = useAuthStore()

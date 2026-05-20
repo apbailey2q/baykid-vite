@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useDemoStore, type PickupInput } from '../../store/demoStore'
+import { getPendingBags } from '../../lib/driver'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -28,6 +30,7 @@ interface ZipZone {
 }
 
 // ── Demo data (sorted highest demand first) ────────────────────────────────────
+// Used ONLY when demoMode=true. Live mode queries Supabase exclusively.
 
 const ZONES: ZipZone[] = [
   {
@@ -99,26 +102,95 @@ const ZONES: ZipZone[] = [
   },
 ]
 
+// ── Shared offline/online bar ─────────────────────────────────────────────────
+
+function StatusBar({ isOnline }: { isOnline: boolean }) {
+  if (!isOnline) {
+    return (
+      <div className="flex items-center justify-center mb-4">
+        <div
+          className="flex items-center gap-2 rounded-full px-4 py-2"
+          style={{ background: 'rgba(255,60,60,0.10)', border: '1px solid rgba(255,80,80,0.35)' }}
+        >
+          <span style={{ fontSize: 12 }}>⚠️</span>
+          <p style={{ fontSize: 11, color: 'rgba(255,120,120,0.95)', fontWeight: 500 }}>
+            View only — tap status badge to go online
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div
+      className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 mb-4"
+      style={{ background: 'rgba(0,188,212,0.07)', border: '1px solid rgba(0,188,212,0.2)' }}
+    >
+      <span style={{ fontSize: 13 }}>ℹ️</span>
+      <p style={{ fontSize: 11, color: 'rgba(0,210,255,0.75)' }}>
+        Select pickups &amp; add to your route
+      </p>
+    </div>
+  )
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function PickupsNearYou({
   isOnline,
   onSelectionChange,
   resetKey = 0,
+  demoMode,
 }: {
   isOnline: boolean
   onSelectionChange: (count: number, pickups: PickupInput[]) => void
   resetKey?: number
+  demoMode: boolean
 }) {
-  const navigate            = useNavigate()
-  const { activeRoute }     = useDemoStore()
+  const navigate        = useNavigate()
+  const { activeRoute } = useDemoStore()
 
   const [expandedZip, setExpandedZip]         = useState<string | null>('37206')
   const [selectedPickups, setSelectedPickups] = useState<Set<string>>(new Set())
+  // Live-mode flat selection (bag IDs from Supabase)
+  const [liveSelectedIds, setLiveSelectedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    if (resetKey > 0) setSelectedPickups(new Set())
+    if (resetKey > 0) {
+      setSelectedPickups(new Set())
+      setLiveSelectedIds(new Set())
+    }
   }, [resetKey])
+
+  // ── Live mode: query Supabase ────────────────────────────────────────────────
+  const { data: liveBags = [], isLoading: liveLoading } = useQuery({
+    queryKey: ['pickups-near-you-live'],
+    queryFn: async () => {
+      const rows = await getPendingBags(50)
+      console.log('[pickup-data] source: "supabase" | pickups-tab | count:', rows.length)
+      return rows
+    },
+    enabled: !demoMode,
+    refetchInterval: 30_000,
+  })
+
+  // Log demo source once on mount (and when mode flips)
+  useEffect(() => {
+    if (demoMode) {
+      const total = ZONES.reduce((s, z) => s + z.pickups.length, 0)
+      console.log('[pickup-data] source: "demo-mock" | pickups-tab | count:', total)
+    }
+  }, [demoMode])
+
+  // Notify parent of live-mode selection changes
+  useEffect(() => {
+    if (demoMode) return
+    const inputs: PickupInput[] = liveBags
+      .filter(b => liveSelectedIds.has(b.id))
+      .map(b => ({ id: b.id, address: b.city ?? 'Pickup', bags: 1 }))
+    onSelectionChange(liveSelectedIds.size, inputs)
+  }, [liveSelectedIds, liveBags, demoMode, onSelectionChange])
+
+  // ── Demo-mode selection helpers ──────────────────────────────────────────────
 
   const totalSelected = selectedPickups.size
 
@@ -133,8 +205,9 @@ export function PickupsNearYou({
   }
 
   useEffect(() => {
+    if (!demoMode) return
     onSelectionChange(totalSelected, getPickupInputs(selectedPickups))
-  }, [totalSelected, onSelectionChange])
+  }, [totalSelected, demoMode, onSelectionChange])
 
   const togglePickup = (id: string) => {
     if (!isOnline) return
@@ -159,44 +232,132 @@ export function PickupsNearYou({
   const selectedInZone = (zone: ZipZone) =>
     zone.pickups.filter((p) => selectedPickups.has(p.id)).length
 
+  // ── Active route hero (shared between modes) ─────────────────────────────────
+
+  const activeRouteHero = activeRoute && activeRoute.routeStatus !== 'completed' ? (() => {
+    const totalStops = activeRoute.stops.length
+    const doneStops  = activeRoute.stops.filter((s) => s.status === 'completed').length
+    return (
+      <button
+        type="button"
+        onClick={() => navigate('/dashboard/driver/route-map')}
+        className="w-full p-6 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 to-transparent shadow-[0_0_20px_rgba(0,188,212,0.25)] text-left mb-5 active:scale-[0.98] transition-transform"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-lg font-bold" style={{ color: '#ffffff' }}>Active Route</p>
+          <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>● Active</span>
+        </div>
+        <p className="text-sm text-gray-300">
+          {totalStops} stop{totalStops !== 1 ? 's' : ''} · {doneStops} done
+        </p>
+        <div className="mt-4">
+          <span className="text-cyan-400 font-semibold hover:text-cyan-300 cursor-pointer">
+            View Route →
+          </span>
+        </div>
+      </button>
+    )
+  })() : null
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // LIVE MODE — flat list of real Supabase rows
+  // ════════════════════════════════════════════════════════════════════════════
+
+  if (!demoMode) {
+    const toggleLive = (id: string) => {
+      if (!isOnline) return
+      setLiveSelectedIds(prev => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id); else next.add(id)
+        return next
+      })
+    }
+
+    return (
+      <div className="px-4 pt-4 pb-4" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
+        {activeRouteHero}
+        <StatusBar isOnline={isOnline} />
+
+        <p style={{ fontSize: 10, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
+          AVAILABLE PICKUPS
+        </p>
+
+        {liveLoading ? (
+          <div className="rounded-2xl px-4 py-6 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Loading pickups…</p>
+          </div>
+        ) : liveBags.length === 0 ? (
+          <div className="rounded-2xl px-4 py-8 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p style={{ fontSize: 22, marginBottom: 8 }}>📭</p>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>No live pickups available yet</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Check back soon — pickups appear here as consumers request them</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {liveBags.map(bag => {
+              const isSelected = liveSelectedIds.has(bag.id)
+              return (
+                <button
+                  key={bag.id}
+                  onClick={() => toggleLive(bag.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-2xl active:opacity-75 transition-all"
+                  style={{
+                    background: isSelected ? 'rgba(0,200,255,0.07)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isSelected ? 'rgba(0,200,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                    boxShadow: isSelected ? '0 0 14px rgba(0,200,255,0.18)' : 'none',
+                    transition: 'all 0.18s ease',
+                    opacity: !isOnline ? 0.55 : 1,
+                    cursor: isOnline ? 'pointer' : 'default',
+                  }}
+                >
+                  {/* Checkbox */}
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                    border: `1.5px solid ${isSelected ? '#00D9FF' : 'rgba(255,255,255,0.18)'}`,
+                    background: isSelected ? 'rgba(0,200,255,0.14)' : 'transparent',
+                    boxShadow: isSelected ? '0 0 9px rgba(0,200,255,0.38)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.18s ease',
+                  }}>
+                    {isSelected && (
+                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="#00D9FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-mono font-bold" style={{ fontSize: 13, color: isSelected ? '#00c8ff' : 'rgba(255,255,255,0.82)' }}>
+                      {bag.bag_code}
+                    </p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                      {bag.city ?? 'Location pending'}
+                    </p>
+                  </div>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700,
+                    color:      bag.status === 'assigned' ? '#FFB340' : '#5BFFB0',
+                    background: bag.status === 'assigned' ? 'rgba(255,179,64,0.1)' : 'rgba(91,255,176,0.1)',
+                    borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap',
+                  }}>
+                    {bag.status === 'assigned' ? 'Assigned' : 'Pending'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // DEMO MODE — ZIP accordion with hardcoded mock zones (unchanged)
+  // ════════════════════════════════════════════════════════════════════════════
+
   return (
     <div className="px-4 pt-4 pb-4" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
 
-      {/* ── Active Route hero card ───────────────────────────────────────── */}
-      {activeRoute && activeRoute.routeStatus !== 'completed' && (() => {
-        const totalStops = activeRoute.stops.length
-        const doneStops  = activeRoute.stops.filter((s) => s.status === 'completed').length
-
-        return (
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/driver/route-map')}
-            className="w-full p-6 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 to-transparent shadow-[0_0_20px_rgba(0,188,212,0.25)] text-left mb-5 active:scale-[0.98] transition-transform"
-          >
-            {/* Label */}
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-lg font-bold" style={{ color: '#ffffff' }}>
-                Active Route
-              </p>
-              <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>
-                ● Active
-              </span>
-            </div>
-
-            {/* Stop count */}
-            <p className="text-sm text-gray-300">
-              {totalStops} stop{totalStops !== 1 ? 's' : ''} · {doneStops} done
-            </p>
-
-            {/* View Route button */}
-            <div className="mt-4">
-              <span className="text-cyan-400 font-semibold hover:text-cyan-300 cursor-pointer">
-                View Route →
-              </span>
-            </div>
-          </button>
-        )
-      })()}
+      {activeRouteHero}
 
       {/* ── Offline pill / online info bar ───────────────────────────────── */}
       {!isOnline ? (

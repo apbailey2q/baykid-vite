@@ -82,6 +82,15 @@ function buildWeekSchedule() {
 
 const MOCK_SCHEDULE = buildWeekSchedule()
 
+// Demo-mode placeholder bags shown in the home tab "Available Pickups" section.
+// Only used when demoMode=true; live mode always queries Supabase directly.
+const DEMO_HOME_BAGS: Array<{ id: string; bag_code: string; city: string | null; status: string; created_at: string }> = [
+  { id: 'demo-bag-1', bag_code: 'CB-0042', city: 'East Nashville',  status: 'pending',  created_at: '' },
+  { id: 'demo-bag-2', bag_code: 'CB-0089', city: 'Midtown',          status: 'pending',  created_at: '' },
+  { id: 'demo-bag-3', bag_code: 'CB-0103', city: 'Germantown',       status: 'assigned', created_at: '' },
+  { id: 'demo-bag-4', bag_code: 'CB-0156', city: 'The Gulch',        status: 'pending',  created_at: '' },
+]
+
 const ACCOUNT_CATEGORIES = [
   { icon: '👤', title: 'Profile Details',        subtitle: 'Name, email, phone number'         },
   { icon: '🚐', title: 'Vehicle Information',    subtitle: 'Make, model, license plate'         },
@@ -291,9 +300,25 @@ export default function DriverDashboard() {
 
   const { data: pendingBags = [] } = useQuery({
     queryKey: ['driver-pending-bags'],
-    queryFn: () => getPendingBags(30),
+    queryFn: async () => {
+      const rows = await getPendingBags(30)
+      console.log('[pickup-data] source: "supabase" | count:', rows.length)
+      return rows
+    },
+    enabled: !demoMode,          // never query Supabase in demo mode
     refetchInterval: 30_000,
   })
+
+  // Home tab pickup source: real Supabase rows in live, static mock in demo.
+  // Never mix the two — no Supabase fallback from demo data, no mock fallback on errors.
+  const displayBags = demoMode ? DEMO_HOME_BAGS : pendingBags
+
+  // Log pickup data source once on mount / when mode changes
+  useEffect(() => {
+    if (demoMode) {
+      console.log('[pickup-data] source: "demo-mock" | count:', DEMO_HOME_BAGS.length)
+    }
+  }, [demoMode])
 
   useBroadcastAlerts(
     profile?.role ?? null,
@@ -877,7 +902,7 @@ export default function DriverDashboard() {
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.3 }}>Recycling pickups are piling up</p>
                     <p style={{ fontSize: 10, color: 'rgba(0,200,255,0.7)', marginTop: 3, fontWeight: 500 }}>
-                      {pendingBags.length} requests near you
+                      {displayBags.length} requests near you
                     </p>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -889,16 +914,18 @@ export default function DriverDashboard() {
             </div>
 
 
-            {/* Available Pickups — real pending bags */}
+            {/* Available Pickups — Supabase rows in live mode, static mock in demo */}
             <div>
               <SectionLabel title="Available Pickups" accent={ACCENT} />
-              {pendingBags.length === 0 ? (
+              {displayBags.length === 0 ? (
                 <div className="rounded-2xl px-4 py-6 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>No pending pickups right now</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
+                    {demoMode ? 'No demo pickups' : 'No live pickups available yet'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {pendingBags.map((bag) => {
+                  {displayBags.map((bag) => {
                     const isSelected = selectedPickupIds.has(bag.id)
                     return (
                       <button
@@ -952,7 +979,7 @@ export default function DriverDashboard() {
                   className="w-full mt-3 rounded-2xl py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98]"
                   style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 20px rgba(0,190,255,0.32)' }}
                   onClick={async () => {
-                    const selected = pendingBags.filter(b => selectedPickupIds.has(b.id))
+                    const selected = displayBags.filter(b => selectedPickupIds.has(b.id))
                     const stops = selected.map(b => ({ address: b.city ?? 'Pickup', zipCode: '', bagCode: b.bag_code }))
                     const routeName = `Route ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                     try {
@@ -1045,6 +1072,7 @@ export default function DriverDashboard() {
             <PickupsNearYou
               isOnline={isOnline}
               resetKey={pickupsResetKey}
+              demoMode={demoMode}
               onSelectionChange={(count, inputs) => {
                 setSelectedPickupCount(count)
                 setSelectedPickupInputs(inputs)

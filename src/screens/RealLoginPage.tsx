@@ -97,29 +97,29 @@ export default function RealLoginPage() {
     transition: `opacity 0.4s ease ${delay}ms, transform 0.4s ease ${delay}ms`,
   })
 
-  // Creates a minimal profile when one is missing. Uses the selectedRole so a
-  // driver/warehouse/admin who signs in for the first time is not demoted to
-  // consumer. Approval: consumer is auto-approved; all other roles start pending
-  // (an admin must approve them). BYPASS_APPROVAL=true skips that gate for now.
+  // Creates a minimal profile when one is missing (first sign-in only).
+  // Uses INSERT — never UPSERT — so an existing profile row is never touched.
+  // If the row already exists (duplicate-key error) we ignore the error and let
+  // the caller's retry fetch return the real DB role unchanged. This prevents
+  // a transient fetch failure from stamping the dropdown value over an existing
+  // driver/warehouse/etc. profile.
   async function createProfile(userId: string) {
     const roleForProfile = selectedRole as string
     const autoApproved = roleForProfile === 'consumer' ? 'approved' : 'pending'
 
     const { error: profileErr } = await supabase
       .from('profiles')
-      .upsert(
-        {
-          id: userId,
-          email,
-          full_name: fullName.trim() || null,
-          city: city.trim() || null,
-          role: roleForProfile,
-          approval_status: autoApproved,
-        },
-        { onConflict: 'id' }
-      )
+      .insert({
+        id: userId,
+        email,
+        full_name: fullName.trim() || null,
+        city: city.trim() || null,
+        role: roleForProfile,
+        approval_status: autoApproved,
+      })
 
-    if (profileErr) {
+    // Duplicate-key = profile already exists; that's fine — retry will read it.
+    if (profileErr && !profileErr.code?.includes('23505') && !profileErr.message?.includes('duplicate')) {
       console.error('[createProfile]', profileErr.message)
     }
 

@@ -28,16 +28,32 @@ const MODE_KEY = 'baykid-demo-mode'
 
 /**
  * True only when demo mode is explicitly active AND no real user is signed in.
- * Mirrors the original devBypass.isDemoModeActive() logic exactly so behavior
- * is unchanged — this is now the one place that logic lives.
+ *
+ * Activation rules (in priority order):
+ *  1. A real Supabase user (UUID id) is ALWAYS live — hard anti-leak guarantee.
+ *  2. DEV_BYPASS_AUTH=true  → demo (developer escape hatch, explicit env flag).
+ *  3. baykid-demo-mode=true in localStorage → demo (user clicked "Continue in
+ *     Demo Mode"; cleared by logout() and by RealLoginPage on mount).
+ *  4. Everything else → live (the default).
+ *
+ * ENABLE_DEMO_ACCESS controls only whether the "Continue in Demo Mode" button
+ * is rendered. It does NOT activate demo mode on its own — that would make
+ * every unauthenticated page (including /real-login) run as demo, which is
+ * wrong. The button sets baykid-demo-mode=true when clicked; that's the only
+ * way ENABLE_DEMO_ACCESS translates into an active demo session.
  */
 export function isDemoMode(): boolean {
-  // Hard guarantee: a real authenticated user is NEVER in demo mode.
-  // Mock users have ids shaped "dev-<role>-mock"; real Supabase ids are UUIDs.
+  // 1. Real Supabase user → always live.
+  //    Mock users have ids shaped "dev-<role>-mock"; real Supabase ids are UUIDs.
   const { user } = useAuthStore.getState()
   if (user && !user.id.startsWith('dev-')) return false
 
-  if (ENABLE_DEMO_ACCESS || DEV_BYPASS_AUTH) return true
+  // 2. Explicit dev bypass flag → demo.
+  if (DEV_BYPASS_AUTH) return true
+
+  // 3. Explicit localStorage opt-in → demo.
+  //    Set by the "Continue in Demo Mode" button; cleared by logout() and
+  //    by RealLoginPage on mount so /real-login is always live.
   try {
     return localStorage.getItem(MODE_KEY) === 'true'
   } catch {

@@ -23,8 +23,7 @@ import {
   getDriverWalletBalance,
 } from '../../lib/driver'
 import { getBroadcastsForRole } from '../../lib/points'
-import { isDemoModeActive } from '../../lib/devBypass'
-const DEV_BYPASS_AUTH = isDemoModeActive()
+import { isDemoMode } from '../../lib/mode'
 import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { DriverRouteView } from '../driver/DriverRouteView'
 import { logout } from '../../lib/auth'
@@ -44,15 +43,44 @@ const CONFETTI_PIECES = Array.from({ length: 30 }, (_, i) => ({
   size: 14 + (i % 6) * 3,
 }))
 
-const MOCK_SCHEDULE = [
-  { day: 'Mon', date: 'Apr 28', isToday: false, status: 'completed' as const, blocks: ['8 AM–12 PM', '1 PM–5 PM'] },
-  { day: 'Tue', date: 'Apr 29', isToday: false, status: 'completed' as const, blocks: ['8 AM–12 PM', '1 PM–5 PM', '6 PM–10 PM'] },
-  { day: 'Wed', date: 'Apr 30', isToday: true,  status: 'active'    as const, blocks: ['8 AM–12 PM', '1 PM–5 PM'] },
-  { day: 'Thu', date: 'May 1',  isToday: false, status: 'available' as const, blocks: ['8 AM–12 PM', '6 PM–10 PM'] },
-  { day: 'Fri', date: 'May 2',  isToday: false, status: 'available' as const, blocks: ['8 AM–12 PM', '1 PM–5 PM', '6 PM–10 PM'] },
-  { day: 'Sat', date: 'May 3',  isToday: false, status: 'day_off'   as const, blocks: [] },
-  { day: 'Sun', date: 'May 4',  isToday: false, status: 'available' as const, blocks: ['1 PM–5 PM'] },
-]
+type ScheduleStatus = 'active' | 'completed' | 'available' | 'day_off'
+
+function buildWeekSchedule() {
+  const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const DEFAULT_BLOCKS: string[][] = [
+    ['1 PM–5 PM'],                            // Sun
+    ['8 AM–12 PM', '1 PM–5 PM'],              // Mon
+    ['8 AM–12 PM', '1 PM–5 PM', '6 PM–10 PM'], // Tue
+    ['8 AM–12 PM', '1 PM–5 PM'],              // Wed
+    ['8 AM–12 PM', '6 PM–10 PM'],             // Thu
+    ['8 AM–12 PM', '1 PM–5 PM', '6 PM–10 PM'], // Fri
+    [],                                        // Sat (day off)
+  ]
+  const today = new Date()
+  const todayDow = today.getDay() // 0=Sun
+  // Start of current week (Mon)
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - ((todayDow + 6) % 7))
+
+  return [1, 2, 3, 4, 5, 6, 0].map((dow) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + ([1,2,3,4,5,6,0].indexOf(dow)))
+    const isToday = d.toDateString() === today.toDateString()
+    const isPast  = d < today && !isToday
+    const isSat   = dow === 6
+    const status: ScheduleStatus = isToday ? 'active' : isPast ? 'completed' : isSat ? 'day_off' : 'available'
+    return {
+      day:     DAY_LABELS[dow],
+      date:    `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`,
+      isToday,
+      status,
+      blocks:  isSat ? [] : DEFAULT_BLOCKS[dow],
+    }
+  })
+}
+
+const MOCK_SCHEDULE = buildWeekSchedule()
 
 const ACCOUNT_CATEGORIES = [
   { icon: '👤', title: 'Profile Details',        subtitle: 'Name, email, phone number'         },
@@ -193,6 +221,12 @@ export default function DriverDashboard() {
   const navigate  = useNavigate()
   const location  = useLocation()
   const ACCENT    = '#3b82f6'
+  // Evaluated each render so it reacts to real user being set in the auth store.
+  // The old module-level `const DEV_BYPASS_AUTH = isDemoModeActive()` was frozen
+  // at module load time when the user was still null, causing isDemoMode() to
+  // return true (ENABLE_DEMO_ACCESS=true shortcut) and permanently disabling all
+  // real Supabase queries even after a live user signed in.
+  const demoMode  = isDemoMode()
   const {
     driverStatus,
     activeRoute,
@@ -240,19 +274,19 @@ export default function DriverDashboard() {
   const { data: availablePayout = 0 } = useQuery({
     queryKey: ['driver-balance', user?.id],
     queryFn: () => getDriverWalletBalance(user!.id),
-    enabled: !DEV_BYPASS_AUTH && !!user,
+    enabled: !demoMode && !!user,
   })
 
   const { data: completedStops = [] } = useQuery({
     queryKey: ['driver-completed-stops', user?.id],
     queryFn: () => getDriverCompletedStops(user!.id),
-    enabled: !DEV_BYPASS_AUTH && !!user,
+    enabled: !demoMode && !!user,
   })
 
   const { data: weekHistory = [] } = useQuery({
     queryKey: ['driver-weekly-earnings', user?.id],
     queryFn: () => getDriverWeeklyEarnings(user!.id),
-    enabled: !DEV_BYPASS_AUTH && !!user,
+    enabled: !demoMode && !!user,
   })
 
   const { data: pendingBags = [] } = useQuery({
@@ -267,7 +301,7 @@ export default function DriverDashboard() {
   )
 
   useEffect(() => {
-    if (DEV_BYPASS_AUTH) return
+    if (demoMode) return
     if (!user) return
     const init = async () => {
       try {
@@ -289,7 +323,7 @@ export default function DriverDashboard() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleToggleOnline = async () => {
-    if (DEV_BYPASS_AUTH) {
+    if (demoMode) {
       setDevIsOnline((prev) => {
         const next = !prev
         localStorage.setItem('isOnline', String(next))
@@ -313,7 +347,7 @@ export default function DriverDashboard() {
   }
 
   const handleGoOnlineOnly = async () => {
-    if (DEV_BYPASS_AUTH) { setDevIsOnline(true); localStorage.setItem('isOnline', 'true'); return }
+    if (demoMode) { setDevIsOnline(true); localStorage.setItem('isOnline', 'true'); return }
     if (!user || !driverStatus) return
     setToggling(true)
     try {
@@ -396,7 +430,7 @@ export default function DriverDashboard() {
 
   const pendingCount   = activeRouteStops.filter((s) => s.status === 'pending').length
   const doneCount      = activeRouteStops.filter((s) => s.status === 'completed').length
-  const isOnline       = DEV_BYPASS_AUTH ? devIsOnline : (driverStatus?.is_online ?? false)
+  const isOnline       = demoMode ? devIsOnline : (driverStatus?.is_online ?? false)
   const hasActiveRoute = !!activeRoute && activeRoute.status !== 'completed'
   const isRouteActive  = activeRoute?.status === 'active'
   const isRoutePaused  = activeRoute?.status === 'paused'

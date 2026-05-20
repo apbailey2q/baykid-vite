@@ -181,7 +181,7 @@ export default function RealLoginPage() {
       console.log('[4] before profile fetch', { userId })
 
       let { data: profile, error: profileError } = await withTimeout(
-        supabase.from('profiles').select('role, approval_status, driver_service_type, account_type').eq('id', userId).single(),
+        supabase.from('profiles').select('role, approval_status, driver_service_type, account_type').eq('id', userId).maybeSingle(),
         10000
       )
 
@@ -192,7 +192,7 @@ export default function RealLoginPage() {
         await createProfile(userId)
 
         const retry = await withTimeout(
-          supabase.from('profiles').select('role, approval_status, driver_service_type, account_type').eq('id', userId).single(),
+          supabase.from('profiles').select('role, approval_status, driver_service_type, account_type').eq('id', userId).maybeSingle(),
           10000
         )
         profile = retry.data

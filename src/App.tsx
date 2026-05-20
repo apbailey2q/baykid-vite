@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { usePushToken } from './hooks/usePushToken'
+import { normalizeRole } from './lib/auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ModeBanner } from './components/ModeBanner'
 import { ToastProvider } from './components/ui/Toast'
 import WelcomePage from './screens/WelcomePage'
 import RealLoginPage from './screens/RealLoginPage'
@@ -135,28 +137,24 @@ import AdminRegions from './screens/admin/AdminRegions'
 import AdminForecasting from './screens/admin/AdminForecasting'
 import AdminLaunchRoadmap from './screens/admin/AdminLaunchRoadmap'
 
+// Uses canonical DB role values (warehouse_employee, not 'warehouse').
+// normalizeRole() from lib/auth is the single shared implementation.
 const ROLE_HOME: Record<string, string> = {
-  admin:              '/dashboard/admin',
-  consumer:           '/dashboard/consumer',
-  commercial:         '/dashboard/commercial',
-  driver:             '/dashboard/driver',
-  warehouse:          '/dashboard/warehouse',
-  fundraiser:         '/dashboard/fundraiser',
-  partner:            '/dashboard/partner',
-  municipal_viewer:   '/dashboard/municipal',
-  municipal_manager:  '/dashboard/municipal',
-  city_admin:         '/dashboard/municipal',
-  executive:          '/dashboard/executive',
-  investor_viewer:    '/dashboard/executive',
-  regional_admin:     '/dashboard/admin/regions',
-  city_manager:       '/dashboard/admin/regions',
-}
-
-function normalizeRole(role: string | null | undefined): string | null {
-  if (!role) return null
-  const r = role.toLowerCase().trim()
-  if (r === 'warehouse_employee' || r === 'warehouse_supervisor') return 'warehouse'
-  return r
+  admin:                '/dashboard/admin',
+  consumer:             '/dashboard/consumer',
+  commercial:           '/dashboard/commercial',
+  driver:               '/dashboard/driver',
+  warehouse_employee:   '/dashboard/warehouse',
+  warehouse_supervisor: '/dashboard/warehouse-supervisor',
+  fundraiser:           '/dashboard/fundraiser',
+  partner:              '/dashboard/partner',
+  municipal_viewer:     '/dashboard/municipal',
+  municipal_manager:    '/dashboard/municipal',
+  city_admin:           '/dashboard/municipal',
+  executive:            '/dashboard/executive',
+  investor_viewer:      '/dashboard/executive',
+  regional_admin:       '/dashboard/admin/regions',
+  city_manager:         '/dashboard/admin/regions',
 }
 
 function HomeRedirect() {
@@ -223,6 +221,7 @@ function App() {
     <BrowserRouter>
       <PushTokenManager />
       <ServiceWorkerManager />
+      <ModeBanner />
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/welcome" element={<WelcomePage />} />

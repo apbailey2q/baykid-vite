@@ -8,6 +8,7 @@ import { PrimaryButton } from '../components/ui/PrimaryButton'
 import { BYPASS_APPROVAL } from '../lib/appMode'
 import { logMode, isDemoMode, getAppMode } from '../lib/mode'
 import { getMockUser, getMockProfile, type BypassKey } from '../lib/demo'
+import { normalizeRole, getRoleDashboardPath } from '../lib/auth'
 
 const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'consumer',   label: 'Consumer' },
@@ -19,77 +20,10 @@ const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'admin',      label: 'Admin' },
 ]
 
-const ROLE_DASHBOARD_PATHS: Record<AccessRole, string> = {
-  admin:      '/dashboard/admin',
-  consumer:   '/dashboard/consumer',
-  commercial: '/dashboard/commercial',
-  driver:     '/dashboard/driver',
-  warehouse:  '/dashboard/warehouse',
-  fundraiser: '/dashboard/fundraiser',
-  partner:    '/dashboard/partner',
-}
+// Dashboard path routing is handled by getRoleDashboardPath() from lib/auth.
 
-/**
- * Normalizes old/legacy database role names into the current app role names.
- *
- * Your current clean roles should be:
- * admin
- * consumer
- * driver
- * warehouse
- * partner
- * fundraiser
- */
-function normalizeRole(role: string | null | undefined): AccessRole | null {
-  if (!role) return null
-
-  const cleanRole = role.toLowerCase().trim()
-
-  if (cleanRole === 'warehouse_employee') return 'warehouse'
-  if (cleanRole === 'warehouse_supervisor') return 'warehouse'
-
-  if (
-    cleanRole === 'admin' ||
-    cleanRole === 'consumer' ||
-    cleanRole === 'commercial' ||
-    cleanRole === 'driver' ||
-    cleanRole === 'warehouse' ||
-    cleanRole === 'fundraiser' ||
-    cleanRole === 'partner'
-  ) {
-    return cleanRole as AccessRole
-  }
-
-  return null
-}
-
-type ProfileShape = {
-  role: string | null
-  account_type?: string | null
-  driver_service_type?: string | null
-}
-
-function getDashboardPath(
-  role: AccessRole | null,
-  profile?: ProfileShape | null,
-): string | null {
-  if (!role) return null
-
-  // Commercial accounts regardless of role field
-  if (role === 'commercial' || profile?.account_type === 'commercial') {
-    return '/dashboard/commercial'
-  }
-
-  // Drivers branch by service type
-  if (role === 'driver') {
-    const dst = profile?.driver_service_type
-    if (dst === 'consumer_only')  return '/dashboard/driver/consumer-routes'
-    if (dst === 'commercial_only') return '/dashboard/driver/commercial-routes'
-    return '/dashboard/driver'
-  }
-
-  return ROLE_DASHBOARD_PATHS[role] ?? null
-}
+// normalizeRole and dashboard-path resolution are now in lib/auth.ts.
+// Imported above; no local duplicate needed.
 
 // Accepts PromiseLike so it works with both Promise and PostgrestBuilder
 function withTimeout<T>(promise: PromiseLike<T>, ms = 10000): Promise<T> {
@@ -147,7 +81,7 @@ export default function RealLoginPage() {
     const targetRole = isDemoMode()
       ? selectedRole
       : realRole === 'admin' ? selectedRole : realRole
-    const path = getDashboardPath(targetRole as AccessRole, storeProfile)
+    const path = getRoleDashboardPath({ ...storeProfile, role: targetRole })
     console.log('Selected role:', selectedRole)
     console.log('Current App Mode:', getAppMode())
     console.log('Redirecting to:', path)
@@ -160,7 +94,14 @@ export default function RealLoginPage() {
     transition: `opacity 0.4s ease ${delay}ms, transform 0.4s ease ${delay}ms`,
   })
 
+  // Creates a minimal profile when one is missing. Uses the selectedRole so a
+  // driver/warehouse/admin who signs in for the first time is not demoted to
+  // consumer. Approval: consumer is auto-approved; all other roles start pending
+  // (an admin must approve them). BYPASS_APPROVAL=true skips that gate for now.
   async function createProfile(userId: string) {
+    const roleForProfile = selectedRole as string
+    const autoApproved = roleForProfile === 'consumer' ? 'approved' : 'pending'
+
     const { error: profileErr } = await supabase
       .from('profiles')
       .upsert(
@@ -169,8 +110,8 @@ export default function RealLoginPage() {
           email,
           full_name: fullName.trim() || null,
           city: city.trim() || null,
-          role: 'consumer',
-          approval_status: 'pending',
+          role: roleForProfile,
+          approval_status: autoApproved,
         },
         { onConflict: 'id' }
       )
@@ -181,7 +122,7 @@ export default function RealLoginPage() {
 
     const { error: roleErr } = await supabase
       .from('user_roles')
-      .insert({ user_id: userId, new_role: 'consumer' })
+      .insert({ user_id: userId, new_role: roleForProfile })
 
     if (roleErr && !roleErr.message.includes('duplicate')) {
       console.error('[createUserRole]', roleErr.message)
@@ -334,12 +275,12 @@ export default function RealLoginPage() {
       const targetRole: AccessRole = demo
         ? selectedRole
         : isAdmin ? selectedRole : databaseRole
-      const dashboardPath = getDashboardPath(targetRole, profile)
+      const dashboardPath = getRoleDashboardPath({ ...profile, role: targetRole })
 
       console.log('Redirect destination:', dashboardPath)
       console.log('[9] target dashboard', { targetRole, dashboardPath })
 
-      if (!dashboardPath) {
+      if (!dashboardPath || dashboardPath === '/real-login') {
         setError(`No dashboard route found for role: ${targetRole}`)
         return
       }
@@ -348,7 +289,9 @@ export default function RealLoginPage() {
       localStorage.removeItem('baykid-demo-mode')
       localStorage.removeItem('baykid-demo-role')
 
-      login(email, targetRole)
+      // AuthProvider.login() is demo-only; in live mode useAuthStore is the
+      // single source of truth (set by initAuth onAuthStateChange above).
+      // We store last-used email for convenience only — not for auth decisions.
       localStorage.setItem('baykid-last-email', email)
 
       console.log('[10] navigating', dashboardPath)

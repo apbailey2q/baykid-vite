@@ -5,6 +5,29 @@ import { useAuthStore } from '../store/authStore'
 
 export const AUTO_APPROVED_ROLES: Role[] = ['consumer']
 
+/**
+ * Canonical role normalizer. Maps legacy/variant DB values to the Role type
+ * used throughout the app. This is the single implementation — App.tsx and
+ * RealLoginPage.tsx both call this rather than defining their own.
+ *
+ * warehouse_employee / warehouse_supervisor → kept as-is (DB canonical values)
+ * 'warehouse' shorthand (used in demo keys) → 'warehouse_employee'
+ */
+export function normalizeRole(role: string | null | undefined): Role | null {
+  if (!role) return null
+  const r = role.toLowerCase().trim() as Role
+  // Demo shorthand → canonical DB value
+  if (r === ('warehouse' as string)) return 'warehouse_employee'
+  // Pass through recognised canonical values unchanged
+  const VALID: Role[] = [
+    'consumer', 'driver', 'commercial', 'warehouse_employee',
+    'warehouse_supervisor', 'partner', 'fundraiser', 'admin',
+    'municipal_viewer', 'municipal_manager', 'city_admin',
+    'executive', 'investor_viewer', 'regional_admin', 'city_manager',
+  ]
+  return VALID.includes(r) ? r : null
+}
+
 type ProfileLike = {
   role?: Role | string | null
   account_type?: string | null

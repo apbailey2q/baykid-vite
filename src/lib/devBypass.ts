@@ -1,15 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth bypass utilities — used for both the dev env flag and runtime demo mode.
-// Set VITE_DEV_BYPASS_AUTH=false in .env.local to disable the env-var bypass.
+// Set VITE_DEV_BYPASS_AUTH=true in .env.local to enable the dev bypass.
 // Runtime demo mode is controlled via localStorage ('baykid-demo-mode').
+//
+// DEV_BYPASS_AUTH is the single export from appMode.ts — re-exported here so
+// existing import paths (import { DEV_BYPASS_AUTH } from './devBypass') keep
+// working without any call-site changes.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '../types'
 
-import { ENABLE_DEMO_ACCESS } from './appMode'
-import { useAuthStore } from '../store/authStore'
-
-export const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
+import { isDemoMode } from './mode'
+export { DEV_BYPASS_AUTH } from './appMode'
 
 // Maps demo role keys → app Role values
 export type BypassKey = 'consumer' | 'commercial' | 'driver' | 'warehouse' | 'partner' | 'admin' | 'fundraiser'
@@ -65,20 +67,15 @@ export function getMockUser(key: BypassKey): User {
   return { id, email: `dev-${key}@demo.local`, role: 'authenticated' } as unknown as User
 }
 
-/** True when consumer demo access is enabled, dev bypass is set, or user entered demo mode via the UI.
- *  Returns false unconditionally when a real (non-mock) Supabase user is signed in — real users
- *  are never treated as demo regardless of env-var flags or localStorage state. */
+/** @deprecated Back-compat alias. The single source of truth is now
+ *  `isDemoMode()` in lib/mode.ts — this just delegates so existing call sites
+ *  keep working without behavior change. New code should import from lib/mode. */
 export function isDemoModeActive(): boolean {
-  // Real authenticated users always override every demo flag.
-  // Mock IDs have the form "dev-<role>-mock"; real Supabase IDs are UUIDs.
-  const { user } = useAuthStore.getState()
-  if (user && !user.id.startsWith('dev-')) return false
-
-  return ENABLE_DEMO_ACCESS || DEV_BYPASS_AUTH || localStorage.getItem('baykid-demo-mode') === 'true'
+  return isDemoMode()
 }
 
 /** The currently active demo role, or null if not in demo mode. */
 export function getDemoModeRole(): BypassKey | null {
-  if (!isDemoModeActive()) return null
+  if (!isDemoMode()) return null
   return (localStorage.getItem('baykid-demo-role') ?? 'consumer') as BypassKey
 }

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { logMode } from '../../lib/mode'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -32,6 +33,8 @@ export default function CommercialScan() {
   const [phase, setPhase]       = useState<ScanPhase>('scanning')
   const [manualCode, setManualCode] = useState('')
   const [toast, setToast]       = useState<string | null>(null)
+
+  useEffect(() => { logMode('qr-scan') }, [])
 
   function showToast(msg: string) {
     setToast(msg)

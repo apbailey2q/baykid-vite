@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { logMode } from '../../lib/mode'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -148,6 +149,7 @@ export default function AdminCommercialPickups() {
   // ── Data loading ────────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
+    logMode('admin-pickups')
     setPageState('loading')
 
     const [pickupsRes, driversRes] = await Promise.all([

@@ -13,10 +13,12 @@ export const IS_REAL_APP = !ENABLE_DEMO_ACCESS && !DEV_BYPASS_AUTH
 // under `vite build`), so it cannot ship enabled by accident. Force on in a
 // prod build only via VITE_BYPASS_APPROVAL=true.
 //
-// REMOVE this flag and its two call sites (ProtectedRoute.tsx,
-// notificationRouter.ts) before real launch — see those files for `BYPASS_APPROVAL`.
-export const BYPASS_APPROVAL =
-  import.meta.env.VITE_BYPASS_APPROVAL === 'true' || import.meta.env.DEV
+// *** TEMPORARY — TESTING ONLY. MUST BE SET BACK TO false BEFORE LAUNCH. ***
+// Previously gated on import.meta.env.DEV, but that did not reliably evaluate
+// true in the running app (stale service-worker-cached bundle), so it is
+// unconditionally true while role-testing. Gated call sites: ProtectedRoute.tsx,
+// notificationRouter.ts, RealLoginPage.tsx (x2). Remove all before real launch.
+export const BYPASS_APPROVAL = true
 
 if (BYPASS_APPROVAL) {
   console.warn(

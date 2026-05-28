@@ -1,7 +1,14 @@
-// Structured error + event monitoring.
-// Currently logs to console with category context.
-// To wire Sentry: replace the body of logError() with Sentry.captureException().
-// To wire Logtail: push entries to @logtail/browser client.
+// monitoring.ts — Production-wired structured logging and error monitoring
+// BayKid Platform
+//
+// In development: structured console output with timestamps + categories
+// In production:  sends to Sentry (errors/warnings) + PostHog (events)
+//   — Sentry: set VITE_SENTRY_DSN in Vercel dashboard
+//   — PostHog: set VITE_POSTHOG_KEY in Vercel dashboard
+//
+// Usage: import { monitor } from '../lib/monitoring'
+//   monitor.payment.error('Stripe checkout failed', { invoice_id, error: err.message })
+//   monitor.ai.error('Generation failed', { contentType, error: err.message })
 
 type LogLevel = 'error' | 'warn' | 'info'
 
@@ -14,6 +21,8 @@ export type LogCategory =
   | 'warehouse'
   | 'auth'
   | 'offline'
+  | 'ai'
+  | 'publish'
   | 'general'
 
 interface LogEntry {
@@ -24,16 +33,64 @@ interface LogEntry {
   ts:       string
 }
 
-const IS_PROD = import.meta.env.PROD
+const IS_PROD    = import.meta.env.PROD
+const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
+const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
+
+// ── Sentry integration ────────────────────────────────────────────────────────
+// Sentry is loaded via CDN snippet or npm package (not installed here by default).
+// If VITE_SENTRY_DSN is set, Sentry should be initialized in main.tsx.
+// This module calls the global Sentry object if available.
+
+function getSentry(): { captureException?: (err: Error, ctx?: object) => void; captureMessage?: (msg: string, level?: string, ctx?: object) => void } | null {
+  if (typeof window === 'undefined') return null
+  return (window as Record<string, unknown>).Sentry as typeof import('@sentry/browser') | null
+}
+
+function sendToSentry(entry: LogEntry): void {
+  if (!SENTRY_DSN) return
+  try {
+    const sentry = getSentry()
+    if (!sentry) return
+    const ctx = { extra: entry.data, tags: { category: entry.category } }
+    if (entry.level === 'error') {
+      sentry.captureException?.(new Error(entry.message), ctx)
+    } else if (entry.level === 'warn') {
+      sentry.captureMessage?.(entry.message, 'warning', ctx)
+    }
+  } catch { /* non-critical */ }
+}
+
+// ── PostHog integration ───────────────────────────────────────────────────────
+
+function getPostHog(): { capture?: (event: string, props?: Record<string, unknown>) => void } | null {
+  if (typeof window === 'undefined') return null
+  return (window as Record<string, unknown>).posthog as { capture?: (event: string, props?: Record<string, unknown>) => void } | null
+}
+
+function sendToPostHog(entry: LogEntry): void {
+  if (!POSTHOG_KEY) return
+  try {
+    const ph = getPostHog()
+    ph?.capture?.(`monitor_${entry.category}_${entry.level}`, {
+      message:  entry.message,
+      category: entry.category,
+      level:    entry.level,
+      ...entry.data,
+    })
+  } catch { /* non-critical */ }
+}
+
+// ── Core emit ─────────────────────────────────────────────────────────────────
 
 function emit(entry: LogEntry) {
   if (IS_PROD) {
-    // ── Production: send to external service ───────────────────────────────
-    // Sentry:   Sentry.captureException(new Error(entry.message), { extra: entry.data, tags: { category: entry.category } })
-    // Logtail:  logtailClient.log(entry.message, { ...entry.data, category: entry.category, level: entry.level })
-    // PostHog:  posthog.capture(`${entry.category}_${entry.level}`, entry.data)
-    //
-    // For now, silent in production until a service is wired.
+    // Send errors + warnings to Sentry
+    if (entry.level === 'error' || entry.level === 'warn') {
+      sendToSentry(entry)
+    }
+    // Send all events to PostHog for operational analytics
+    sendToPostHog(entry)
     return
   }
 
@@ -58,65 +115,75 @@ export function logInfo(category: LogCategory, message: string, data?: Record<st
   emit({ level: 'info', category, message, data, ts: now() })
 }
 
-// ── Convenience wrappers ─────────────────────────────────────────────────────
+// ── Convenience wrappers ──────────────────────────────────────────────────────
 
-export const monitor = {
-  payment: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('payment', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('payment',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('payment',  msg, data),
-  },
-  push: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('push', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('push',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('push',  msg, data),
-  },
-  gps: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('gps', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('gps',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('gps',  msg, data),
-  },
-  inspection: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('inspection', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('inspection',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('inspection',  msg, data),
-  },
-  route: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('route', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('route',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('route',  msg, data),
-  },
-  warehouse: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('warehouse', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('warehouse',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('warehouse',  msg, data),
-  },
-  auth: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('auth', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('auth',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('auth',  msg, data),
-  },
-  offline: {
-    error: (msg: string, data?: Record<string, unknown>) => logError('offline', msg, data),
-    warn:  (msg: string, data?: Record<string, unknown>) => logWarn('offline',  msg, data),
-    info:  (msg: string, data?: Record<string, unknown>) => logInfo('offline',  msg, data),
-  },
+function makeCategory(cat: LogCategory) {
+  return {
+    error: (msg: string, data?: Record<string, unknown>) => logError(cat, msg, data),
+    warn:  (msg: string, data?: Record<string, unknown>) => logWarn(cat,  msg, data),
+    info:  (msg: string, data?: Record<string, unknown>) => logInfo(cat,  msg, data),
+  }
 }
 
-// ── Usage examples ────────────────────────────────────────────────────────────
-// import { monitor } from '../lib/monitoring'
-//
-// Payment failure:
-//   monitor.payment.error('Stripe checkout failed', { invoice_id, error: err.message })
-//
-// Push not delivered:
-//   monitor.push.warn('Push token missing for user', { user_id })
-//
-// GPS lost:
-//   monitor.gps.error('watchPosition error', { code: err.code, message: err.message })
-//
-// Inspection conflict:
-//   monitor.inspection.warn('Inspection override by driver', { stop_id, ai_result, driver_result })
-//
-// Offline sync failure:
-//   monitor.offline.error('Draft sync failed after 3 retries', { local_id, action_type })
+export const monitor = {
+  payment:    makeCategory('payment'),
+  push:       makeCategory('push'),
+  gps:        makeCategory('gps'),
+  inspection: makeCategory('inspection'),
+  route:      makeCategory('route'),
+  warehouse:  makeCategory('warehouse'),
+  auth:       makeCategory('auth'),
+  offline:    makeCategory('offline'),
+  ai:         makeCategory('ai'),
+  publish:    makeCategory('publish'),
+  general:    makeCategory('general'),
+}
+
+// ── PostHog initialization helper ─────────────────────────────────────────────
+// Call this from main.tsx after React renders if VITE_POSTHOG_KEY is set.
+// This lazy-loads PostHog so it doesn't bloat the main bundle.
+
+export async function initPostHog(): Promise<void> {
+  if (!POSTHOG_KEY || typeof window === 'undefined') return
+  try {
+    const posthogHost = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? 'https://app.posthog.com'
+    // Dynamically import to avoid adding to main bundle unless key is set.
+    // vite-ignore: intentionally optional — posthog-js may not be installed.
+    // Install with: npm install posthog-js
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const { default: posthog } = await import(/* @vite-ignore */ 'posthog-js')
+    posthog.init(POSTHOG_KEY, {
+      api_host:              posthogHost,
+      capture_pageview:      true,
+      capture_pageleave:     true,
+      autocapture:           false,          // manual events only
+      session_recording:     { maskAllInputs: true },   // mask all PII
+      persistence:           'localStorage',
+    });
+    (window as Record<string, unknown>).posthog = posthog
+  } catch { /* PostHog not installed — skip silently */ }
+}
+
+// ── Sentry initialization helper ──────────────────────────────────────────────
+// Call this from main.tsx before React renders.
+
+export async function initSentry(): Promise<void> {
+  if (!SENTRY_DSN || typeof window === 'undefined') return
+  try {
+    // vite-ignore: intentionally optional — @sentry/browser may not be installed.
+    // Install with: npm install @sentry/browser
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const Sentry = await import(/* @vite-ignore */ '@sentry/browser')
+    Sentry.init({
+      dsn:           SENTRY_DSN,
+      environment:   (import.meta.env.VITE_ENVIRONMENT as string | undefined) ?? 'production',
+      release:       (import.meta.env.VITE_APP_VERSION as string | undefined) ?? 'unknown',
+      tracesSampleRate: 0.1,
+      // Don't capture console.log noise
+      integrations: [],
+    });
+    (window as Record<string, unknown>).Sentry = Sentry
+  } catch { /* @sentry/browser not installed — skip silently */ }
+}

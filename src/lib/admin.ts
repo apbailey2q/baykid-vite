@@ -76,22 +76,41 @@ export async function getBroadcastAlerts(): Promise<BroadcastAlert[]> {
 }
 
 export async function getAllAlerts(): Promise<AlertWithDriver[]> {
+  // alerts.driver_id → auth.users(id), NOT profiles(id), so PostgREST cannot
+  // resolve the join via that FK. Fetch alerts first, then look up driver
+  // names from profiles in a second query.
   const { data, error } = await supabase
     .from('alerts')
-    .select('*, profiles!alerts_driver_id_fkey(full_name)')
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(100)
   if (error) throw error
 
-  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
-    id: row.id as string,
-    driver_id: row.driver_id as string,
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+
+  // Batch-fetch driver names for all unique driver_ids
+  const driverIds = [...new Set(rows.map((r) => r.driver_id as string).filter(Boolean))]
+  const nameMap: Record<string, string> = {}
+  if (driverIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', driverIds)
+    for (const p of profiles ?? []) {
+      const pr = p as { id: string; full_name: string }
+      nameMap[pr.id] = pr.full_name
+    }
+  }
+
+  return rows.map((row) => ({
+    id:         row.id         as string,
+    driver_id:  row.driver_id  as string,
     alert_type: row.alert_type as string,
-    status: row.status as string,
-    notes: row.notes as string | null,
+    status:     row.status     as string,
+    notes:      row.notes      as string | null,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
-    driver_name: (row.profiles as { full_name: string } | null)?.full_name ?? null,
+    driver_name: nameMap[row.driver_id as string] ?? null,
   })) as AlertWithDriver[]
 }
 

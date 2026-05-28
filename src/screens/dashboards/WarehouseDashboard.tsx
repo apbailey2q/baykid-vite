@@ -6,9 +6,6 @@ import { QrScanner } from '../../components/QrScanner'
 import { lookupOrCreateBag } from '../../lib/bags'
 import { markBagAtWarehouse, getInspectionQueue, getMyStatsToday } from '../../lib/warehouse'
 import { useAuthStore } from '../../store/authStore'
-
-import { isDemoModeActive } from '../../lib/devBypass'
-const DEV_BYPASS_AUTH = isDemoModeActive()
 import { Spinner } from '../../components/ui'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { SectionLabel } from '../../components/ui/dashboard'
@@ -29,25 +26,7 @@ type ScanState =
   | { phase: 'success'; bagCode: string; bagId: string }
   | { phase: 'error'; message: string }
 
-interface MockBag {
-  id: string
-  code: string
-  last4: string
-  ts: string
-  consumerName: string
-  driverStatus: 'accepted' | 'rejected' | 'caution'
-  warehouseStatus: 'waiting' | 'completed' | 'flagged'
-  note?: string
-}
-
-interface MockDriverGroup {
-  id: string
-  driverName: string
-  area: string
-  bags: MockBag[]
-}
-
-interface HistoryEntry {
+interface ScanEntry {
   id: string
   bagCode: string
   last4: string
@@ -60,313 +39,59 @@ interface HistoryEntry {
   driverPayoutStatus: 'triggered' | 'pending'
 }
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
+// ── (mock data removed — live data only) ─────────────────────────────────────
 
-const REJECT_NOTES = [
-  'Bag appeared torn and leaking.',
-  'Sharp material visible inside bag.',
-  'Contamination detected — non-recyclable waste mixed in.',
-  'Unsafe for vehicle transport — bag damaged.',
-  'Bag was leaking liquid.',
-]
 
-const TIMES = [
-  '8:12 AM', '8:45 AM', '9:03 AM', '9:28 AM', '9:55 AM',
-  '10:14 AM', '10:42 AM', '11:06 AM', '11:33 AM', '11:58 AM',
-  '12:22 PM', '12:50 PM', '1:18 PM', '1:44 PM', '2:10 PM',
-]
-
-const CONSUMER_NAMES = [
-  'James Wright', 'Lisa Chen', 'Michael Torres', 'Sarah Kim',
-  'David Johnson', 'Emily Davis', 'Robert Miller', 'Jennifer Wilson',
-  'Thomas Brown', 'Amanda Martinez', 'Christopher Lee', 'Jessica Taylor',
-  'Daniel Anderson', 'Stephanie Jackson', 'Matthew White',
-]
-
-function makeBags(
-  prefix: string,
-  count: number,
-  rejectAt: number[] = [],
-  cautionAt: number[] = [],
-): MockBag[] {
-  return Array.from({ length: count }, (_, i) => {
-    const seq  = String(i + 1).padStart(4, '0')
-    const code = `BAG-${prefix}${seq}`
-    const isRejected = rejectAt.includes(i)
-    const isCaution  = cautionAt.includes(i)
-    return {
-      id: `${prefix}-${i}`,
-      code,
-      last4: seq,
-      ts: `Today · ${TIMES[i % TIMES.length]}`,
-      consumerName: CONSUMER_NAMES[i % CONSUMER_NAMES.length],
-      driverStatus: isRejected ? 'rejected' : isCaution ? 'caution' : 'accepted',
-      warehouseStatus: i < 2 ? 'completed' : 'waiting',
-      note: isRejected ? REJECT_NOTES[i % REJECT_NOTES.length] : undefined,
-    }
-  })
-}
-
-const MOCK_DRIVERS: MockDriverGroup[] = [
-  { id: 'mrc', driverName: 'Marcus Reed',   area: 'East Nashville',      bags: makeBags('MRC', 12, [4],     [8])       },
-  { id: 'tbr', driverName: 'Tanya Brooks',  area: 'South Nashville',     bags: makeBags('TBR', 14, [2, 9],  [5])       },
-  { id: 'dct', driverName: 'Devon Carter',  area: 'Downtown Nashville',  bags: makeBags('DCT', 11, [6],     [3, 10])   },
-  { id: 'rjh', driverName: 'Renee Johnson', area: 'North Nashville',     bags: makeBags('RJH', 13, [1, 7],  [4])       },
-  { id: 'amr', driverName: 'Alicia Moore',  area: 'Madison / Rivergate', bags: makeBags('AMR', 15, [3, 11], [6])       },
-  { id: 'jhs', driverName: 'Jamal Harris',  area: 'Antioch',             bags: makeBags('JHS', 12, [5],     [2, 9])    },
-]
-
-const MOCK_HISTORY: HistoryEntry[] = [
-  { id: 'h1', bagCode: 'BAG-MRC0001', last4: '1836', consumerName: 'James Wright',   driverName: 'Marcus Reed',   workerInitials: 'DW', workerName: 'David W.',  completedTs: 'Today · 2:44 PM', consumerPayoutStatus: 'triggered', driverPayoutStatus: 'triggered' },
-  { id: 'h2', bagCode: 'BAG-TBR0001', last4: 'A2C4', consumerName: 'Lisa Chen',      driverName: 'Tanya Brooks',  workerInitials: 'SK', workerName: 'Sandra K.', completedTs: 'Today · 2:30 PM', consumerPayoutStatus: 'triggered', driverPayoutStatus: 'triggered' },
-  { id: 'h3', bagCode: 'BAG-DCT0001', last4: '7A92', consumerName: 'Michael Torres', driverName: 'Devon Carter',  workerInitials: 'DW', workerName: 'David W.',  completedTs: 'Today · 2:10 PM', consumerPayoutStatus: 'triggered', driverPayoutStatus: 'triggered' },
-  { id: 'h4', bagCode: 'BAG-RJH0001', last4: 'B381', consumerName: 'Sarah Kim',      driverName: 'Renee Johnson', workerInitials: 'MT', workerName: 'Marco T.',  completedTs: 'Today · 1:58 PM', consumerPayoutStatus: 'triggered', driverPayoutStatus: 'triggered' },
-  { id: 'h5', bagCode: 'BAG-AMR0001', last4: 'C044', consumerName: 'David Johnson',  driverName: 'Alicia Moore',  workerInitials: 'DW', workerName: 'David W.',  completedTs: 'Today · 1:32 PM', consumerPayoutStatus: 'triggered', driverPayoutStatus: 'triggered' },
-  { id: 'h6', bagCode: 'BAG-JHS0001', last4: 'F217', consumerName: 'Emily Davis',    driverName: 'Jamal Harris',  workerInitials: 'SK', workerName: 'Sandra K.', completedTs: 'Today · 1:10 PM', consumerPayoutStatus: 'triggered', driverPayoutStatus: 'triggered' },
-]
-
-// ── Queue Tab ─────────────────────────────────────────────────────────────────
+// ── Queue Tab — real inspection queue ────────────────────────────────────────
 
 function QueueTab({
-  onQueueScanIn,
+  queue,
+  queueLoading,
 }: {
-  onQueueScanIn: (bagCode: string, driverName: string, consumerName: string) => void
+  queue: Awaited<ReturnType<typeof getInspectionQueue>>
+  queueLoading: boolean
 }) {
-  const [driverGroups, setDriverGroups] = useState<MockDriverGroup[]>(() =>
-    MOCK_DRIVERS.map((g) => ({ ...g, bags: g.bags.map((b) => ({ ...b })) }))
-  )
-  const [expandedDriver, setExpandedDriver] = useState<string | null>('mrc')
 
-  const handleScanIn = (groupId: string, bag: MockBag, driverName: string) => {
-    setDriverGroups((prev) =>
-      prev.map((g) =>
-        g.id === groupId
-          ? { ...g, bags: g.bags.map((b) => b.id === bag.id ? { ...b, warehouseStatus: 'completed' } : b) }
-          : g
-      )
-    )
-    onQueueScanIn(bag.code, driverName, bag.consumerName)
+  if (queueLoading) {
+    return <div className="flex justify-center py-10"><Spinner size="md" /></div>
   }
 
-  const totalWaiting   = driverGroups.reduce((s, g) => s + g.bags.filter((b) => b.driverStatus !== 'rejected' && b.warehouseStatus !== 'completed').length, 0)
-  const acceptedCount  = driverGroups.reduce((s, g) => s + g.bags.filter((b) => b.driverStatus === 'accepted' && b.warehouseStatus !== 'completed').length, 0)
-  const cautionCount   = driverGroups.reduce((s, g) => s + g.bags.filter((b) => b.driverStatus === 'caution'  && b.warehouseStatus !== 'completed').length, 0)
+  if (queue.length === 0) {
+    return (
+      <EmptyState
+        icon="📋"
+        title="No bags in inspection queue"
+        description="Bags checked in will appear here for inspection."
+      />
+    )
+  }
 
   return (
     <div className="space-y-3">
-      {/* Counter cards */}
-      <div className="grid grid-cols-3 gap-2 mb-1">
-        {/* Queue Pending */}
-        <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(74,222,128,0.07)', border: `1px solid ${ACCENT}40` }}>
-          <p style={{ fontSize: 24, color: ACCENT, fontWeight: 700, lineHeight: 1 }}>{totalWaiting}</p>
-          <p style={{ fontSize: 10, color: `${ACCENT}99`, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 3 }}>In Queue</p>
-        </div>
-        {/* Accepted */}
-        <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(0,230,118,0.06)', border: '1px solid rgba(0,230,118,0.22)' }}>
-          <p style={{ fontSize: 24, color: '#00E676', fontWeight: 700, lineHeight: 1 }}>{acceptedCount}</p>
-          <p style={{ fontSize: 10, color: 'rgba(0,230,118,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 3 }}>Accepted</p>
-        </div>
-        {/* Caution */}
-        <div className="rounded-2xl p-3 flex flex-col gap-1" style={{ background: 'rgba(255,214,0,0.06)', border: '1px solid rgba(255,214,0,0.25)' }}>
-          <div className="flex items-center gap-1">
-            <p style={{ fontSize: 24, color: '#FFD600', fontWeight: 700, lineHeight: 1 }}>{cautionCount}</p>
-            {cautionCount > 0 && (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFD600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 2, opacity: 0.8 }}>
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            )}
-          </div>
-          <p style={{ fontSize: 10, color: 'rgba(255,214,0,0.65)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 3 }}>Caution</p>
-        </div>
+      <div className="flex items-center justify-between">
+        <SectionLabel title="Inspection Queue" accent={ACCENT} />
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(255,214,0,0.12)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)' }}>
+          {queue.length} pending
+        </span>
       </div>
-
-      <div className="flex items-center justify-between mb-1">
-        <SectionLabel title="Driver Queue" accent={ACCENT} />
-        {totalWaiting > 0 && (
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(255,214,0,0.12)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)' }}>
-            {totalWaiting} pending
-          </span>
-        )}
-      </div>
-
-      {/* Mock driver groups */}
-      {driverGroups.map((group) => {
-        const isExpanded  = expandedDriver === group.id
-        // Queue shows only accepted + caution bags that have NOT been checked in yet
-        const queueBags   = group.bags.filter((b) => b.driverStatus !== 'rejected' && b.warehouseStatus !== 'completed')
-        const accepted    = group.bags.filter((b) => b.driverStatus === 'accepted').length
-        const rejected    = group.bags.filter((b) => b.driverStatus === 'rejected').length
-        const caution     = group.bags.filter((b) => b.driverStatus === 'caution').length
-        const pendingWh   = queueBags.length
-        const initials    = group.driverName.split(' ').map((p) => p[0]).join('').slice(0, 2)
-
-        // Skip driver groups with nothing left in queue
-        if (queueBags.length === 0 && !isExpanded) return null
-
-        return (
-          <div
-            key={group.id}
-            className="rounded-2xl overflow-hidden"
-            style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${isExpanded ? 'rgba(0,188,212,0.3)' : 'rgba(255,255,255,0.08)'}`,
-              transition: 'border-color 0.2s',
-            }}
-          >
-            {/* Group header */}
-            <button
-              onClick={() => setExpandedDriver(isExpanded ? null : group.id)}
-              className="w-full flex items-center gap-3 px-4 py-4 text-left"
-            >
-              <div
-                className="shrink-0 flex items-center justify-center rounded-full text-xs font-bold"
-                style={{ width: 40, height: 40, background: 'linear-gradient(135deg,rgba(0,87,231,0.4),rgba(0,188,212,0.25))', border: '1.5px solid rgba(0,188,212,0.35)', color: '#ffffff' }}
-              >
-                {initials}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p style={{ fontSize: 14, color: '#ffffff', fontWeight: 700 }}>{group.driverName}</p>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{group.area}</p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex flex-col items-end gap-1">
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap" style={{ background: 'rgba(255,214,0,0.12)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)' }}>
-                    {pendingWh} in queue
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span style={{ fontSize: 10, color: '#00E676' }}>✓{accepted}</span>
-                    {caution  > 0 && <span style={{ fontSize: 10, color: '#FFD600' }}>⚠{caution}</span>}
-                    {rejected > 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>✕{rejected} excl.</span>}
-                  </div>
-                </div>
-                <svg
-                  width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ flexShrink: 0, transition: 'transform 0.3s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
-                >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </div>
-            </button>
-
-            {/* Expanded bags list — rejected and completed bags excluded */}
-            <div style={{ maxHeight: isExpanded ? 2400 : 0, overflow: 'hidden', transition: 'max-height 0.35s ease' }}>
-              <div style={{ borderTop: '1px solid rgba(0,188,212,0.1)' }}>
-                {queueBags.length === 0 && (
-                  <div className="px-4 py-4">
-                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>All bags checked in or rejected.</p>
-                  </div>
-                )}
-                {queueBags.map((bag, i) => {
-                  const isCaution = bag.driverStatus === 'caution'
-                  const rowBg     = isCaution ? 'rgba(255,214,0,0.025)' : 'transparent'
-                  const statusBg    = isCaution ? 'rgba(255,214,0,0.1)'  : 'rgba(0,230,118,0.08)'
-                  const statusBorder = isCaution ? 'rgba(255,214,0,0.28)' : 'rgba(0,230,118,0.25)'
-                  const statusColor  = isCaution ? '#FFD600'              : '#00E676'
-                  const statusLabel  = isCaution ? 'Caution — Check In Carefully' : 'Ready for Check-In'
-
-                  return (
-                    <div
-                      key={bag.id}
-                      className="px-4 py-3.5"
-                      style={{
-                        borderBottom: i < queueBags.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                        background: rowBg,
-                      }}
-                    >
-                      {/* Bag code + warehouse status badge */}
-                      <div className="flex items-start justify-between gap-2">
-                        <p style={{ fontSize: 13, color: '#E0F7FA', fontWeight: 700, fontFamily: 'monospace' }}>{bag.code}</p>
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0"
-                          style={{ background: statusBg, color: statusColor, border: `1px solid ${statusBorder}` }}
-                        >
-                          {statusLabel}
-                        </span>
-                      </div>
-
-                      {/* Consumer · Driver · Time */}
-                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>
-                        {bag.consumerName} · {group.driverName} · {bag.ts}
-                      </p>
-
-                      {/* Caution note */}
-                      {bag.note && (
-                        <p className="mt-1.5 rounded-lg px-2 py-1" style={{ fontSize: 10, color: '#FFD600', fontStyle: 'italic', background: 'rgba(255,214,0,0.06)', border: '1px solid rgba(255,214,0,0.15)' }}>
-                          ⚠ {bag.note}
-                        </p>
-                      )}
-
-                      {/* Check In button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleScanIn(group.id, bag, group.driverName) }}
-                        className="mt-2.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white"
-                        style={{ background: 'linear-gradient(135deg,#0057e7,#00BCD4)', boxShadow: '0 1px 8px rgba(0,188,212,0.25)' }}
-                      >
-                        Check In
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+      {queue.map((item) => (
+        <Link
+          key={item.id}
+          to={`/bag/${item.id}/inspect`}
+          className="block rounded-2xl px-4 py-3.5 transition-opacity hover:opacity-90 active:opacity-75"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,188,212,0.2)', textDecoration: 'none' }}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p style={{ fontSize: 13, color: '#E0F7FA', fontWeight: 700, fontFamily: 'monospace' }}>{item.bag_code}</p>
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0" style={{ background: 'rgba(0,230,118,0.08)', color: '#00E676', border: '1px solid rgba(0,230,118,0.25)' }}>
+              Ready to Inspect
+            </span>
           </div>
-        )
-      })}
-
-    </div>
-  )
-}
-
-// ── Scanner viewfinder (DEV mock) ─────────────────────────────────────────────
-
-function MockViewfinder({ scanning }: { scanning: boolean }) {
-  const C = '#00BCD4'
-  const bracketStyle = (top: boolean, left: boolean): React.CSSProperties => ({
-    position: 'absolute',
-    width: 24, height: 24,
-    ...(top ? { top: 24 } : { bottom: 24 }),
-    ...(left ? { left: 24 } : { right: 24 }),
-    borderTop:    top  ? `2.5px solid ${C}` : 'none',
-    borderBottom: !top ? `2.5px solid ${C}` : 'none',
-    borderLeft:   left  ? `2.5px solid ${C}` : 'none',
-    borderRight:  !left ? `2.5px solid ${C}` : 'none',
-    borderRadius: top && left ? '4px 0 0 0' : top && !left ? '0 4px 0 0' : !top && left ? '0 0 0 4px' : '0 0 4px 0',
-  })
-
-  return (
-    <div className="relative overflow-hidden" style={{ aspectRatio: '4/3', background: '#000' }}>
-      {/* Brackets */}
-      <div style={bracketStyle(true, true)} />
-      <div style={bracketStyle(true, false)} />
-      <div style={bracketStyle(false, true)} />
-      <div style={bracketStyle(false, false)} />
-
-      {/* Scan line */}
-      {scanning && (
-        <div
-          style={{
-            position: 'absolute', left: '12%', right: '12%', height: 2,
-            background: `linear-gradient(90deg, transparent, ${C}, transparent)`,
-            boxShadow: `0 0 8px ${C}`,
-            animation: 'scanLine 1.2s ease-in-out infinite',
-          }}
-        />
-      )}
-
-      {/* Icon */}
-      {!scanning && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(0,188,212,0.35)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <path d="M14 14h.01M14 17h3M17 14v3M17 21h4M21 17h-4M21 14v3" />
-          </svg>
-        </div>
-      )}
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>
+            {new Date(item.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          </p>
+        </Link>
+      ))}
     </div>
   )
 }
@@ -384,7 +109,6 @@ function ScanInTab({
   confirmCheckIn,
   resetScanner,
   recentEntries,
-  onSuccessCallback,
 }: {
   scanState: ScanState
   setScanState: (s: ScanState) => void
@@ -395,21 +119,8 @@ function ScanInTab({
   handleManualSubmit: (e: React.FormEvent) => void
   confirmCheckIn: (code: string) => void
   resetScanner: () => void
-  recentEntries: HistoryEntry[]
-  onSuccessCallback: (code: string) => void
+  recentEntries: ScanEntry[]
 }) {
-  const [mockScanning, setMockScanning] = useState(false)
-
-  const triggerMockScan = () => {
-    if (mockScanning) return
-    setMockScanning(true)
-    setTimeout(() => {
-      setMockScanning(false)
-      const code = `BAG-WH${Date.now().toString().slice(-4)}`
-      processScan(code)
-    }, 1100)
-  }
-
   const activePhases: ScanPhase[] = ['idle', 'scanning', 'manual']
   const showInput = activePhases.includes(scanState.phase as ScanPhase)
 
@@ -418,26 +129,8 @@ function ScanInTab({
       {/* ── Scanner area ── */}
       <div className="space-y-3">
 
-        {/* DEV mode: premium mock viewfinder */}
-        {DEV_BYPASS_AUTH && showInput && (
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{ border: '2px solid rgba(0,188,212,0.35)', boxShadow: '0 0 20px rgba(0,188,212,0.1)' }}
-          >
-            <MockViewfinder scanning={mockScanning} />
-            <button
-              onClick={triggerMockScan}
-              disabled={mockScanning}
-              className="w-full py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-70"
-              style={{ background: 'linear-gradient(135deg,#0057e7,#00BCD4)', boxShadow: '0 0 12px rgba(0,188,212,0.25)' }}
-            >
-              {mockScanning ? 'Scanning…' : 'Scan Bag'}
-            </button>
-          </div>
-        )}
-
-        {/* PROD mode: real QrScanner */}
-        {!DEV_BYPASS_AUTH && scanState.phase === 'scanning' && (
+        {/* Real QrScanner */}
+        {scanState.phase === 'scanning' && (
           <>
             <div className="rounded-2xl overflow-hidden" style={{ border: '2px solid rgba(0,188,212,0.35)' }}>
               <QrScanner key={scannerKey} onScan={processScan} />
@@ -452,8 +145,8 @@ function ScanInTab({
           </>
         )}
 
-        {/* Manual entry — always shown in DEV, shown on demand in PROD */}
-        {(DEV_BYPASS_AUTH || scanState.phase === 'manual') && showInput && (
+        {/* Manual entry */}
+        {scanState.phase === 'manual' && showInput && (
           <form onSubmit={handleManualSubmit} className="space-y-3">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide" style={{ color: '#7B909C' }}>
@@ -468,16 +161,14 @@ function ScanInTab({
               />
             </div>
             <div className="flex gap-2">
-              {!DEV_BYPASS_AUTH && (
-                <button
-                  type="button"
-                  onClick={() => setScanState({ phase: 'scanning' })}
-                  className="flex-1 rounded-xl py-2.5 text-sm font-medium"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#7B909C' }}
-                >
-                  Use Camera
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setScanState({ phase: 'scanning' })}
+                className="flex-1 rounded-xl py-2.5 text-sm font-medium"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#7B909C' }}
+              >
+                Use Camera
+              </button>
               <button
                 type="submit"
                 disabled={!manualCode.trim()}
@@ -552,24 +243,13 @@ function ScanInTab({
               </div>
             </div>
             <div className="flex gap-2">
-              {!DEV_BYPASS_AUTH && scanState.bagId !== 'demo' && (
-                <Link
-                  to={`/bag/${scanState.bagId}/inspect`}
-                  className="flex-1 rounded-xl py-2.5 text-center text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg,#00BCD4,#0097A7)', boxShadow: '0 0 12px rgba(0,188,212,0.3)' }}
-                >
-                  Inspect Now
-                </Link>
-              )}
-              {DEV_BYPASS_AUTH && (
-                <button
-                  onClick={() => { onSuccessCallback(scanState.bagCode); resetScanner() }}
-                  className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg,#0057e7,#00BCD4)', boxShadow: '0 0 12px rgba(0,188,212,0.3)' }}
-                >
-                  Scan Next Bag
-                </button>
-              )}
+              <Link
+                to={`/bag/${scanState.bagId}/inspect`}
+                className="flex-1 rounded-xl py-2.5 text-center text-sm font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg,#00BCD4,#0097A7)', boxShadow: '0 0 12px rgba(0,188,212,0.3)' }}
+              >
+                Inspect Now
+              </Link>
               <button
                 onClick={resetScanner}
                 className="flex-1 rounded-xl py-2.5 text-sm font-semibold"
@@ -634,7 +314,7 @@ function ScanInTab({
 
 // ── History Tab ───────────────────────────────────────────────────────────────
 
-function HistoryTab({ entries }: { entries: HistoryEntry[] }) {
+function HistoryTab({ entries }: { entries: ScanEntry[] }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -746,28 +426,24 @@ function BarRow({ label, value, max, color }: { label: string; value: number; ma
 function MyStatsTab({
   myStats,
   statsLoading,
-  historyCount,
 }: {
   myStats: { scansToday: number; inspectionsToday: number; greenToday: number; yellowToday: number; redToday: number } | null | undefined
   statsLoading: boolean
-  historyCount: number
 }) {
-  const demo = DEV_BYPASS_AUTH
+  const today       = myStats?.scansToday ?? 0
+  const week        = 0
+  const month       = 0
+  const year        = 0
+  const quality     = 0
+  const avgTime     = 0
+  const safetyFlags = 0
 
-  const today     = demo ? Math.max(historyCount, 38) : (myStats?.scansToday ?? 0)
-  const week      = demo ? 187  : 0
-  const month     = demo ? 742  : 0
-  const year      = demo ? 4891 : 0
-  const quality   = demo ? 97   : 0
-  const avgTime   = demo ? 18   : 0
-  const safetyFlags = demo ? 4  : 0
-
-  const greenToday  = demo ? 34 : (myStats?.greenToday  ?? 0)
-  const yellowToday = demo ? 3  : (myStats?.yellowToday ?? 0)
-  const redToday    = demo ? 1  : (myStats?.redToday    ?? 0)
+  const greenToday  = myStats?.greenToday  ?? 0
+  const yellowToday = myStats?.yellowToday ?? 0
+  const redToday    = myStats?.redToday    ?? 0
   const totalInspections = greenToday + yellowToday + redToday
 
-  if (statsLoading && !demo) {
+  if (statsLoading) {
     return <div className="flex justify-center py-10"><Spinner size="md" /></div>
   }
 
@@ -868,10 +544,10 @@ export default function WarehouseDashboard() {
   const { user }      = useAuthStore()
   const queryClient   = useQueryClient()
   const [tab, setTab]                   = useState<Tab>('queue')
-  const [scanState, setScanState]       = useState<ScanState>({ phase: DEV_BYPASS_AUTH ? 'idle' : 'scanning' })
+  const [scanState, setScanState]       = useState<ScanState>({ phase: 'scanning' })
   const [scannerKey, setScannerKey]     = useState(0)
   const [manualCode, setManualCode]     = useState('')
-  const [completedEntries, setCompletedEntries] = useState<HistoryEntry[]>(DEV_BYPASS_AUTH ? MOCK_HISTORY : [])
+  const [completedEntries, setCompletedEntries] = useState<ScanEntry[]>([])
 
   const { data: queue = [], isLoading: queueLoading } = useQuery({
     queryKey: ['inspection-queue'],
@@ -894,7 +570,7 @@ export default function WarehouseDashboard() {
         bagCode,
         last4: bagCode.slice(-4),
         consumerName: consumerName ?? 'Walk-in / Manual',
-        driverName: driverName ?? 'Demo Driver',
+        driverName: driverName ?? 'Unknown Driver',
         workerInitials: 'DW',
         workerName: 'David W.',
         completedTs: `Today · ${now}`,
@@ -906,20 +582,15 @@ export default function WarehouseDashboard() {
   }, [])
 
   const processScan = useCallback(async (rawCode: string) => {
-    setScanState({ phase: 'processing' })
-    if (DEV_BYPASS_AUTH) {
-      await new Promise((r) => setTimeout(r, 500))
-      const code = rawCode.trim().toUpperCase() || `BAG-WH${Date.now().toString().slice(-4)}`
-      setScanState({ phase: 'success', bagCode: code, bagId: 'demo' })
-      return
-    }
     if (!user) return
+    setScanState({ phase: 'processing' })
     try {
       const bag = await lookupOrCreateBag(rawCode)
       await markBagAtWarehouse(bag.id, user.id)
       queryClient.invalidateQueries({ queryKey: ['inspection-queue'] })
       queryClient.invalidateQueries({ queryKey: ['my-stats-today', user.id] })
       setScanState({ phase: 'success', bagCode: bag.bag_code, bagId: bag.id })
+      addEntry(bag.bag_code)
     } catch (err) {
       setScanState({ phase: 'error', message: err instanceof Error ? err.message : 'Unknown error' })
     }
@@ -938,13 +609,11 @@ export default function WarehouseDashboard() {
 
   const resetScanner = () => {
     setManualCode('')
-    setScanState({ phase: DEV_BYPASS_AUTH ? 'idle' : 'scanning' })
+    setScanState({ phase: 'scanning' })
     setScannerKey((k) => k + 1)
   }
 
-  const totalWaiting = DEV_BYPASS_AUTH
-    ? MOCK_DRIVERS.reduce((s, d) => s + d.bags.filter((b) => b.warehouseStatus === 'waiting').length, 0)
-    : queue.length
+  const totalWaiting = queue.length
 
   const TABS: { value: Tab; label: string }[] = [
     { value: 'queue',   label: `Queue (${totalWaiting})` },
@@ -1000,35 +669,7 @@ export default function WarehouseDashboard() {
             </svg>
           </Link>
 
-          {/* DEV: mock driver queue */}
-          {DEV_BYPASS_AUTH && (
-            <QueueTab
-              onQueueScanIn={(code, driver, consumer) => addEntry(code, driver, consumer)}
-            />
-          )}
-
-          {/* PROD: real queue from Supabase */}
-          {!DEV_BYPASS_AUTH && (
-            <>
-              {queueLoading && (
-                <div className="flex justify-center py-8">
-                  <div className="h-7 w-7 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: '#00BCD4', borderTopColor: 'transparent' }} />
-                </div>
-              )}
-              {!queueLoading && queue.length === 0 && (
-                <EmptyState icon="📦" title="Queue is clear" description="No bags awaiting inspection right now." />
-              )}
-              {!queueLoading && queue.map((bag) => (
-                <div key={bag.id} className="mt-2 flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,188,212,0.15)' }}>
-                  <div>
-                    <p className="font-mono text-sm font-bold" style={{ color: '#E0F7FA' }}>{bag.bag_code}</p>
-                    <p className="text-xs" style={{ color: '#7B909C' }}>Arrived {new Date(bag.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
-                  </div>
-                  <Link to={`/bag/${bag.id}/inspect`} className="rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#00BCD4,#0097A7)' }}>Inspect →</Link>
-                </div>
-              ))}
-            </>
-          )}
+          <QueueTab queue={queue} queueLoading={queueLoading} />
         </div>
       )}
 
@@ -1046,7 +687,6 @@ export default function WarehouseDashboard() {
             confirmCheckIn={confirmCheckIn}
             resetScanner={resetScanner}
             recentEntries={completedEntries}
-            onSuccessCallback={(code) => addEntry(code)}
           />
         </div>
       )}
@@ -1064,7 +704,6 @@ export default function WarehouseDashboard() {
           <MyStatsTab
             myStats={myStats}
             statsLoading={statsLoading}
-            historyCount={completedEntries.length}
           />
         </div>
       )}

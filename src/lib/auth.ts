@@ -85,18 +85,44 @@ export async function signUp(
   fullName: string,
   role: Role,
 ) {
-  const { data, error } = await supabase.auth.signUp({ email, password })
-  if (error) throw error
+  // Normalize email — Supabase Auth is case-insensitive but profile lookups
+  // downstream rely on a single canonical lowercase form.
+  const cleanEmail = email.trim().toLowerCase()
+  console.log('[signUp] starting', { email: cleanEmail, role })
+
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password,
+  })
+  if (error) {
+    console.error('[signUp] auth error:', error.message)
+    throw error
+  }
 
   if (data.user) {
     const approvalStatus = AUTO_APPROVED_ROLES.includes(role) ? 'approved' : 'pending'
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      full_name: fullName,
-      role,
-      approval_status: approvalStatus,
-    })
-    if (profileError) throw profileError
+    // upsert (not insert) — Supabase sometimes creates a profile row via a
+    // trigger on auth.users INSERT, which causes a 409 from a plain insert
+    // here. onConflict:'id' makes this idempotent across retries too.
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: data.user.id,
+          email: cleanEmail,
+          full_name: fullName,
+          role,
+          approval_status: approvalStatus,
+        },
+        { onConflict: 'id' },
+      )
+    if (profileError) {
+      console.error('[signUp] profile upsert error:', profileError.message)
+      throw profileError
+    }
+    console.log('[signUp] profile upserted', { id: data.user.id, role, approvalStatus })
+  } else {
+    console.warn('[signUp] no user in response (email confirmation may be required)')
   }
 
   return data
@@ -115,22 +141,24 @@ export async function signOut() {
   if (error) throw error
 }
 
-// Canonical logout. There are three independent auth-persistence layers
-// (zustand `baykid-auth`, demo keys, and AuthProvider's `cb_demo_user`); a
-// partial clear leaves a layer that re-hydrates the user on next load. This
-// clears all of them, then does a HARD redirect so no in-memory state survives
-// (Supabase client, realtime channels, AuthProvider context). Never throws —
-// logout must always complete.
+// Canonical logout. Clears Supabase session and Zustand auth state, then
+// does a HARD redirect so no in-memory state survives (Supabase client,
+// realtime channels, AuthProvider context). Never throws — logout must
+// always complete.
 export async function logout(): Promise<void> {
-  try { await signOut() } catch { /* no real session (dev bypass / demo) — proceed */ }
+  try { await signOut() } catch { /* no active session — proceed */ }
   try { useAuthStore.getState().clearAuth() } catch { /* store may be uninitialized */ }
   try {
-    localStorage.removeItem('baykid-auth')        // zustand persist
-    localStorage.removeItem('baykid-demo-mode')   // demo-mode flag
-    localStorage.removeItem('baykid-demo-role')   // demo-mode role
-    localStorage.removeItem('cb_demo_user')       // AuthProvider (loadUser reads this back)
+    localStorage.removeItem('baykid-auth')      // zustand persist
+    localStorage.removeItem('baykid-last-email') // PII cleanup
+    // Sweep any in-progress onboarding drafts for any user on this browser.
+    // Wizard keys are 'baykid-onboarding:<userId>' — see ConsumerOnboarding.tsx.
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('baykid-onboarding:')) localStorage.removeItem(key)
+    }
   } catch { /* storage unavailable — non-fatal */ }
-  window.location.href = '/real-login'            // hard reload tears down all in-memory state
+  window.location.href = '/real-login'       // hard reload tears down all in-memory state
 }
 
 export async function fetchProfile(userId: string) {

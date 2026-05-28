@@ -1,106 +1,46 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+// ── Driver: Available Pickups (real consumer scans only) ────────────────────
+// Data source: public.consumer_bag_scans WHERE scan_status IN ('active',
+// 'pending_pickup'). RLS for drivers is granted by migration
+// 20260528_drivers_can_read_consumer_scans.sql — without it, this query
+// returns zero rows for any driver.
+//
+// Per spec: NO mock/demo/sample/fallback data. If the query returns nothing,
+// the user sees an empty state — never a placeholder list.
+
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useDemoStore, type PickupInput } from '../../store/demoStore'
-import { getPendingBags } from '../../lib/driver'
+import { supabase } from '../../lib/supabase'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface Pickup {
-  id: string
+export interface PickupInput {
+  id:      string
   address: string
-  customer: string
-  distance: string
-  eta: string
-  bags: number
+  bags:    number
 }
 
-interface ZipZone {
-  zip: string
-  neighborhood: string
-  distanceRange: string
-  demandLevel: string
-  pickupCount: number
-  bagTotal: number
-  iconBg: string
-  dotColor: string
-  pillBg: string
-  pillColor: string
-  pickups: Pickup[]
+interface AvailablePickup {
+  id:          string
+  qr_code:     string
+  bag_id:      string | null
+  scan_status: string
+  scanned_at:  string
 }
 
-// ── Demo data (sorted highest demand first) ────────────────────────────────────
-// Used ONLY when demoMode=true. Live mode queries Supabase exclusively.
+const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  active:         { label: 'Active',         color: '#5BFFB0', bg: 'rgba(91,255,176,0.10)' },
+  pending_pickup: { label: 'Pending pickup', color: '#FFB340', bg: 'rgba(255,179,64,0.10)' },
+}
 
-const ZONES: ZipZone[] = [
-  {
-    zip: '37206',
-    neighborhood: 'East Nashville',
-    distanceRange: '0.6–2.1 mi',
-    demandLevel: 'Highest demand',
-    pickupCount: 4,
-    bagTotal: 11,
-    iconBg: 'rgba(0,230,118,0.15)',
-    dotColor: '#00E676',
-    pillBg: 'rgba(0,230,118,0.15)',
-    pillColor: '#00E676',
-    pickups: [
-      { id: 'p1', address: '114 S 11th St',     customer: 'J. Williams', distance: '0.6 mi', eta: '3 min', bags: 3 },
-      { id: 'p2', address: '832 Chicamauga Ave', customer: 'M. Thompson', distance: '1.2 mi', eta: '5 min', bags: 3 },
-      { id: 'p3', address: '1409 McGavock Pike', customer: 'T. Harris',   distance: '1.7 mi', eta: '7 min', bags: 2 },
-      { id: 'p4', address: '407 S 14th St',      customer: 'R. Davis',    distance: '2.1 mi', eta: '9 min', bags: 3 },
-    ],
-  },
-  {
-    zip: '37210',
-    neighborhood: 'South Nashville',
-    distanceRange: '1.4–2.0 mi',
-    demandLevel: 'High demand',
-    pickupCount: 3,
-    bagTotal: 8,
-    iconBg: 'rgba(74,222,128,0.13)',
-    dotColor: '#4ade80',
-    pillBg: 'rgba(74,222,128,0.13)',
-    pillColor: '#4ade80',
-    pickups: [
-      { id: 'p6', address: '800 Wedgewood Ave', customer: 'C. Smith',  distance: '1.4 mi', eta: '6 min', bags: 3 },
-      { id: 'p7', address: '1102 Kirkwood Ave', customer: 'L. Brown',  distance: '1.7 mi', eta: '7 min', bags: 2 },
-      { id: 'p8', address: '310 Chestnut St',   customer: 'P. Wilson', distance: '2.0 mi', eta: '8 min', bags: 3 },
-    ],
-  },
-  {
-    zip: '37201',
-    neighborhood: 'Downtown Nashville',
-    distanceRange: '0.8–1.2 mi',
-    demandLevel: 'Moderate demand',
-    pickupCount: 2,
-    bagTotal: 4,
-    iconBg: 'rgba(251,191,36,0.12)',
-    dotColor: '#FBBF24',
-    pillBg: 'rgba(251,191,36,0.12)',
-    pillColor: '#FBBF24',
-    pickups: [
-      { id: 'p9',  address: '111 Commerce St', customer: 'N. Moore',  distance: '0.8 mi', eta: '4 min', bags: 2 },
-      { id: 'p10', address: '200 4th Ave N',   customer: 'K. Taylor', distance: '1.2 mi', eta: '5 min', bags: 2 },
-    ],
-  },
-  {
-    zip: '37207',
-    neighborhood: 'North Nashville',
-    distanceRange: '3.2 mi',
-    demandLevel: 'Low demand',
-    pickupCount: 2,
-    bagTotal: 4,
-    iconBg: 'rgba(14,165,233,0.10)',
-    dotColor: '#38bdf8',
-    pillBg: 'rgba(14,165,233,0.10)',
-    pillColor: '#38bdf8',
-    pickups: [
-      { id: 'p11', address: '1502 Haynes St Apt 503', customer: 'D. Jackson',  distance: '3.2 mi', eta: '14 min', bags: 2 },
-      { id: 'p12', address: '1502 Haynes St Apt 405', customer: 'A. Peterson', distance: '3.2 mi', eta: '14 min', bags: 2 },
-    ],
-  },
-]
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  const s  = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60)  return `${s}s ago`
+  const m = Math.floor(s / 60); if (m < 60)  return `${m}m ago`
+  const h = Math.floor(m / 60); if (h < 24)  return `${h}h ago`
+  const d = Math.floor(h / 24); if (d < 7)   return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
+}
 
 // ── Shared offline/online bar ─────────────────────────────────────────────────
 
@@ -139,462 +79,149 @@ export function PickupsNearYou({
   isOnline,
   onSelectionChange,
   resetKey = 0,
-  demoMode,
 }: {
   isOnline: boolean
   onSelectionChange: (count: number, pickups: PickupInput[]) => void
   resetKey?: number
-  demoMode: boolean
 }) {
-  const navigate        = useNavigate()
-  const { activeRoute } = useDemoStore()
-
-  const [expandedZip, setExpandedZip]         = useState<string | null>('37206')
-  const [selectedPickups, setSelectedPickups] = useState<Set<string>>(new Set())
-  // Live-mode flat selection (bag IDs from Supabase)
   const [liveSelectedIds, setLiveSelectedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    if (resetKey > 0) {
-      setSelectedPickups(new Set())
-      setLiveSelectedIds(new Set())
-    }
+    if (resetKey > 0) setLiveSelectedIds(new Set())
   }, [resetKey])
 
-  // ── Live mode: query Supabase ────────────────────────────────────────────────
-  const { data: liveBags = [], isLoading: liveLoading } = useQuery({
-    queryKey: ['pickups-near-you-live'],
+  // Real consumer scans only — no fallback, no mock data.
+  const { data: liveScans = [], isLoading: liveLoading } = useQuery<AvailablePickup[]>({
+    queryKey: ['driver-available-pickups'],
     queryFn: async () => {
-      const rows = await getPendingBags(50)
-      console.log('[pickup-data] source: "supabase" | pickups-tab | count:', rows.length)
-      return rows
+      console.log('[driver] loading real driver pickups from Supabase')
+      const { data, error } = await supabase
+        .from('consumer_bag_scans')
+        .select('id, qr_code, bag_id, scan_status, scanned_at')
+        .in('scan_status', ['active', 'pending_pickup'])
+        .order('scanned_at', { ascending: false })
+        .limit(50)
+      if (error) {
+        console.error('[driver] consumer_bag_scans query failed:', error)
+        // No demo data fallback — return empty so the empty state renders.
+        return []
+      }
+      console.log('[driver] real pickup count', data?.length ?? 0, '— no demo data used')
+      return (data ?? []) as AvailablePickup[]
     },
-    enabled: !demoMode,
     refetchInterval: 30_000,
   })
 
-  // Log demo source once on mount (and when mode flips)
+  // Notify parent of selection changes.
+  // NOTE: onSelectionChange MUST be referentially stable (wrap with useCallback
+  // at the call site). If it's an inline arrow it changes every render → this
+  // effect re-fires → parent re-renders → new callback → "Maximum update
+  // depth exceeded". DriverDashboard wraps with useCallback as of this revision.
   useEffect(() => {
-    if (demoMode) {
-      const total = ZONES.reduce((s, z) => s + z.pickups.length, 0)
-      console.log('[pickup-data] source: "demo-mock" | pickups-tab | count:', total)
+    const inputs: PickupInput[] = liveScans
+      .filter(s => liveSelectedIds.has(s.id))
+      .map(s => ({
+        id:      s.id,
+        address: s.qr_code,  // no location column on consumer_bag_scans yet
+        bags:    1,
+      }))
+    if (inputs.length > 0) {
+      console.log('[driver] selected pickup added to route', { count: inputs.length, ids: inputs.map(i => i.id) })
     }
-  }, [demoMode])
-
-  // Notify parent of live-mode selection changes
-  useEffect(() => {
-    if (demoMode) return
-    const inputs: PickupInput[] = liveBags
-      .filter(b => liveSelectedIds.has(b.id))
-      .map(b => ({ id: b.id, address: b.city ?? 'Pickup', bags: 1 }))
     onSelectionChange(liveSelectedIds.size, inputs)
-  }, [liveSelectedIds, liveBags, demoMode, onSelectionChange])
+  }, [liveSelectedIds, liveScans, onSelectionChange])
 
-  // ── Demo-mode selection helpers ──────────────────────────────────────────────
-
-  const totalSelected = selectedPickups.size
-
-  const getPickupInputs = (ids: Set<string>): PickupInput[] => {
-    const result: PickupInput[] = []
-    for (const zone of ZONES) {
-      for (const p of zone.pickups) {
-        if (ids.has(p.id)) result.push({ id: p.id, address: p.address, bags: p.bags })
-      }
-    }
-    return result
-  }
-
-  useEffect(() => {
-    if (!demoMode) return
-    onSelectionChange(totalSelected, getPickupInputs(selectedPickups))
-  }, [totalSelected, demoMode, onSelectionChange])
-
-  const togglePickup = (id: string) => {
+  const toggleLive = (id: string) => {
     if (!isOnline) return
-    setSelectedPickups((prev) => {
+    setLiveSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
 
-  const toggleZipAll = (zone: ZipZone) => {
-    if (!isOnline) return
-    const ids = zone.pickups.map((p) => p.id)
-    const allSelected = ids.every((id) => selectedPickups.has(id))
-    setSelectedPickups((prev) => {
-      const next = new Set(prev)
-      ids.forEach((id) => (allSelected ? next.delete(id) : next.add(id)))
-      return next
-    })
-  }
-
-  const selectedInZone = (zone: ZipZone) =>
-    zone.pickups.filter((p) => selectedPickups.has(p.id)).length
-
-  // ── Active route hero (shared between modes) ─────────────────────────────────
-
-  const activeRouteHero = activeRoute && activeRoute.routeStatus !== 'completed' ? (() => {
-    const totalStops = activeRoute.stops.length
-    const doneStops  = activeRoute.stops.filter((s) => s.status === 'completed').length
-    return (
-      <button
-        type="button"
-        onClick={() => navigate('/dashboard/driver/route-map')}
-        className="w-full p-6 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 to-transparent shadow-[0_0_20px_rgba(0,188,212,0.25)] text-left mb-5 active:scale-[0.98] transition-transform"
-      >
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-lg font-bold" style={{ color: '#ffffff' }}>Active Route</p>
-          <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>● Active</span>
-        </div>
-        <p className="text-sm text-gray-300">
-          {totalStops} stop{totalStops !== 1 ? 's' : ''} · {doneStops} done
-        </p>
-        <div className="mt-4">
-          <span className="text-cyan-400 font-semibold hover:text-cyan-300 cursor-pointer">
-            View Route →
-          </span>
-        </div>
-      </button>
-    )
-  })() : null
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // LIVE MODE — flat list of real Supabase rows
-  // ════════════════════════════════════════════════════════════════════════════
-
-  if (!demoMode) {
-    const toggleLive = (id: string) => {
-      if (!isOnline) return
-      setLiveSelectedIds(prev => {
-        const next = new Set(prev)
-        if (next.has(id)) next.delete(id); else next.add(id)
-        return next
-      })
-    }
-
-    return (
-      <div className="px-4 pt-4 pb-4" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
-        {activeRouteHero}
-        <StatusBar isOnline={isOnline} />
-
-        <p style={{ fontSize: 10, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
-          AVAILABLE PICKUPS
-        </p>
-
-        {liveLoading ? (
-          <div className="rounded-2xl px-4 py-6 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Loading pickups…</p>
-          </div>
-        ) : liveBags.length === 0 ? (
-          <div className="rounded-2xl px-4 py-8 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <p style={{ fontSize: 22, marginBottom: 8 }}>📭</p>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>No live pickups available yet</p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Check back soon — pickups appear here as consumers request them</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {liveBags.map(bag => {
-              const isSelected = liveSelectedIds.has(bag.id)
-              return (
-                <button
-                  key={bag.id}
-                  onClick={() => toggleLive(bag.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-2xl active:opacity-75 transition-all"
-                  style={{
-                    background: isSelected ? 'rgba(0,200,255,0.07)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${isSelected ? 'rgba(0,200,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
-                    boxShadow: isSelected ? '0 0 14px rgba(0,200,255,0.18)' : 'none',
-                    transition: 'all 0.18s ease',
-                    opacity: !isOnline ? 0.55 : 1,
-                    cursor: isOnline ? 'pointer' : 'default',
-                  }}
-                >
-                  {/* Checkbox */}
-                  <div style={{
-                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                    border: `1.5px solid ${isSelected ? '#00D9FF' : 'rgba(255,255,255,0.18)'}`,
-                    background: isSelected ? 'rgba(0,200,255,0.14)' : 'transparent',
-                    boxShadow: isSelected ? '0 0 9px rgba(0,200,255,0.38)' : 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.18s ease',
-                  }}>
-                    {isSelected && (
-                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="#00D9FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono font-bold" style={{ fontSize: 13, color: isSelected ? '#00c8ff' : 'rgba(255,255,255,0.82)' }}>
-                      {bag.bag_code}
-                    </p>
-                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
-                      {bag.city ?? 'Location pending'}
-                    </p>
-                  </div>
-                  <span style={{
-                    fontSize: 9, fontWeight: 700,
-                    color:      bag.status === 'assigned' ? '#FFB340' : '#5BFFB0',
-                    background: bag.status === 'assigned' ? 'rgba(255,179,64,0.1)' : 'rgba(91,255,176,0.1)',
-                    borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap',
-                  }}>
-                    {bag.status === 'assigned' ? 'Assigned' : 'Pending'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // DEMO MODE — ZIP accordion with hardcoded mock zones (unchanged)
-  // ════════════════════════════════════════════════════════════════════════════
-
   return (
     <div className="px-4 pt-4 pb-4" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
+      <StatusBar isOnline={isOnline} />
 
-      {activeRouteHero}
-
-      {/* ── Offline pill / online info bar ───────────────────────────────── */}
-      {!isOnline ? (
-        <div className="flex items-center justify-center mb-4">
-          <div
-            className="flex items-center gap-2 rounded-full px-4 py-2"
-            style={{ background: 'rgba(255,60,60,0.10)', border: '1px solid rgba(255,80,80,0.35)' }}
-          >
-            <span style={{ fontSize: 12 }}>⚠️</span>
-            <p style={{ fontSize: 11, color: 'rgba(255,120,120,0.95)', fontWeight: 500 }}>
-              View only — tap status badge to go online
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div
-          className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 mb-4"
-          style={{ background: 'rgba(0,188,212,0.07)', border: '1px solid rgba(0,188,212,0.2)' }}
-        >
-          <span style={{ fontSize: 13 }}>ℹ️</span>
-          <p style={{ fontSize: 11, color: 'rgba(0,210,255,0.75)' }}>
-            Tap a ZIP card to expand, select pickups &amp; add to route
-          </p>
-        </div>
-      )}
-
-      {/* ── Section label ────────────────────────────────────────────────── */}
-      <p
-        style={{
-          fontSize: 10,
-          color: '#00BCD4',
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          marginBottom: 12,
-        }}
-      >
-        PICKUPS NEAR YOU — SORTED BY DEMAND
+      <p style={{ fontSize: 10, color: '#00BCD4', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
+        AVAILABLE PICKUPS
       </p>
 
-      {/* ── ZIP accordion cards ──────────────────────────────────────────── */}
-      <div className="space-y-3">
-        {ZONES.map((zone) => {
-          const isExpanded = expandedZip === zone.zip
-          const selCount   = selectedInZone(zone)
+      {liveLoading ? (
+        <div className="rounded-2xl px-4 py-6 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Loading pickups…</p>
+        </div>
+      ) : liveScans.length === 0 ? (
+        <div className="rounded-2xl px-4 py-8 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p style={{ fontSize: 22, marginBottom: 8 }}>📭</p>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>No available pickups yet.</p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+            Consumer bag scans will appear here when customers scan bags.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {liveScans.map(scan => {
+            const isSelected = liveSelectedIds.has(scan.id)
+            const status     = STATUS_STYLE[scan.scan_status] ?? { label: scan.scan_status, color: '#7B909C', bg: 'rgba(255,255,255,0.04)' }
+            const bagSuffix  = scan.bag_id ? String(scan.bag_id).slice(0, 8) : null
 
-          return (
-            <div
-              key={zone.zip}
-              className="rounded-2xl overflow-hidden"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid ${isExpanded ? `${zone.dotColor}35` : 'rgba(255,255,255,0.08)'}`,
-                boxShadow: isExpanded ? `0 0 18px ${zone.dotColor}10` : 'none',
-                transition: 'border-color 0.25s, box-shadow 0.25s',
-              }}
-            >
-              {/* ── Header row ── */}
+            return (
               <button
-                onClick={() => setExpandedZip(isExpanded ? null : zone.zip)}
-                className="w-full flex items-center gap-3 px-4 py-4 text-left active:opacity-80 transition-opacity"
-              >
-                {/* Circular demand icon */}
-                <div
-                  className="shrink-0 flex items-center justify-center rounded-full"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    background: zone.iconBg,
-                    border: `1.5px solid ${zone.dotColor}50`,
-                    boxShadow: `0 0 12px ${zone.dotColor}20`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      background: zone.dotColor,
-                      boxShadow: `0 0 6px ${zone.dotColor}80`,
-                    }}
-                  />
-                </div>
-
-                {/* ZIP + neighborhood + distance */}
-                <div className="flex-1 min-w-0">
-                  <p style={{ fontSize: 16, color: '#ffffff', fontWeight: 700, lineHeight: 1.2 }}>
-                    {zone.zip}
-                  </p>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 1 }}>
-                    {zone.neighborhood}
-                  </p>
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginTop: 1 }}>
-                    {zone.distanceRange}
-                  </p>
-                </div>
-
-                {/* Badge + demand + chevron */}
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap"
-                    style={{ background: zone.pillBg, color: zone.pillColor }}
-                  >
-                    {zone.pickupCount} pickups · {zone.bagTotal} bags
-                  </span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-                    {zone.demandLevel}
-                  </span>
-                </div>
-
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.35)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0 ml-1"
-                  style={{
-                    transition: 'transform 0.3s ease',
-                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                  }}
-                >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
-
-              {/* ── Expanded content ── */}
-              <div
+                key={scan.id}
+                onClick={() => toggleLive(scan.id)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-2xl active:opacity-75 transition-all"
                 style={{
-                  maxHeight: isExpanded ? 1200 : 0,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.35s ease',
+                  background: isSelected ? 'rgba(0,200,255,0.07)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${isSelected ? 'rgba(0,200,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                  boxShadow: isSelected ? '0 0 14px rgba(0,200,255,0.18)' : 'none',
+                  transition: 'all 0.18s ease',
+                  opacity: !isOnline ? 0.55 : 1,
+                  cursor: isOnline ? 'pointer' : 'default',
                 }}
               >
-                <div style={{ borderTop: `1px solid ${zone.dotColor}18` }}>
-
-                  {/* Pickup rows */}
-                  {zone.pickups.map((pickup, i) => {
-                    const checked = selectedPickups.has(pickup.id)
-                    return (
-                      <button
-                        key={pickup.id}
-                        onClick={() => togglePickup(pickup.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
-                        style={{
-                          borderBottom: i < zone.pickups.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                          opacity: !isOnline ? 0.5 : 1,
-                          cursor: isOnline ? 'pointer' : 'default',
-                          background: checked ? `${zone.dotColor}08` : 'transparent',
-                        }}
-                      >
-                        {/* Checkbox */}
-                        <div
-                          className="shrink-0 flex items-center justify-center rounded-md"
-                          style={{
-                            width: 22,
-                            height: 22,
-                            background: checked ? `${zone.dotColor}22` : 'rgba(255,255,255,0.05)',
-                            border: `1.5px solid ${checked ? zone.dotColor : 'rgba(255,255,255,0.18)'}`,
-                            transition: 'border-color 0.15s, background 0.15s',
-                          }}
-                        >
-                          {checked && (
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke={zone.dotColor}
-                              strokeWidth="3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                          )}
-                        </div>
-
-                        {/* Address + meta */}
-                        <div className="flex-1 min-w-0">
-                          <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>
-                            {pickup.address}
-                          </p>
-                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
-                            {pickup.customer} · {pickup.distance} · {pickup.eta}
-                          </p>
-                        </div>
-
-                        {/* Bag count */}
-                        <div className="shrink-0 flex flex-col items-end gap-0.5">
-                          <span style={{ fontSize: 18, fontWeight: 700, color: '#fde047', lineHeight: 1 }}>
-                            {pickup.bags}
-                          </span>
-                          <span style={{ fontSize: 9, color: 'rgba(253,224,71,0.55)', fontWeight: 600, letterSpacing: '0.04em' }}>
-                            BAGS
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  })}
-
-                  {/* Accept-all button for this ZIP */}
-                  <div className="px-4 pb-4 pt-3">
-                    <button
-                      onClick={() => toggleZipAll(zone)}
-                      disabled={!isOnline}
-                      className="w-full rounded-xl py-3 text-xs font-bold transition-all disabled:cursor-not-allowed"
-                      style={
-                        selCount > 0 && isOnline
-                          ? {
-                              background: `linear-gradient(135deg, ${zone.dotColor}80, ${zone.dotColor}40)`,
-                              border: `1px solid ${zone.dotColor}60`,
-                              color: '#fff',
-                              boxShadow: `0 3px 14px ${zone.dotColor}25`,
-                            }
-                          : {
-                              background: 'rgba(255,255,255,0.04)',
-                              border: '1px solid rgba(255,255,255,0.10)',
-                              color: 'rgba(255,255,255,0.35)',
-                            }
-                      }
-                    >
-                      {selCount > 0
-                        ? `Deselect all in ${zone.zip} (${selCount} selected)`
-                        : `Select all pickups in ${zone.zip}`}
-                    </button>
-                  </div>
+                {/* Checkbox */}
+                <div style={{
+                  width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                  border: `1.5px solid ${isSelected ? '#00D9FF' : 'rgba(255,255,255,0.18)'}`,
+                  background: isSelected ? 'rgba(0,200,255,0.14)' : 'transparent',
+                  boxShadow: isSelected ? '0 0 9px rgba(0,200,255,0.38)' : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.18s ease',
+                }}>
+                  {isSelected && (
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="#00D9FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                 </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
 
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono font-bold" style={{
+                    fontSize: 13, color: isSelected ? '#00c8ff' : 'rgba(255,255,255,0.82)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {scan.qr_code}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                    {bagSuffix ? `Bag #${bagSuffix} · ` : ''}{relativeTime(scan.scanned_at)}
+                  </p>
+                </div>
+
+                <span style={{
+                  fontSize: 9, fontWeight: 700,
+                  color: status.color,
+                  background: status.bg,
+                  borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap',
+                }}>
+                  {status.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

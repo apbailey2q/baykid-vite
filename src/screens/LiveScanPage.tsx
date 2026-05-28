@@ -174,6 +174,11 @@ export default function LiveScanPage() {
             bag_id:     bagId,
             scanned_by: currentUser.id,
             location:   currentScanMode,
+            // bag_scans.scan_type is NOT NULL with a CHECK constraint —
+            // omitting it caused silent insert failures (and broke the
+            // downstream inspection flow that reads scan.id). 'pickup' is
+            // the correct value for a consumer claim/scan event.
+            scan_type:  'pickup',
           }
           if (currentScanMode === 'fundraiser' && currentFundraiser) {
             scanRow.fundraiser_id = currentFundraiser
@@ -188,6 +193,23 @@ export default function LiveScanPage() {
           if (scanErr || !scan) {
             setError(`Could not save scan: ${scanErr?.message ?? 'Unknown error'}`)
             return
+          }
+
+          // Mirror the scan into consumer_bag_scans so it shows in the
+          // consumer dashboard "Recent Scans" panel (and triggers realtime).
+          // Best-effort — never blocks the main inspection flow.
+          try {
+            console.log('[scan] mirroring to consumer_bag_scans', { qr_code: code, bag_id: bagId })
+            const { error: cbsErr } = await supabase.from('consumer_bag_scans').insert({
+              user_id:     currentUser.id,
+              qr_code:     code,
+              bag_id:      bagId,
+              scan_status: 'active',
+            })
+            if (cbsErr) console.warn('[scan] consumer_bag_scans mirror failed (non-fatal):', cbsErr)
+            else console.log('[scan] consumer_bag_scans mirror success')
+          } catch (e) {
+            console.warn('[scan] consumer_bag_scans mirror threw (non-fatal):', e)
           }
 
           localStorage.setItem('live_scan_id', scan.id)

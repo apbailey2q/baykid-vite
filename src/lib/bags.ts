@@ -90,6 +90,37 @@ export async function getBagWithLatestInspection(bagId: string): Promise<{
   }
 }
 
+export interface BagLocation {
+  city: string | null
+  state?: string | null
+  pickup_address?: string | null
+  zip?: string | null
+}
+
+/**
+ * Claim a bag for a consumer and stamp the pickup location.
+ * Used by the consumer QR scan flow — sets owner, status, and
+ * location in a single UPDATE so drivers immediately see city.
+ */
+export async function claimBag(
+  bagId: string,
+  ownerId: string,
+  location: BagLocation,
+): Promise<void> {
+  const { error } = await supabase
+    .from('qr_bags')
+    .update({
+      owner_id:       ownerId,
+      status:         'pending_pickup' as BagStatus,
+      city:           location.city,
+      state:          location.state ?? null,
+      pickup_address: location.pickup_address ?? null,
+      zip:            location.zip ?? null,
+    })
+    .eq('id', bagId)
+  if (error) throw error
+}
+
 export async function updateBagStatus(bagId: string, status: BagStatus) {
   const { error } = await supabase
     .from('qr_bags')
@@ -134,12 +165,18 @@ export async function uploadInspectionPhoto(inspectionId: string, file: File): P
     .upload(path, file)
   if (uploadError) throw uploadError
 
-  const { data: urlData } = supabase.storage.from('inspection-photos').getPublicUrl(path)
+  // Use a signed URL (1 h) — bucket is private, getPublicUrl would produce broken URLs.
+  const { data: urlData, error: signError } = await supabase.storage
+    .from('inspection-photos')
+    .createSignedUrl(path, 3600)
+  if (signError) throw signError
+
+  const signedUrl = urlData.signedUrl
 
   const { error: recordError } = await supabase
     .from('inspection_photos')
-    .insert({ inspection_id: inspectionId, photo_url: urlData.publicUrl })
+    .insert({ inspection_id: inspectionId, photo_url: signedUrl })
   if (recordError) throw recordError
 
-  return urlData.publicUrl
+  return signedUrl
 }

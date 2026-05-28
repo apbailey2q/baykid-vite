@@ -137,12 +137,21 @@ export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
 export interface Profile {
   id: string
+  email: string | null
   full_name: string
   role: Role
   approval_status: ApprovalStatus
   driver_service_type: DriverServiceType | null
   account_type: string | null
+  city: string | null
   created_at: string
+  // Consumer onboarding — added 2026-05-23. Other roles ignore these.
+  onboarding_completed?: boolean
+  onboarding_step?: number
+  avatar_key?: string | null
+  // Unified avatar source — emoji string ('🦊') OR uploaded image URL
+  // ('https://…'). Added 2026-05-26. See 20260526 migration.
+  avatar_url?: string | null
 }
 
 export type BagStatus =
@@ -161,6 +170,11 @@ export interface Bag {
   status: BagStatus
   owner_id: string | null
   partner_id: string | null
+  // Location fields — written when a consumer claims a bag
+  city: string | null
+  state: string | null
+  pickup_address: string | null
+  zip: string | null
   created_at: string
   updated_at: string
 }

@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { activeFundraiser, demoScanRewardSplit } from '../../lib/demoFundraisers'
+// TODO: Replace with real scan data from route state or Supabase query
+const demoScanRewardSplit = {
+  bagId: 'BAG-DEMO0001',
+  totalEarnings: 1.40,
+  co2Saved: 2.1,
+  pointsEarned: 140,
+  userAmount: 0.98,
+  fundraiserAmount: 0.42,
+}
+const activeFundraiser = {
+  emoji: '🏀',
+  name: 'East Nashville High Basketball',
+  percentToCause: 30,
+}
 
 type ScanState = 'idle' | 'scanning' | 'verified'
 

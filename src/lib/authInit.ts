@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient'
 import { useAuthStore } from '../store/authStore'
-import { getMockUser, getMockProfile, type BypassKey } from './devBypass'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -29,7 +28,7 @@ async function fetchProfileDirect(userId: string, accessToken: string) {
 }
 
 // Read the Supabase session from localStorage WITHOUT acquiring the Web Lock.
-// Also handles demo mode: injects a mock user/profile when the real session is absent.
+// This avoids the StrictMode double-invoke deadlock on the Web Lock.
 async function bootstrapFromStorage(): Promise<void> {
   const { setUser, setProfile, setLoading } = useAuthStore.getState()
   try {
@@ -47,13 +46,6 @@ async function bootstrapFromStorage(): Promise<void> {
         }
         return
       }
-    }
-
-    // No real session — check for demo mode
-    if (localStorage.getItem('baykid-demo-mode') === 'true') {
-      const demoRole = (localStorage.getItem('baykid-demo-role') ?? 'consumer') as BypassKey
-      setUser(getMockUser(demoRole))
-      setProfile(getMockProfile(demoRole))
     }
   } catch {
     // malformed storage — ignore
@@ -84,8 +76,7 @@ export function initAuth(): () => void {
       } catch {
         setProfile(null)
       }
-    } else if (localStorage.getItem('baykid-demo-mode') !== 'true') {
-      // Only clear auth when not in demo mode — demo sessions have no Supabase session
+    } else {
       clearAuth()
     }
     setLoading(false)

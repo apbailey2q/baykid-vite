@@ -140,7 +140,7 @@ function ApprovalCard({ user, onAction }: { user: PendingUser; onAction: () => v
         .eq('user_id', user.id)
       // Send in-app welcome notification
       await supabase.from('profiles').select('id').eq('id', user.id).single()
-        .then(() => supabase.functions.invoke('send-notification', {
+        .then(() => supabase.functions.invoke('send-push-notification', {
           body: {
             user_id: user.id,
             title: 'Account Approved 🎉',

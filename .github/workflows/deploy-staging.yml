@@ -1,0 +1,49 @@
+name: Deploy — Staging
+
+# Vercel handles the actual deploy via its GitHub App. This workflow gates
+# that deploy behind type-check + build verification AND posts a deploy URL
+# to the PR / commit summary so reviewers can find the staging build fast.
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: staging-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  VITE_ENVIRONMENT: staging
+  VITE_APP_VERSION: ${{ github.sha }}
+  # CI-only placeholders so the build doesn't crash on missing env. Real
+  # staging values come from Vercel project env vars at deploy time.
+  VITE_SUPABASE_URL: 'https://ci-placeholder.supabase.co'
+  VITE_SUPABASE_ANON_KEY: 'ci-placeholder-anon-key'
+
+jobs:
+  verify:
+    name: Verify Staging Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+      - name: Verify dist
+        run: |
+          test -f dist/index.html
+          echo "✅ Staging build clean"
+      - name: Summary
+        run: |
+          echo "## ✅ Staging build verified" >> $GITHUB_STEP_SUMMARY
+          echo "Vercel will deploy the same commit to the staging environment." >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

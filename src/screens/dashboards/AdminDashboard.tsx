@@ -66,6 +66,13 @@ export default function AdminDashboard() {
         >
           🏢 Commercial Ops
         </Link>
+        <Link
+          to="/dashboard/admin/ai-marketing"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', textDecoration: 'none' }}
+        >
+          🤖 AI Marketing
+        </Link>
       </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"

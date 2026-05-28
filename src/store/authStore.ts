@@ -31,18 +31,18 @@ export const useAuthStore = create<AuthState>()(
           approvalStatus: profile?.approval_status ?? null,
         }),
       clearAuth: () => {
-        localStorage.removeItem('baykid-demo-mode')
-        localStorage.removeItem('baykid-demo-role')
         set({ user: null, profile: null, role: null, approvalStatus: null })
       },
       setLoading: (isLoading) => set({ isLoading }),
     }),
     {
       name: 'baykid-auth',
+      // Only persist the raw profile. role and approvalStatus are derived from
+      // profile on hydration and can be set via DevTools if persisted directly.
+      // onAuthStateChange always re-validates and overwrites before any route
+      // guard executes, so the persisted profile is only used for fast first-paint.
       partialize: (state) => ({
         profile: state.profile,
-        role: state.role,
-        approvalStatus: state.approvalStatus,
       }),
     },
   ),

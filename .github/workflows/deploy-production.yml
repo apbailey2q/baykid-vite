@@ -1,0 +1,73 @@
+name: Deploy — Production
+
+# Gates production deploys behind a release tag (vX.Y.Z) or manual trigger.
+# Vercel does the actual deploy; this workflow enforces the safety bar.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm production deploy'
+        required: true
+        default: ''
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+  VITE_ENVIRONMENT: production
+  VITE_APP_VERSION: ${{ github.sha }}
+  VITE_SUPABASE_URL: 'https://ci-placeholder.supabase.co'
+  VITE_SUPABASE_ANON_KEY: 'ci-placeholder-anon-key'
+
+jobs:
+  guard:
+    name: Manual confirmation gate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Check confirmation phrase
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy" ]; then
+            echo "❌ Confirmation phrase missing or wrong. Type 'deploy' exactly."
+            exit 1
+          fi
+          echo "✅ Confirmation accepted"
+
+  verify:
+    name: Verify Production Build
+    runs-on: ubuntu-latest
+    needs: [guard]
+    if: ${{ always() && (github.event_name == 'push' || needs.guard.result == 'success') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - name: Verify dist
+        run: |
+          test -f dist/index.html
+          echo "Bundle sizes:"
+          du -sh dist/assets/*.js | sort -h | tail -5
+      - name: Scan bundle for dev bypasses
+        run: |
+          if grep -rE "DEV_BYPASS_AUTH|SKIP_AUTH|devbypass" dist/ 2>/dev/null; then
+            echo "❌ Dev-bypass strings found in production bundle. Refusing."
+            exit 1
+          fi
+          echo "✅ No dev bypasses in bundle"
+      - name: Summary
+        run: |
+          echo "## 🚀 Production build verified — Vercel will deploy" >> $GITHUB_STEP_SUMMARY
+          echo "Tag: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

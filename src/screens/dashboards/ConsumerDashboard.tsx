@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { QrScanner } from '../../components/QrScanner'
 import { logout } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
-import { isDemoModeActive } from '../../lib/devBypass'
+import { claimBag } from '../../lib/bags'
 import {
   getConsumerBags,
   getBroadcastsForRole,
@@ -15,36 +15,6 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
 import { SectionLabel } from '../../components/ui/dashboard'
-import QuickActionPage, { type QuickPage } from '../../components/demo/QuickActionPage'
-
-// ── Demo mock data ────────────────────────────────────────────────────────────
-
-// No fake money — wallet always shows real data or $0 empty state
-const DEMO_WALLET  = { balance: 0, totalEarned: 0 }
-const DEMO_BAGS = [
-  { id: 'demo-bag-1', status: 'completed',    bag_code: 'CB-DEMO1', co2_saved_lbs: 4.2,  created_at: new Date(Date.now() - 86400000 * 3).toISOString() },
-  { id: 'demo-bag-2', status: 'at_warehouse', bag_code: 'CB-DEMO2', co2_saved_lbs: 0,    created_at: new Date(Date.now() - 86400000).toISOString()     },
-  { id: 'demo-bag-3', status: 'pending',      bag_code: 'CB-DEMO3', co2_saved_lbs: 0,    created_at: new Date().toISOString()                          },
-] as const
-const DEMO_WEEKLY_EARNINGS = [
-  { label: 'Current Week',              amount: 12.50  },
-  { label: 'Apr 28 – May 4, 2025',     amount: 18.75  },
-  { label: 'Apr 21 – Apr 27, 2025',    amount: 8.25   },
-  { label: 'Apr 14 – Apr 20, 2025',    amount: 7.50   },
-]
-const DEMO_WEEKLY_RECYCLED = [
-  { label: 'Current Week',              lbs: 8   },
-  { label: 'Apr 28 – May 4, 2025',     lbs: 12  },
-  { label: 'Apr 21 – Apr 27, 2025',    lbs: 5   },
-  { label: 'Apr 14 – Apr 20, 2025',    lbs: 9   },
-]
-const DEMO_TOP_FUNDRAISER = {
-  id: 'f-demo',
-  name: 'School Garden Project',
-  goal_amount: 500,
-  raised_amount: 127.50,
-  bag_count: 12,
-}
 
 async function fetchWalletBalance(userId: string) {
   const [txRes, prRes] = await Promise.all([
@@ -129,28 +99,18 @@ interface Particle {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const FOR_YOU_CATEGORIES: { icon: string; label: string; page: QuickPage }[] = [
-  { icon: '🛒', label: 'Food & Shop', page: 'food-shop' },
-  { icon: '🔧', label: 'Tools',       page: 'tools'     },
-  { icon: '🌱', label: 'Eco Tips',    page: 'eco-tips'  },
-  { icon: '💼', label: 'Jobs',        page: 'jobs'      },
-  { icon: '🏘️', label: 'Community',  page: 'community' },
-  { icon: '📦', label: 'Supplies',    page: 'supplies'  },
+const FOR_YOU_CATEGORIES: { icon: string; label: string }[] = [
+  { icon: '🛒', label: 'Food & Shop' },
+  { icon: '🔧', label: 'Tools'       },
+  { icon: '🌱', label: 'Eco Tips'    },
+  { icon: '💼', label: 'Jobs'        },
+  { icon: '🏘️', label: 'Community'  },
+  { icon: '📦', label: 'Supplies'    },
 ]
 
-const BAG_STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
-  pending:            { label: 'Awaiting Dispatch', bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
-  pending_pickup:     { label: 'Awaiting Dispatch', bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
-  awaiting_dispatch:  { label: 'Awaiting Dispatch', bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
-  issued:             { label: 'Awaiting Dispatch', bg: 'rgba(245,158,11,0.15)',  color: '#fde047' },
-  assigned:           { label: 'Driver En Route',   bg: 'rgba(139,92,246,0.18)', color: '#a78bfa' },
-  picked_up:          { label: 'Picked Up',          bg: 'rgba(0,190,255,0.15)',  color: '#00c8ff' },
-  at_warehouse:       { label: 'Received',           bg: 'rgba(0,190,255,0.12)',  color: '#67e8f9' },
-  inspected:          { label: 'Processing',         bg: 'rgba(255,214,0,0.15)',  color: '#FFD600' },
-  processed:          { label: 'Processing',         bg: 'rgba(255,214,0,0.15)',  color: '#FFD600' },
-  completed:          { label: 'Completed',           bg: 'rgba(34,197,94,0.15)',  color: '#4ade80' },
-  paid_out:           { label: 'Completed',           bg: 'rgba(34,197,94,0.15)',  color: '#4ade80' },
-}
+// (BAG_STATUS_BADGE removed — the Bags tab now uses SCAN_STATUS_STYLE since
+// it renders consumer_bag_scans rows, not qr_bags rows. SCAN_STATUS_STYLE
+// covers the same status vocabulary.)
 
 function normalizeBagCode(rawCode: string): string {
   let code = rawCode.trim().toUpperCase()
@@ -168,6 +128,214 @@ const CELEBRATE_MSGS  = ['Way to go', 'You rock', 'Keep it up', 'Amazing work', 
 
 function getInitials(name: string) {
   return name.split(' ').map((p) => p[0]).join('').toUpperCase().slice(0, 2)
+}
+
+// ── Sub-component: DashboardAvatar (premium welcome-header avatar) ───────────
+// src can be: an http(s) URL (rendered as <img>), a non-empty string (emoji),
+// or null/empty (default ♻️). Includes a glow ring and click-to-profile.
+
+// ── Recent scans panel ───────────────────────────────────────────────────────
+// Reads from consumer_bag_scans (see migration 20260527). The list updates
+// instantly via realtime subscription and via optimistic prepend after a
+// successful scan insert in handleConsumerScan.
+
+interface RecentScan {
+  id:          string
+  qr_code:     string
+  bag_id:      string | null
+  scan_status: string
+  scanned_at:  string
+}
+
+// Status colour map. 'active' is the default for newly-scanned bags;
+// 'completed' / 'archived' are end-states surfaced under History.
+// Legacy values (scanned, pending_pickup, etc.) kept for back-compat with
+// any data the operational pipeline might write.
+const SCAN_STATUS_STYLE: Record<string, { bg: string; border: string; color: string; label: string }> = {
+  active:         { bg: 'rgba(0,200,255,0.10)',  border: 'rgba(0,200,255,0.35)',  color: '#00c8ff', label: 'Active' },
+  completed:      { bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.35)', color: '#4ade80', label: 'Completed' },
+  archived:       { bg: 'rgba(255,255,255,0.05)',border: 'rgba(255,255,255,0.15)',color: 'rgba(255,255,255,0.5)', label: 'Archived' },
+  // legacy / operational pipeline values
+  scanned:        { bg: 'rgba(0,200,255,0.10)',  border: 'rgba(0,200,255,0.35)',  color: '#00c8ff', label: 'Scanned' },
+  pending_pickup: { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.35)', color: '#fbbf24', label: 'Pending pickup' },
+  picked_up:      { bg: 'rgba(94,234,212,0.12)', border: 'rgba(94,234,212,0.35)', color: '#5eead4', label: 'Picked up' },
+  at_warehouse:   { bg: 'rgba(167,139,250,0.12)',border: 'rgba(167,139,250,0.35)',color: '#a78bfa', label: 'At warehouse' },
+  processed:      { bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.35)', color: '#4ade80', label: 'Processed' },
+  paid_out:       { bg: 'rgba(74,222,128,0.16)', border: 'rgba(74,222,128,0.45)', color: '#4ade80', label: 'Paid out' },
+  error:          { bg: 'rgba(248,113,113,0.12)',border: 'rgba(248,113,113,0.35)',color: '#f87171', label: 'Error' },
+}
+
+// Status groupings the panel sub-tabs filter by.
+// History includes terminal statuses + any status the operational pipeline
+// flips bags to once they leave the consumer's hands (picked_up onwards).
+const HISTORY_STATUSES = new Set([
+  'completed', 'archived', 'picked_up',
+  'at_warehouse', 'processed', 'paid_out',
+])
+
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  const s  = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60)        return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60)        return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24)        return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 7)         return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+function RecentScansPanel({
+  scans, loading, error,
+}: {
+  scans: RecentScan[]; loading: boolean; error: string | null
+}) {
+  const [tab, setTab] = useState<'active' | 'history'>('active')
+
+  const active  = scans.filter(s => !HISTORY_STATUSES.has(s.scan_status))
+  const history = scans.filter(s =>  HISTORY_STATUSES.has(s.scan_status))
+  const list    = tab === 'active' ? active : history
+
+  console.log('[scan] activeBags updated count', active.length)
+  console.log('[scan] historyBags updated count', history.length)
+  console.log('[scan] display rendered', {
+    tab, activeCount: active.length, historyCount: history.length, loading, error,
+  })
+
+  return (
+    <div className="px-5 mt-6">
+      <div className="flex items-center justify-between mb-3">
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Recent scans
+        </p>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <SubTab label={`Active${active.length ? ` (${active.length})` : ''}`}
+                  active={tab === 'active'} onClick={() => setTab('active')} />
+          <SubTab label={`History${history.length ? ` (${history.length})` : ''}`}
+                  active={tab === 'history'} onClick={() => setTab('history')} />
+        </div>
+      </div>
+
+      <div style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(0,190,255,0.15)',
+        borderRadius: 14,
+        overflow: 'hidden',
+      }}>
+        {loading && (
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+            Loading scans…
+          </div>
+        )}
+
+        {!loading && error && (
+          <div style={{ padding: '14px 16px', color: '#f87171', fontSize: 12, lineHeight: 1.5 }}>
+            Couldn&apos;t load recent scans: {error}
+          </div>
+        )}
+
+        {!loading && !error && list.length === 0 && (
+          <div style={{ padding: '24px 16px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, marginBottom: 6 }}>{tab === 'active' ? '♻️' : '📭'}</div>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
+              {tab === 'active' ? 'No active bags' : 'No history yet'}
+            </p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+              {tab === 'active' ? 'Scan a QR bag to get started.' : 'Completed pickups will appear here.'}
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && list.map((s, i) => {
+          const style = SCAN_STATUS_STYLE[s.scan_status] ?? SCAN_STATUS_STYLE.active
+          return (
+            <div
+              key={s.id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px',
+                borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{
+                  fontSize: 13, color: '#fff', fontWeight: 600,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {s.qr_code}
+                </p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                  {s.bag_id ? `Bag #${String(s.bag_id).slice(0, 8)} · ` : ''}{relativeTime(s.scanned_at)}
+                </p>
+              </div>
+              <span style={{
+                background: style.bg, border: `1px solid ${style.border}`, color: style.color,
+                fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+                whiteSpace: 'nowrap',
+              }}>
+                {style.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SubTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+        letterSpacing: '0.05em', cursor: 'pointer',
+        background: active ? 'rgba(0,200,255,0.14)' : 'transparent',
+        border: active ? '1px solid rgba(0,200,255,0.35)' : '1px solid rgba(255,255,255,0.06)',
+        color: active ? '#00c8ff' : 'rgba(255,255,255,0.5)',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+function DashboardAvatar({ src, onClick }: { src: string | null; onClick: () => void }) {
+  const isImg = !!src && /^https?:\/\//i.test(src)
+  // Debug log so future devs can trace which branch rendered.
+  console.log('[dashboard] avatar render source:', isImg ? 'upload' : src ? 'emoji' : 'default')
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Open profile"
+      style={{
+        position: 'relative', padding: 0, background: 'none', border: 'none',
+        cursor: 'pointer', display: 'inline-flex',
+      }}
+    >
+      <span style={{
+        position: 'absolute', inset: -8,
+        background: 'radial-gradient(circle, rgba(0,200,255,0.45), transparent 70%)',
+        filter: 'blur(12px)',
+      }} />
+      <span style={{
+        position: 'relative',
+        width: 56, height: 56, borderRadius: '50%',
+        background: 'rgba(0,200,255,0.08)',
+        border: '2px solid rgba(0,200,255,0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 26, overflow: 'hidden',
+        boxShadow: '0 6px 20px rgba(0,87,231,0.3)',
+      }}>
+        {isImg
+          ? <img src={src!} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : (src || '♻️')}
+      </span>
+    </button>
+  )
 }
 
 // ── Sub-component: BottomNav ──────────────────────────────────────────────────
@@ -275,9 +443,8 @@ export default function ConsumerDashboard() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const ACCENT = '#00c8ff'
-  const inDemoMode = isDemoModeActive()
-  const firstName = profile?.full_name?.split(' ')[0] ?? (inDemoMode ? 'Explorer' : 'Friend')
-  const initials  = profile?.full_name ? getInitials(profile.full_name) : (inDemoMode ? 'DM' : '??')
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'Friend'
+  const initials  = profile?.full_name ? getInitials(profile.full_name) : '??'
 
   const [tab, setTab]               = useState<Tab>('home')
   const [celebBadge, setCelebBadge] = useState<(BadgeDef & { unlocked: boolean }) | null>(null)
@@ -286,7 +453,6 @@ export default function ConsumerDashboard() {
   const [newMsgBanner, setNewMsgBanner] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('Eco Tips')
   const [bagTab, setBagTab]           = useState<'active' | 'history'>('active')
-  const [activePage, setActivePage]   = useState<QuickPage | null>(null)
   const [earningsWeekIdx, setEarningsWeekIdx] = useState(0)
   const [recycledWeekIdx, setRecycledWeekIdx]  = useState(0)
 
@@ -297,55 +463,54 @@ export default function ConsumerDashboard() {
   const [scanSaving, setScanSaving]               = useState(false)
   const [scanError, setScanError]                 = useState<string | null>(null)
 
+  // Recent scans (consumer_bag_scans, owner-scoped, realtime-fed).
+  // Interface declared at module scope (above this file's default export) so
+  // the RecentScansPanel sub-component can share the type.
+  const [recentScans, setRecentScans]             = useState<RecentScan[]>([])
+  const [recentScansLoading, setRecentScansLoading] = useState(true)
+  const [recentScansError, setRecentScansError]   = useState<string | null>(null)
+
   // (Payout flow handled by /cashout page — no inline modal state needed)
 
-  const demoRafRef = useRef<number | null>(null) // kept for cleanup only
 
   // ── Data queries ───────────────────────────────────────────────────────────
-  const { data: myBags = [], isLoading: loadingBags } = useQuery({
+  const { data: myBags = [] } = useQuery({
     queryKey: ['consumer-bags', user?.id],
     queryFn: () => getConsumerBags(user!.id),
-    enabled: !!user && !inDemoMode,
-    initialData: inDemoMode ? (DEMO_BAGS as unknown as Awaited<ReturnType<typeof getConsumerBags>>) : undefined,
+    enabled: !!user,
     staleTime: 30_000,
   })
 
   const { data: broadcasts = [] } = useQuery({
     queryKey: ['consumer-broadcasts'],
     queryFn: () => getBroadcastsForRole('consumer'),
-    enabled: !inDemoMode,
-    refetchInterval: inDemoMode ? false : 60_000,
+    refetchInterval: 60_000,
   })
 
   const { data: walletData } = useQuery({
     queryKey: ['consumer-wallet', user?.id],
     queryFn: () => fetchWalletBalance(user!.id),
-    enabled: !!user && !inDemoMode,
-    initialData: inDemoMode ? DEMO_WALLET : undefined,
+    enabled: !!user,
     staleTime: 30_000,
   })
 
   const { data: WEEKLY_EARNINGS = [{ label: 'Current Week', amount: null }] } = useQuery({
     queryKey: ['consumer-weekly-earnings', user?.id],
     queryFn: () => fetchWeeklyEarnings(user!.id),
-    enabled: !!user && !inDemoMode,
-    initialData: inDemoMode ? DEMO_WEEKLY_EARNINGS : undefined,
+    enabled: !!user,
     staleTime: 60_000,
   })
 
   const { data: WEEKLY_RECYCLED = [{ label: 'Current Week', lbs: null }] } = useQuery({
     queryKey: ['consumer-weekly-lbs', user?.id],
     queryFn: () => fetchWeeklyLbs(user!.id),
-    enabled: !!user && !inDemoMode,
-    initialData: inDemoMode ? DEMO_WEEKLY_RECYCLED : undefined,
+    enabled: !!user,
     staleTime: 60_000,
   })
 
   const { data: topFundraiser } = useQuery({
     queryKey: ['top-fundraiser'],
     queryFn: fetchTopFundraiser,
-    enabled: !inDemoMode,
-    initialData: inDemoMode ? DEMO_TOP_FUNDRAISER : undefined,
     staleTime: 120_000,
   })
 
@@ -359,7 +524,9 @@ export default function ConsumerDashboard() {
   )
 
   // ── Derived stats ──────────────────────────────────────────────────────────
-  const activeBags     = myBags.filter((b) => !['inspected','completed','recycled'].includes(b.status)).length
+  // Renamed from `activeBags` → `activeBagCount` to free up the name for the
+  // list (see below). This one is the badge number on the Recycling tab pill.
+  const activeBagCount = myBags.filter((b) => !['inspected','completed','recycled'].includes(b.status)).length
   const lbsDiverted    = Math.round(myBags.reduce((s, b) => s + (Number((b as unknown as { co2_saved_lbs?: number }).co2_saved_lbs) || 0), 0))
   const co2Saved       = lbsDiverted
   const balance        = walletData?.balance ?? 0
@@ -367,9 +534,16 @@ export default function ConsumerDashboard() {
   const unreadMsgCount = broadcasts.length
   const realProgress   = Math.min(100, lbsDiverted > 0 ? Math.round((lbsDiverted / 17) * 100) : 0)
 
-  const filteredBags =
-    bagTab === 'history' ? myBags.filter((b) => b.status === 'completed') :
-    myBags.filter((b) => b.status !== 'completed')
+  // Bags tab now derives directly from `recentScans` (consumer_bag_scans) so
+  // a fresh scan shows up here immediately via the same setRecentScans path
+  // that updates the Home-tab panel. The old `myBags` (qr_bags) source meant
+  // the Bags tab showed "No active bags" even when the scan succeeded,
+  // because qr_bags ownership wasn't always being set in lock-step.
+  const activeBags  = recentScans.filter(s => !HISTORY_STATUSES.has(s.scan_status))
+  const historyBags = recentScans.filter(s =>  HISTORY_STATUSES.has(s.scan_status))
+  const filteredBags = bagTab === 'history' ? historyBags : activeBags
+  console.log('[render] activeBags length', activeBags.length)
+  console.log('[render] historyBags length', historyBags.length)
 
   const newsItems = broadcasts.length > 0
     ? broadcasts.slice(0, 2).map((b) => ({ title: 'Admin Update', desc: b.message }))
@@ -398,14 +572,87 @@ export default function ConsumerDashboard() {
     return () => clearInterval(id)
   }, [celebBadge])
 
-  useEffect(() => () => {
-    if (demoRafRef.current !== null) cancelAnimationFrame(demoRafRef.current)
-  }, [])
+  // ── Recent scans: initial fetch + realtime subscription ────────────────────
+  // Owner-scoped (RLS enforces auth.uid() = user_id). Realtime feed picks up
+  // any insert from this device or another (e.g. /live-scan page) instantly.
 
-  // ── Bag scan logic (real users) ───────────────────────────────────────────
+  const fetchRecentScans = useCallback(async () => {
+    if (!user) return
+    setRecentScansError(null)
+    // Log the Supabase URL the app is actually talking to. If the schema
+    // cache 404 persists after running the SQL, this proves whether the
+    // frontend is pointing at the SAME project where the table was created.
+    console.log('[scan] table query started', {
+      table:        'consumer_bag_scans',
+      userId:       user.id,
+      supabaseUrl:  import.meta.env.VITE_SUPABASE_URL,
+    })
+    const { data, error } = await supabase
+      .from('consumer_bag_scans')
+      .select('id, qr_code, bag_id, scan_status, scanned_at')
+      .eq('user_id', user.id)
+      .order('scanned_at', { ascending: false })
+      .limit(50)
+    if (error) {
+      console.error('[scan] recent scans fetch failed:', error)
+      // Special-case the most likely "you forgot to run the SQL" failure
+      if (/schema cache|relation .* does not exist/i.test(error.message)) {
+        setRecentScansError(
+          'The consumer_bag_scans table is missing. Run ' +
+          'supabase/migrations/20260527_consumer_bag_scans.sql in your ' +
+          'Supabase SQL Editor (Dashboard → SQL Editor → New query → paste → Run).',
+        )
+      } else {
+        setRecentScansError(error.message)
+      }
+      return
+    }
+    console.log('[scan] fetch scans count', data?.length ?? 0)
+    setRecentScans((data ?? []) as RecentScan[])
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    setRecentScansLoading(true)
+    fetchRecentScans().finally(() => {
+      if (!cancelled) setRecentScansLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [user, fetchRecentScans])
+
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`consumer-scans-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'consumer_bag_scans',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as RecentScan
+          console.log('[scan] realtime insert received', row)
+          setRecentScans(prev => {
+            if (prev.some(s => s.id === row.id)) return prev   // de-dupe vs optimistic
+            return [row, ...prev].slice(0, 20)
+          })
+        },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+
+
+  // ── Bag scan logic ────────────────────────────────────────────────────────
   async function handleConsumerScan(rawCode: string) {
+    console.log('[scan] QR code scanned', { rawCode })
     const code = normalizeBagCode(rawCode)
     if (!user || !code) { setScanError('Invalid bag code.'); return }
+    console.log('[scan] user id found', { userId: user.id, normalized: code })
     setScanSaving(true)
     setScanError(null)
     try {
@@ -421,10 +668,56 @@ export default function ConsumerDashboard() {
         setScanError('This bag is already registered to another account.'); return
       }
       if (!bag.owner_id) {
-        // Claim bag for this consumer; pending_pickup = awaiting driver
-        await supabase.from('qr_bags').update({ owner_id: user.id, status: 'pending_pickup' }).eq('id', bag.id)
+        // Claim bag and stamp pickup location so drivers see the city immediately
+        await claimBag(bag.id, user.id, { city: profile?.city ?? null })
       }
-      await supabase.from('bag_scans').insert({ bag_id: bag.id, scanned_by: user.id, location: 'personal' })
+
+      // ── Log the scan into consumer_bag_scans ──────────────────────────────
+      // The previous code wrote to `bag_scans` without `scan_type` (NOT NULL),
+      // which failed silently. consumer_bag_scans is the per-user log that
+      // powers the Recent Scans panel + realtime feed.
+      console.log('[scan] inserting into consumer_bag_scans', { qr_code: code, bag_id: bag.id })
+      const { data: inserted, error: scanErr } = await supabase
+        .from('consumer_bag_scans')
+        .insert({
+          user_id:     user.id,
+          qr_code:     code,
+          bag_id:      bag.id,
+          scan_status: 'active',
+        })
+        .select('id, qr_code, bag_id, scan_status, scanned_at')
+        .single()
+
+      if (scanErr) {
+        console.error('[scan] consumer_bag_scans insert failed (full):', scanErr)
+        if (/schema cache|relation .* does not exist/i.test(scanErr.message ?? '')) {
+          setScanError(
+            'Scan saved locally but Supabase says the consumer_bag_scans ' +
+            'table is missing. Run supabase/migrations/20260527_consumer_bag_scans.sql ' +
+            'in the Supabase SQL Editor, then retry.',
+          )
+        } else {
+          setScanError(`Scan saved partially: ${scanErr.message}`)
+        }
+      } else {
+        console.log('[scan] insert row returned', inserted)
+        if (inserted) {
+          // Optimistic UI: prepend immediately so the user sees it before the
+          // realtime broadcast catches up.
+          setRecentScans(prev => {
+            const next = [inserted as RecentScan, ...prev.filter(s => s.id !== inserted.id)].slice(0, 50)
+            const active  = next.filter(s => !HISTORY_STATUSES.has(s.scan_status)).length
+            const history = next.length - active
+            console.log('[scan] activeBags updated count', active)
+            console.log('[scan] historyBags updated count', history)
+            return next
+          })
+          // Belt-and-suspenders refetch — pulls the canonical server state
+          // in case anything changed in the moment after our insert.
+          fetchRecentScans()
+        }
+      }
+
       setShowCameraOverlay(false)
       setShowQrModal(false)
       setQrModalCode('')
@@ -443,13 +736,6 @@ export default function ConsumerDashboard() {
     e.preventDefault()
     const trimmed = qrModalCode.trim()
     if (!trimmed) return
-    if (inDemoMode) {
-      toast.success('Demo: Bag registered! Pickup requested.')
-      setShowQrModal(false)
-      setQrModalCode('')
-      setTab('bags')
-      return
-    }
     await handleConsumerScan(trimmed)
   }
 
@@ -486,14 +772,6 @@ export default function ConsumerDashboard() {
             <p style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', lineHeight: 1.1 }}>Cyan's Brooklynn</p>
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.2, letterSpacing: '0.04em' }}>Recycling Enterprise</p>
           </div>
-          {inDemoMode && (
-            <span
-              className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest"
-              style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24' }}
-            >
-              Demo
-            </span>
-          )}
         </div>
 
         {/* Right: logout on account tab, else bell + avatar */}
@@ -555,14 +833,22 @@ export default function ConsumerDashboard() {
           <div style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
 
             {/* ── Welcome ────────────────────────────────────────────────────── */}
-            <div className="px-5 pt-6 pb-4 flex items-center justify-between">
-              <div>
-                <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.01em', lineHeight: 1 }}>
-                  Welcome back,
-                </p>
-                <p style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', lineHeight: 1.2, marginTop: 4 }}>
-                  {firstName}
-                </p>
+            {/* Avatar source order: avatar_url (URL → <img>, emoji → text), else ♻️.
+                Clicking the avatar opens the account/settings area. */}
+            <div className="px-5 pt-6 pb-4 flex items-center justify-between" style={{ animation: 'fadeSlideUp 0.45s ease both' }}>
+              <div className="flex items-center gap-3">
+                <DashboardAvatar
+                  src={(profile as { avatar_url?: string | null } | null)?.avatar_url ?? null}
+                  onClick={() => navigate('/settings/notifications')}
+                />
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.01em', lineHeight: 1 }}>
+                    Welcome back,
+                  </p>
+                  <p style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', lineHeight: 1.2, marginTop: 4 }}>
+                    {firstName}
+                  </p>
+                </div>
               </div>
               <div className="text-right">
                 <p style={{ fontSize: 22, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>${earnings}</p>
@@ -597,9 +883,9 @@ export default function ConsumerDashboard() {
               </div>
               <div className="flex gap-7 overflow-x-auto px-5 pb-1" style={{ scrollbarWidth: 'none' }}>
                 {[
-                  { icon: '♻️', label: 'Recycling', badge: activeBags,    action: () => setActivePage('recycling') },
-                  { icon: '🎁', label: 'Rewards',   badge: 0,              action: () => setActivePage('rewards')   },
-                  { icon: '🌍', label: 'Community', badge: unreadMsgCount, action: () => setActivePage('community') },
+                  { icon: '♻️', label: 'Recycling', badge: activeBagCount, action: () => setTab('bags')    },
+                  { icon: '🎁', label: 'Rewards',   badge: 0,              action: () => setTab('deeds')   },
+                  { icon: '🌍', label: 'Community', badge: unreadMsgCount, action: () => setTab('account') },
                 ].map((tile) => (
                   <button
                     key={tile.label}
@@ -700,7 +986,7 @@ export default function ConsumerDashboard() {
                   return (
                     <button
                       key={cat.label}
-                      onClick={() => { setSelectedCategory(cat.label); setActivePage(cat.page) }}
+                      onClick={() => setSelectedCategory(cat.label)}
                       className="shrink-0 flex flex-col items-center gap-1.5 transition-all active:scale-[0.92]"
                       style={{ width: 64 }}
                     >
@@ -738,6 +1024,13 @@ export default function ConsumerDashboard() {
                 ))}
               </div>
             </div>
+
+            {/* ── Recent Scans (consumer_bag_scans, owner-scoped + realtime) ── */}
+            <RecentScansPanel
+              scans={recentScans}
+              loading={recentScansLoading}
+              error={recentScansError}
+            />
 
           </div>
         )}
@@ -808,8 +1101,8 @@ export default function ConsumerDashboard() {
                   ))}
                 </div>
 
-                {/* Bag cards */}
-                {loadingBags ? (
+                {/* Bag cards — sourced from recentScans (consumer_bag_scans) */}
+                {recentScansLoading ? (
                   <div className="space-y-3">
                     {[0, 1, 2].map((i) => <Skeleton key={i} height="h-16" rounded="rounded-2xl" />)}
                   </div>
@@ -822,26 +1115,33 @@ export default function ConsumerDashboard() {
                   />
                 ) : (
                   <div className="space-y-2.5">
-                    {filteredBags.map((bag) => {
-                      const badge = BAG_STATUS_BADGE[bag.status] ?? { label: bag.status, bg: 'rgba(255,255,255,0.08)', color: '#7B909C' }
-                      const d = new Date(bag.created_at)
+                    {filteredBags.map((scan) => {
+                      const badge = SCAN_STATUS_STYLE[scan.scan_status] ?? SCAN_STATUS_STYLE.active
+                      const d = new Date(scan.scanned_at)
                       const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
                       return (
                         <div
-                          key={bag.id}
+                          key={scan.id}
                           className="px-1 py-3 flex items-center justify-between"
                           style={{ borderBottom: '1px solid rgba(0,190,255,0.07)' }}
                         >
-                          <div>
-                            <p className="font-mono font-bold" style={{ fontSize: 14, color: '#ffffff' }}>{bag.bag_code}</p>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <p className="font-mono font-bold" style={{
+                              fontSize: 14, color: '#ffffff',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>{scan.qr_code}</p>
                             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                              {dateStr} · {timeStr} · 1 bag
+                              {scan.bag_id ? `Bag #${String(scan.bag_id).slice(0, 8)} · ` : ''}{dateStr} · {timeStr}
                             </p>
                           </div>
                           <span
                             className="rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0"
-                            style={{ background: badge.bg, color: badge.color }}
+                            style={{
+                              background: badge.bg,
+                              border:     `1px solid ${badge.border}`,
+                              color:      badge.color,
+                            }}
                           >
                             {badge.label}
                           </span>
@@ -1353,7 +1653,6 @@ export default function ConsumerDashboard() {
 
       <BottomNav tab={tab} onTab={setTab} msgCount={unreadMsgCount} />
 
-      {activePage && <QuickActionPage page={activePage} onClose={() => setActivePage(null)} />}
 
       {/* ── CAMERA OVERLAY (real users) ───────────────────────────────────── */}
       {showCameraOverlay && (

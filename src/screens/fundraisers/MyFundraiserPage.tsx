@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import FundraiserCountdown from '../../components/FundraiserCountdown'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { typeAccent, pctFunded, fmtNum } from '../../lib/demoFundraisers'
+import { typeAccent, pctFunded, fmtNum } from '../../lib/fundraisers'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

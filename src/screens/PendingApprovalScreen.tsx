@@ -1,21 +1,67 @@
+// ── Pending approval screen ──────────────────────────────────────────────────
+// Reachable at /pending-approval (any role) and /driver/pending-approval (the
+// driver-specific copy). Content is role-aware so the same component serves
+// every role; copy changes by role detected via profile.role.
+
+import { useLocation } from 'react-router-dom'
 import { logout } from '../lib/auth'
 import { useAuthStore } from '../store/authStore'
 
 const ROLE_LABELS: Record<string, string> = {
-  driver: 'Driver',
-  warehouse_employee: 'Warehouse Employee',
+  driver:               'Driver',
+  warehouse_employee:   'Warehouse Employee',
   warehouse_supervisor: 'Warehouse Supervisor',
-  partner: 'Partner',
+  partner:              'Partner',
+  fundraiser:           'Fundraiser',
+}
+
+interface RoleCopy {
+  title:    string
+  subtitle: string
+}
+
+const ROLE_COPY: Record<string, RoleCopy> = {
+  driver: {
+    title:    'Driver application pending approval',
+    subtitle: 'Your account is waiting for admin approval before accessing the driver platform.',
+  },
+  warehouse_employee: {
+    title:    'Warehouse application pending approval',
+    subtitle: 'Your account is waiting for admin approval before accessing the warehouse platform.',
+  },
+  warehouse_supervisor: {
+    title:    'Supervisor application pending approval',
+    subtitle: 'Your account is waiting for admin approval before accessing the warehouse platform.',
+  },
+  partner: {
+    title:    'Partner application pending approval',
+    subtitle: 'Your account is waiting for admin approval before partner access is granted.',
+  },
+  fundraiser: {
+    title:    'Fundraiser application pending approval',
+    subtitle: 'Your account is waiting for admin approval before fundraiser access is granted.',
+  },
+}
+
+const DEFAULT_COPY: RoleCopy = {
+  title:    'Pending Approval',
+  subtitle: 'Your account is under review. An administrator will approve your access shortly.',
 }
 
 export default function PendingApprovalScreen() {
   const { profile } = useAuthStore()
+  const { pathname } = useLocation()
 
-  const handleSignOut = async () => {
+  // The /driver/pending-approval route forces driver copy even if the auth
+  // store hasn't fully hydrated the profile yet (e.g. first paint right after
+  // signup before authStore syncs).
+  const role = pathname.startsWith('/driver/') ? 'driver' : (profile?.role ?? '')
+  const copy = ROLE_COPY[role] ?? DEFAULT_COPY
+  const roleLabel = role ? (ROLE_LABELS[role] ?? role) : ''
+
+  async function handleSignOut() {
     await logout()
   }
-
-  const roleLabel = profile?.role ? (ROLE_LABELS[profile.role] ?? profile.role) : ''
 
   return (
     <div
@@ -43,10 +89,9 @@ export default function PendingApprovalScreen() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold" style={{ color: '#E0F7FA' }}>Pending Approval</h1>
+        <h1 className="text-2xl font-bold" style={{ color: '#E0F7FA' }}>{copy.title}</h1>
         <p className="mt-2 text-sm" style={{ color: '#7B909C' }}>
-          {profile?.full_name ? `Hi ${profile.full_name}! ` : ''}
-          Your account is under review. An administrator will approve your access shortly.
+          {profile?.full_name ? `Hi ${profile.full_name}! ` : ''}{copy.subtitle}
         </p>
 
         {roleLabel && (

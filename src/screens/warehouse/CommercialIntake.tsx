@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { logMode } from '../../lib/mode'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -71,7 +70,6 @@ export default function CommercialIntake() {
   // ── Load expected load when arriving from expected loads screen ──────────
 
   useEffect(() => {
-    logMode('warehouse-intake')
     if (!loadId) return
     async function fetchLoad() {
       setLoadState('loading')

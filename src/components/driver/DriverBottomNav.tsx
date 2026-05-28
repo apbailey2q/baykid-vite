@@ -3,10 +3,30 @@ export type DriverTab = 'home' | 'pickups' | 'route' | 'earnings' | 'schedule' |
 interface DriverBottomNavProps {
   tab: DriverTab
   onTab: (t: DriverTab) => void
+  // Optional dedicated handler for the Route tap. When supplied, the Route
+  // tab calls onRoute() (typically navigates to /dashboard/driver/route-map)
+  // instead of onTab('route'). Lets the parent route to a separate URL while
+  // other tabs stay in-page.
+  onRoute?: () => void
+  // Badge on the Pickups tab. Default 0 = no badge.
   pickupCount?: number
+  // Badge on the Route tab. Default 0 = no badge. Route-related counts (e.g.
+  // pending stops in the active route) belong here, NOT on Pickups.
+  routeCount?: number
+  // Accent color for active state. Default keeps the existing cyan look used
+  // by DriverEarnings + DriverScanScreen; DriverDashboard / route-map pass
+  // '#3b82f6' so residential-driver screens stay visually consistent.
+  accent?: string
 }
 
-export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNavProps) {
+export function DriverBottomNav({
+  tab,
+  onTab,
+  onRoute,
+  pickupCount = 0,
+  routeCount  = 0,
+  accent      = '#00BCD4',
+}: DriverBottomNavProps) {
   const items: { id: DriverTab; label: string; icon: (active: boolean) => React.ReactNode }[] = [
     {
       id: 'home',
@@ -16,8 +36,8 @@ export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNav
           width="22"
           height="22"
           viewBox="0 0 24 24"
-          fill={a ? '#00BCD4' : 'none'}
-          stroke={a ? '#00BCD4' : 'rgba(255,255,255,0.35)'}
+          fill={a ? accent : 'none'}
+          stroke={a ? accent : 'rgba(255,255,255,0.35)'}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -61,20 +81,30 @@ export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNav
       id: 'route',
       label: 'Route',
       icon: (a) => (
-        <svg
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill={a ? '#00BCD4' : 'none'}
-          stroke={a ? '#00BCD4' : 'rgba(255,255,255,0.35)'}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="6" cy="19" r="3" />
-          <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
-          <circle cx="18" cy="5" r="3" />
-        </svg>
+        <div className="relative">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill={a ? accent : 'none'}
+            stroke={a ? accent : 'rgba(255,255,255,0.35)'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="6" cy="19" r="3" />
+            <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+            <circle cx="18" cy="5" r="3" />
+          </svg>
+          {routeCount > 0 && (
+            <span
+              className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
+              style={{ background: '#FF1744', color: '#fff' }}
+            >
+              {routeCount > 9 ? '9+' : routeCount}
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -85,8 +115,8 @@ export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNav
           width="22"
           height="22"
           viewBox="0 0 24 24"
-          fill={a ? '#00BCD4' : 'none'}
-          stroke={a ? '#00BCD4' : 'rgba(255,255,255,0.35)'}
+          fill={a ? accent : 'none'}
+          stroke={a ? accent : 'rgba(255,255,255,0.35)'}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -104,8 +134,8 @@ export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNav
           width="22"
           height="22"
           viewBox="0 0 24 24"
-          fill={a ? '#00BCD4' : 'none'}
-          stroke={a ? '#00BCD4' : 'rgba(255,255,255,0.35)'}
+          fill={a ? accent : 'none'}
+          stroke={a ? accent : 'rgba(255,255,255,0.35)'}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -125,8 +155,8 @@ export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNav
           width="22"
           height="22"
           viewBox="0 0 24 24"
-          fill={a ? '#00BCD4' : 'none'}
-          stroke={a ? '#00BCD4' : 'rgba(255,255,255,0.35)'}
+          fill={a ? accent : 'none'}
+          stroke={a ? accent : 'rgba(255,255,255,0.35)'}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -155,20 +185,20 @@ export function DriverBottomNav({ tab, onTab, pickupCount = 0 }: DriverBottomNav
         return (
           <button
             key={item.id}
-            onClick={() => onTab(item.id)}
+            onClick={() => (item.id === 'route' && onRoute ? onRoute() : onTab(item.id))}
             className="relative flex flex-col items-center gap-0.5 min-w-[52px] py-1 transition-all duration-150 active:scale-[0.88]"
           >
             <span
               className="relative z-10"
               style={{
-                filter: active ? 'drop-shadow(0 0 6px rgba(0,188,212,0.7))' : 'none',
+                filter: active ? `drop-shadow(0 0 6px ${accent}B3)` : 'none',
               }}
             >
               {item.icon(active)}
             </span>
             <span
               className="relative z-10 text-[10px] font-semibold"
-              style={{ color: active ? '#00BCD4' : 'rgba(255,255,255,0.35)' }}
+              style={{ color: active ? accent : 'rgba(255,255,255,0.35)' }}
             >
               {item.label}
             </span>

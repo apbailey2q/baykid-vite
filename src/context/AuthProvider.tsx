@@ -1,4 +1,18 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+/**
+ * AuthProvider — real-auth shim
+ *
+ * Previously this was a demo-era context backed by localStorage['cb_demo_user'].
+ * It is now a thin wrapper over useAuthStore (Zustand / Supabase) so that all
+ * ~75 existing call sites continue to work without modification while the
+ * underlying data source is 100% real Supabase auth.
+ *
+ * The `login()` method is intentionally a no-op — real authentication happens
+ * exclusively through RealLoginPage → Supabase. It is kept for backwards
+ * compatibility so call sites that import it don't need to change.
+ */
+import { createContext, useCallback, useContext, useMemo } from 'react'
+import { useAuthStore } from '../store/authStore'
+import { logout as realLogout } from '../lib/auth'
 
 export type AccessRole =
   | 'consumer'
@@ -22,42 +36,43 @@ interface AuthContextValue {
   canAccessRole: (role: AccessRole) => boolean
 }
 
-const STORAGE_KEY = 'cb_demo_user'
-
-function loadUser(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as AuthUser) : null
-  } catch {
-    return null
-  }
-}
-
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(loadUser)
+/**
+ * Maps the DB canonical role (warehouse_employee, warehouse_supervisor, etc.)
+ * to the simplified AccessRole type used by legacy call sites.
+ */
+function toAccessRole(role: string | null | undefined): AccessRole {
+  if (role === 'warehouse_employee' || role === 'warehouse_supervisor') return 'warehouse'
+  const known: AccessRole[] = ['consumer', 'commercial', 'driver', 'warehouse', 'partner', 'fundraiser', 'admin']
+  if (role && known.includes(role as AccessRole)) return role as AccessRole
+  return 'consumer'
+}
 
-  const login = useCallback((email: string, role: AccessRole) => {
-    const next: AuthUser = { email, role }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    setUser(next)
-  }, [])
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { user: supabaseUser, role } = useAuthStore()
+
+  const user: AuthUser | null = supabaseUser
+    ? { email: supabaseUser.email ?? '', role: toAccessRole(role) }
+    : null
+
+  // No-op: real auth is handled by Supabase via RealLoginPage.
+  // Kept so legacy call sites that invoke login() don't error.
+  const login = useCallback((_email: string, _role: AccessRole) => {}, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    setUser(null)
+    realLogout()
   }, [])
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = role === 'admin'
 
   const canAccessRole = useCallback(
-    (role: AccessRole) => {
+    (r: AccessRole): boolean => {
       if (!user) return false
-      if (user.role === 'admin') return true
-      return user.role === role
+      if (role === 'admin') return true
+      return toAccessRole(role) === r
     },
-    [user],
+    [user, role],
   )
 
   const value = useMemo(

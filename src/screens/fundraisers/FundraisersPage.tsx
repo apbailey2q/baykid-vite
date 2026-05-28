@@ -10,7 +10,7 @@ import {
   typeAccent,
   getFundraiserStatus,
   type Fundraiser,
-} from '../../lib/demoFundraisers'
+} from '../../lib/fundraisers'
 
 function orgEmoji(org: string | null): string {
   if (!org) return '🌱'

@@ -3,13 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
+// TODO: Wire to real bag data from QR scan route state or URL param
 const BAG = {
-  id:             'CB-NASH-000421',
-  warehouse:      'NASH-01',
-  source:         'Consumer Scan',
-  fundraiser:     'East Nashville High Basketball',
-  estimatedValue: '$2.85',
-  co2Saved:       '4.2 lbs',
+  id:        'CB-NASH-000421',
+  warehouse: 'NASH-01',
+  source:    'Consumer Scan',
+  fundraiser:'East Nashville High Basketball',
 }
 
 // ── AI decision config ─────────────────────────────────────────────────────────
@@ -188,12 +187,10 @@ export default function BagInspectionPage() {
   const originalStatus = status
 
   const BAG_ROWS = [
-    { label: 'Bag ID',           value: BAG.id,             mono: true  },
-    { label: 'Warehouse',        value: BAG.warehouse,      mono: true  },
-    { label: 'Source',           value: BAG.source                      },
-    { label: 'Fundraiser',       value: BAG.fundraiser,     green: true },
-    { label: 'Estimated Value',  value: BAG.estimatedValue, accent: true},
-    { label: 'CO₂ Saved',        value: BAG.co2Saved,       green: true },
+    { label: 'Bag ID',    value: BAG.id,        mono: true  },
+    { label: 'Warehouse', value: BAG.warehouse,  mono: true  },
+    { label: 'Source',    value: BAG.source                  },
+    { label: 'Fundraiser',value: BAG.fundraiser, green: true },
   ]
 
   return (
@@ -268,7 +265,7 @@ export default function BagInspectionPage() {
                   style={{
                     fontSize:   12,
                     fontWeight: 700,
-                    color:      row.green ? '#5eead4' : row.accent ? '#00c8ff' : '#ffffff',
+                    color:      row.green ? '#5eead4' : '#ffffff',
                     maxWidth:   '55%',
                     textAlign:  'right',
                   }}

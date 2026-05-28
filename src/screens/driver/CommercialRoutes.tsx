@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { logMode } from '../../lib/mode'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -537,7 +536,6 @@ export default function CommercialRoutes() {
   // ── Load ─────────────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    logMode('driver-routes')
     if (!user) { setPageState('no_user'); return }
     setPageState('loading')
 

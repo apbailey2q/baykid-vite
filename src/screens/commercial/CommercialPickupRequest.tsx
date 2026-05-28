@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { logMode } from '../../lib/mode'
 import { CommercialLayout } from './CommercialLayout'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
@@ -162,7 +161,6 @@ export default function CommercialPickupRequest() {
 
   useEffect(() => {
     async function loadAccount() {
-      logMode('pickups')
       if (!user) {
         setPageState('no_user')
         return

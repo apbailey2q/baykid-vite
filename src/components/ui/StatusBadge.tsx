@@ -1,4 +1,4 @@
-type BadgeVariant =
+export type BadgeVariant =
   | 'green'
   | 'yellow'
   | 'red'

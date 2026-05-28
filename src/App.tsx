@@ -5,7 +5,6 @@ import { usePushToken } from './hooks/usePushToken'
 import { normalizeRole } from './lib/auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { ModeBanner } from './components/ModeBanner'
 import { ToastProvider } from './components/ui/Toast'
 import WelcomePage from './screens/WelcomePage'
 import RealLoginPage from './screens/RealLoginPage'
@@ -15,7 +14,6 @@ import LiveFundraisersPage from './screens/live/LiveFundraisersPage'
 import LiveWalletPage from './screens/live/LiveWalletPage'
 import { RequireAuth } from './components/RequireAuth'
 import { RequireRole } from './components/RequireRole'
-import LoginScreen from './screens/LoginScreen'
 import SignupScreen from './screens/SignupScreen'
 import PendingApprovalScreen from './screens/PendingApprovalScreen'
 import ConsumerDashboard from './screens/dashboards/ConsumerDashboard'
@@ -28,12 +26,7 @@ import FundraiserDashboard from './screens/dashboards/FundraiserDashboard'
 import ScannerScreen from './screens/ScannerScreen'
 import BagDetailScreen from './screens/BagDetailScreen'
 import InspectionScreen from './screens/InspectionScreen'
-import DriverRoutePage from './screens/driver/DriverRoutePage'
-import RouteStopPage from './screens/driver/RouteStopPage'
-import WarehouseCheckinPage from './screens/driver/WarehouseCheckinPage'
 import DriverScanScreen from './screens/driver/DriverScanScreen'
-import DemoSimulationPage from './screens/DemoSimulationPage'
-import FullDemoHUD from './components/FullDemoHUD'
 import FundraisersPage from './screens/fundraisers/FundraisersPage'
 import FundraiserDetailPage from './screens/fundraisers/FundraiserDetailPage'
 import MyFundraiserPage from './screens/fundraisers/MyFundraiserPage'
@@ -42,6 +35,9 @@ import CreateFundraiserPage from './screens/fundraisers/CreateFundraiserPage'
 import QRScanPage from './screens/fundraisers/QRScanPage'
 import EarningsDashboardPage from './screens/EarningsDashboardPage'
 import DriverRoutesPage from './screens/DriverRoutesPage'
+import DriverResidentialRouteMap from './screens/driver/DriverResidentialRouteMap'
+import { WarehouseCheckin }       from './screens/driver/WarehouseCheckin'
+import AIMarketingCenter           from './screens/admin/AIMarketingCenter'
 import BagInspectionPage from './screens/BagInspectionPage'
 import AdminDashboardPage from './screens/AdminDashboardPage'
 import BagLifecyclePage from './screens/BagLifecyclePage'
@@ -80,7 +76,6 @@ import DriverSafetyPage from './screens/legal/DriverSafetyPage'
 import CommercialTermsPage from './screens/legal/CommercialTermsPage'
 import PrivacyPolicy from './screens/legal/PrivacyPolicy'
 import TermsOfService from './screens/legal/TermsOfService'
-import DemoOverview from './screens/demo/DemoOverview'
 import BetaHome from './screens/beta/BetaHome'
 import BetaFeedbackPage from './screens/beta/BetaFeedbackPage'
 import BetaChecklist from './screens/beta/BetaChecklist'
@@ -136,6 +131,23 @@ import ExecutiveDashboard from './screens/executive/ExecutiveDashboard'
 import AdminRegions from './screens/admin/AdminRegions'
 import AdminForecasting from './screens/admin/AdminForecasting'
 import AdminLaunchRoadmap from './screens/admin/AdminLaunchRoadmap'
+import PricingPage     from './screens/billing/PricingPage'
+import UsageDashboard  from './screens/billing/UsageDashboard'
+import AIMarketingQAChecklist from './screens/qa/AIMarketingQAChecklist'
+import SupportContactPage     from './screens/support/SupportContactPage'
+import ReleaseNotesPage       from './screens/admin/ReleaseNotesPage'
+import BetaFeedbackV2         from './screens/beta/BetaFeedbackV2'
+import LaunchCenter           from './screens/admin/launch/LaunchCenter'
+import MarketingHome          from './screens/marketing/MarketingHome'
+import FeaturesPage           from './screens/marketing/FeaturesPage'
+import MarketingPricingPage   from './screens/marketing/MarketingPricingPage'
+import AboutPage              from './screens/marketing/AboutPage'
+import ContactPage            from './screens/marketing/ContactPage'
+import ConsumerOnboarding from './screens/onboarding/ConsumerOnboarding'
+import WelcomeBack from './screens/WelcomeBack'
+import DriverModeSelect from './screens/driver/DriverModeSelect'
+import DriverModeLanding from './screens/driver/DriverModeLanding'
+import DriverScanInspect from './screens/driver/DriverScanInspect'
 
 // Uses canonical DB role values (warehouse_employee, not 'warehouse').
 // normalizeRole() from lib/auth is the single shared implementation.
@@ -168,7 +180,10 @@ function HomeRedirect() {
     )
   }
 
-  if (!user) return <Navigate to="/real-login" replace />
+  // Unauthenticated visitors land on the public marketing site. They can
+  // navigate to /real-login or /signup from there. Authenticated users
+  // continue through the role-based dashboard redirects below.
+  if (!user) return <Navigate to="/marketing" replace />
 
   const normalized = normalizeRole(role)
 
@@ -221,13 +236,11 @@ function App() {
     <BrowserRouter>
       <PushTokenManager />
       <ServiceWorkerManager />
-      <ModeBanner />
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/real-login" element={<RealLoginPage />} />
-        <Route path="/demo-simulation" element={<DemoSimulationPage />} />
-        <Route path="/login" element={<LoginScreen />} />
+        <Route path="/login" element={<Navigate to="/real-login" replace />} />
         <Route path="/signup" element={<SignupScreen />} />
         <Route
           path="/pending-approval"
@@ -237,9 +250,19 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Driver-specific landing for unapproved drivers — same screen,
+            role-aware copy. PendingApprovalScreen detects the URL prefix. */}
+        <Route
+          path="/driver/pending-approval"
+          element={
+            <ProtectedRoute>
+              <PendingApprovalScreen />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Role dashboards — access controlled by routePermissions.ts */}
-        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved allowDemo><ConsumerDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/consumer" element={<ProtectedRoute requireApproved><ConsumerDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/driver" element={<ProtectedRoute requireApproved><DriverDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/driver/consumer-routes" element={<ProtectedRoute requireApproved><ConsumerRoutes /></ProtectedRoute>} />
         <Route path="/dashboard/driver/hybrid-routes"   element={<ProtectedRoute requireApproved><HybridRoutes /></ProtectedRoute>} />
@@ -279,6 +302,17 @@ function App() {
         {/* Onboarding — accessible before approval so new users can complete their application */}
         <Route path="/dashboard/driver/onboarding"            element={<ProtectedRoute><DriverOnboarding /></ProtectedRoute>} />
         <Route path="/dashboard/warehouse/onboarding"         element={<ProtectedRoute><WarehouseOnboarding /></ProtectedRoute>} />
+        <Route path="/onboarding"                              element={<ProtectedRoute><ConsumerOnboarding /></ProtectedRoute>} />
+        <Route path="/welcome-back"                            element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
+
+        {/* ── Driver mode flow (approved drivers only) ── */}
+        <Route path="/driver/mode"          element={<ProtectedRoute requireApproved><DriverModeSelect /></ProtectedRoute>} />
+        <Route path="/driver/residential"   element={<ProtectedRoute requireApproved><DriverModeLanding mode="residential" /></ProtectedRoute>} />
+        <Route path="/driver/commercial"    element={<ProtectedRoute requireApproved><DriverModeLanding mode="commercial"  /></ProtectedRoute>} />
+        <Route path="/driver/scan"          element={<ProtectedRoute requireApproved><DriverScanInspect mode="residential" /></ProtectedRoute>} />
+        <Route path="/driver/commercial-scan"      element={<ProtectedRoute requireApproved><DriverScanInspect mode="commercial"  /></ProtectedRoute>} />
+        <Route path="/driver/warehouse-checkin"    element={<ProtectedRoute requireApproved><WarehouseCheckin /></ProtectedRoute>} />
+        <Route path="/dashboard/admin/ai-marketing" element={<ProtectedRoute requireApproved><AIMarketingCenter /></ProtectedRoute>} />
         <Route path="/dashboard/admin/approvals"              element={<ProtectedRoute requireApproved><AdminApprovalsPage /></ProtectedRoute>} />
         <Route path="/dashboard/municipal"                    element={<ProtectedRoute requireApproved><MunicipalDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/municipal/reports"            element={<ProtectedRoute requireApproved><MunicipalReports /></ProtectedRoute>} />
@@ -286,6 +320,26 @@ function App() {
         <Route path="/dashboard/admin/regions"               element={<ProtectedRoute requireApproved><AdminRegions /></ProtectedRoute>} />
         <Route path="/dashboard/admin/forecasting"           element={<ProtectedRoute requireApproved><AdminForecasting /></ProtectedRoute>} />
         <Route path="/dashboard/admin/launch-roadmap"        element={<ProtectedRoute requireApproved><AdminLaunchRoadmap /></ProtectedRoute>} />
+
+        {/* SaaS billing */}
+        <Route path="/admin/billing/plans" element={<ProtectedRoute requireApproved><PricingPage     /></ProtectedRoute>} />
+        <Route path="/admin/billing/usage" element={<ProtectedRoute requireApproved><UsageDashboard /></ProtectedRoute>} />
+
+        {/* Beta launch surfaces (QA + support + release notes + beta feedback) */}
+        <Route path="/admin/qa/ai-marketing" element={<ProtectedRoute requireApproved><AIMarketingQAChecklist /></ProtectedRoute>} />
+        <Route path="/admin/release-notes"   element={<ProtectedRoute requireApproved><ReleaseNotesPage      /></ProtectedRoute>} />
+        <Route path="/support/contact"       element={<ProtectedRoute><SupportContactPage /></ProtectedRoute>} />
+        <Route path="/beta/feedback"         element={<ProtectedRoute><BetaFeedbackV2 /></ProtectedRoute>} />
+
+        {/* Launch Execution Center — admin-only hub */}
+        <Route path="/admin/launch"          element={<ProtectedRoute requireApproved><LaunchCenter /></ProtectedRoute>} />
+
+        {/* Public marketing site — no auth required */}
+        <Route path="/marketing" element={<MarketingHome />} />
+        <Route path="/features"  element={<FeaturesPage />} />
+        <Route path="/pricing"   element={<MarketingPricingPage />} />
+        <Route path="/about"     element={<AboutPage />} />
+        <Route path="/contact"   element={<ContactPage />} />
 
         {/* Settings */}
         <Route path="/settings/notifications" element={<ProtectedRoute requireApproved><NotificationPreferences /></ProtectedRoute>} />
@@ -298,6 +352,12 @@ function App() {
         <Route path="/dashboard/warehouse/messages"            element={<ProtectedRoute requireApproved><WarehouseMessages /></ProtectedRoute>} />
 
         {/* Driver route flow */}
+        {/* Residential drivers land on the map-preview screen (DriverRouteView style). */}
+        <Route path="/dashboard/driver/route-map"                 element={<ProtectedRoute requireApproved><DriverResidentialRouteMap /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/route"                     element={<ProtectedRoute requireApproved><DriverResidentialRouteMap /></ProtectedRoute>} />
+        <Route path="/dashboard/driver/routes"                    element={<ProtectedRoute requireApproved><DriverResidentialRouteMap /></ProtectedRoute>} />
+        {/* Commercial drivers get the Smart Driver Routing screen (fundraiser / business stops). */}
+        <Route path="/dashboard/driver/commercial-route"          element={<ProtectedRoute requireApproved><DriverRoutesPage /></ProtectedRoute>} />
         <Route path="/dashboard/driver/hybrid"                    element={<ProtectedRoute requireApproved><DriverHybridDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/driver/commercial-routes"         element={<ProtectedRoute requireApproved><CommercialRoutes /></ProtectedRoute>} />
         <Route path="/dashboard/driver/commercial-safety"         element={<ProtectedRoute requireApproved><CommercialSafetyChecklist /></ProtectedRoute>} />
@@ -305,42 +365,49 @@ function App() {
         <Route path="/dashboard/driver/commercial-scan"           element={<ProtectedRoute requireApproved><CommercialScan /></ProtectedRoute>} />
         <Route path="/dashboard/driver/commercial-inspection"     element={<ProtectedRoute requireApproved><CommercialInspection /></ProtectedRoute>} />
         <Route path="/dashboard/driver/dispatch-messages"         element={<ProtectedRoute requireApproved><DriverDispatchMessages /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/routes" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route-map" element={<ProtectedRoute requireApproved><DriverRoutePage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/route/stop/:stopId" element={<ProtectedRoute requireApproved><RouteStopPage /></ProtectedRoute>} />
-        <Route path="/dashboard/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckinPage /></ProtectedRoute>} />
         <Route path="/dashboard/driver/scan"     element={<ProtectedRoute requireApproved><DriverScanScreen /></ProtectedRoute>} />
         <Route path="/dashboard/driver/earnings" element={<ProtectedRoute requireApproved><DriverEarnings /></ProtectedRoute>} />
 
         {/* Bag lifecycle */}
-        <Route path="/scan" element={<ProtectedRoute requireApproved allowDemo><ScannerScreen /></ProtectedRoute>} />
+        <Route path="/scan" element={<ProtectedRoute requireApproved><ScannerScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId" element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
         <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
 
-        {/* Fundraisers — no auth required */}
-        <Route path="/fundraisers" element={<FundraisersPage />} />
-        <Route path="/fundraisers/:id" element={<FundraiserDetailPage />} />
-        <Route path="/my-fundraiser" element={<MyFundraiserPage />} />
-        <Route path="/scan-result" element={<ScanResultPage />} />
+        {/* Fundraisers — public (marketing / community pages) */}
+        <Route path="/fundraisers"      element={<FundraisersPage />} />
+        <Route path="/fundraisers/:id"  element={<FundraiserDetailPage />} />
         <Route path="/create-fundraiser" element={<CreateFundraiserPage />} />
-        <Route path="/qr-scan" element={<QRScanPage />} />
-        <Route path="/earnings" element={<EarningsDashboardPage />} />
-        <Route path="/driver-routes" element={<DriverRoutesPage />} />
-        <Route path="/bag-inspection" element={<BagInspectionPage />} />
-        <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
-        <Route path="/bag-lifecycle" element={<BagLifecyclePage />} />
-        <Route path="/contamination-alerts" element={<ContaminationAlertsPage />} />
+        <Route path="/leaderboard"       element={<LeaderboardPage />} />
         <Route path="/recycling-destination" element={<RecyclingDestinationPage />} />
-        <Route path="/partner-dashboard" element={<PartnerDashboardPage />} />
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
-        <Route path="/reports" element={<ReportsCenterPage />} />
-        <Route path="/donation-receipt" element={<DonationReceiptPage />} />
-        <Route path="/ai-recommendations" element={<AIRecommendationsPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/fraud-detection" element={<FraudDetectionPage />} />
-        <Route path="/wallet" element={<WalletPage />} />
-        <Route path="/fundraiser-admin" element={<FundraiserAdminPage />} />
+        <Route path="/donation-receipt"  element={<DonationReceiptPage />} />
+
+        {/* Auth-required: any approved user */}
+        <Route path="/my-fundraiser" element={<RequireAuth><MyFundraiserPage /></RequireAuth>} />
+        <Route path="/scan-result"   element={<RequireAuth><ScanResultPage /></RequireAuth>} />
+        <Route path="/qr-scan"       element={<RequireAuth><QRScanPage /></RequireAuth>} />
+        <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
+
+        {/* Driver / Admin only */}
+        <Route path="/earnings"      element={<RequireAuth><RequireRole roles={['driver','admin']}><EarningsDashboardPage /></RequireRole></RequireAuth>} />
+        <Route path="/driver-routes" element={<RequireAuth><RequireRole roles={['driver','admin']}><DriverRoutesPage /></RequireRole></RequireAuth>} />
+
+        {/* Warehouse / Admin only */}
+        <Route path="/bag-inspection"      element={<RequireAuth><RequireRole roles={['admin','warehouse_employee','warehouse_supervisor']}><BagInspectionPage /></RequireRole></RequireAuth>} />
+        <Route path="/bag-lifecycle"       element={<RequireAuth><RequireRole roles={['admin','warehouse_employee','warehouse_supervisor']}><BagLifecyclePage /></RequireRole></RequireAuth>} />
+        <Route path="/contamination-alerts" element={<RequireAuth><RequireRole roles={['admin','warehouse_employee','warehouse_supervisor']}><ContaminationAlertsPage /></RequireRole></RequireAuth>} />
+
+        {/* Partner / Admin only */}
+        <Route path="/partner-dashboard" element={<RequireAuth><RequireRole roles={['partner','admin']}><PartnerDashboardPage /></RequireRole></RequireAuth>} />
+        <Route path="/reports"           element={<RequireAuth><RequireRole roles={['admin','partner']}><ReportsCenterPage /></RequireRole></RequireAuth>} />
+
+        {/* Consumer only */}
+        <Route path="/wallet" element={<RequireAuth><RequireRole roles={['consumer','admin']}><WalletPage /></RequireRole></RequireAuth>} />
+
+        {/* Admin only */}
+        <Route path="/admin-dashboard"   element={<RequireAuth><RequireRole roles={['admin']}><AdminDashboardPage /></RequireRole></RequireAuth>} />
+        <Route path="/fraud-detection"   element={<RequireAuth><RequireRole roles={['admin']}><FraudDetectionPage /></RequireRole></RequireAuth>} />
+        <Route path="/ai-recommendations" element={<RequireAuth><RequireRole roles={['admin']}><AIRecommendationsPage /></RequireRole></RequireAuth>} />
+        <Route path="/fundraiser-admin"  element={<RequireAuth><RequireRole roles={['admin','fundraiser']}><FundraiserAdminPage /></RequireRole></RequireAuth>} />
 
         {/* Legacy demo shortcuts → redirect to canonical dashboard routes */}
         <Route path="/consumer"   element={<Navigate to="/dashboard/consumer"   replace />} />
@@ -380,16 +447,15 @@ function App() {
         <Route path="/legal/commercial-terms"   element={<CommercialTermsPage />} />
         <Route path="/legal/privacy-policy"     element={<PrivacyPolicy />} />
         <Route path="/legal/terms-of-service"   element={<TermsOfService />} />
-        <Route path="/demo"                      element={<DemoOverview />} />
-        <Route path="/beta"                      element={<BetaHome />} />
-        <Route path="/beta/feedback"             element={<BetaFeedbackPage />} />
-        <Route path="/beta/checklist"            element={<BetaChecklist />} />
-        <Route path="/deploy/checklist"          element={<ProductionChecklist />} />
-        <Route path="/presentation-mode"          element={<PresentationModePage />} />
-        <Route path="/readiness-checklist"        element={<ReadinessChecklistPage />} />
-        <Route path="/launch-checklist"           element={<LaunchChecklistPage />} />
+        {/* ── Internal ops — admin only ── */}
+        <Route path="/beta"             element={<RequireRole roles={['admin']}><BetaHome /></RequireRole>} />
+        <Route path="/beta/feedback"    element={<RequireRole roles={['admin']}><BetaFeedbackPage /></RequireRole>} />
+        <Route path="/beta/checklist"   element={<RequireRole roles={['admin']}><BetaChecklist /></RequireRole>} />
+        <Route path="/deploy/checklist" element={<RequireRole roles={['admin']}><ProductionChecklist /></RequireRole>} />
+        <Route path="/presentation-mode"   element={<RequireRole roles={['admin']}><PresentationModePage /></RequireRole>} />
+        <Route path="/readiness-checklist" element={<RequireRole roles={['admin']}><ReadinessChecklistPage /></RequireRole>} />
+        <Route path="/launch-checklist"    element={<RequireRole roles={['admin']}><LaunchChecklistPage /></RequireRole>} />
       </Routes>
-      <FullDemoHUD />
     </BrowserRouter>
       </ToastProvider>
     </ErrorBoundary>

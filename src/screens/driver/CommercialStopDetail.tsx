@@ -5,81 +5,35 @@ import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 
-// ── Demo data ─────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface DemoStop {
-  name: string
-  address: string
-  dock: string
-  gate: string
-  window: string
-  materials: string
-  bins: number
-  weight: number
-  contact: string
-  phone: string
-  safety: string
-  warehouse: string
-}
-
-const DEMO_STOPS: Record<string, DemoStop> = {
-  s1: {
-    name: 'Greenway Office Plaza',
-    address: '1200 Commerce Blvd, Nashville TN',
-    dock: 'Dock 3 Entrance — Enter through north gate',
-    gate: 'Gate code: 4481 — call 30 min prior',
-    window: '7AM – 9AM',
-    materials: 'Cardboard + Plastic',
-    bins: 8,
-    weight: 1240,
-    contact: 'Angela Bailey · Building Manager',
-    phone: '+1 615-800-2240',
-    safety: 'Forklift operating on site. PPE required.',
-    warehouse: 'NASH-01',
-  },
-  s2: {
-    name: 'Nashville Retail Center',
-    address: '450 West End Ave, Nashville TN',
-    dock: 'Rear loading bay — approach from Alley B',
-    gate: 'Security kiosk at entrance, show driver ID',
-    window: '10AM – 12PM',
-    materials: 'Mixed Recycling',
-    bins: 5,
-    weight: 740,
-    contact: 'Ops Desk',
-    phone: 'ext. 210',
-    safety: 'No hazardous materials. Standard PPE.',
-    warehouse: 'NASH-01',
-  },
-  s3: {
-    name: 'Metro Office Complex',
-    address: '800 Corporate Dr, Nashville TN',
-    dock: 'Loading Level B — elevator access required',
-    gate: 'Security gate — badge required. Call ahead.',
-    window: '2PM – 4PM',
-    materials: 'Cardboard',
-    bins: 12,
-    weight: 1900,
-    contact: 'Facilities Desk',
-    phone: '+1 615-700-8800',
-    safety: 'High-traffic area. Spotter required at all times.',
-    warehouse: 'NASH-01',
-  },
+interface StopDetails {
+  name:       string
+  address:    string
+  dock:       string | null
+  gate:       string | null
+  window:     string | null
+  materials:  string | null
+  bins:       number | null
+  weight:     number | null
+  contact:    string | null
+  phone:      string | null
+  safety:     string | null
+  warehouse:  string | null
 }
 
 const TRUCK_MAX = 5000
-type StopStatus  = 'pending' | 'arrived' | 'complete'
-type GateStatus  = 'loading' | 'clear' | 'pending_review' | 'blocked' | 'no_inspection' | 'reinspection_required' | 'demo'
-
-const DEMO_STOP_IDS = new Set(['s1', 's2', 's3'])
+type StopStatus = 'pending' | 'arrived' | 'complete'
+type GateStatus = 'loading' | 'clear' | 'pending_review' | 'blocked' | 'no_inspection' | 'reinspection_required'
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function CommercialStopDetail() {
   const navigate = useNavigate()
   const { stopId } = useParams<{ stopId: string }>()
-  const stop = DEMO_STOPS[stopId ?? ''] ?? DEMO_STOPS['s1']
 
+  const [stopDetails,    setStopDetails]    = useState<StopDetails | null>(null)
+  const [stopLoading,    setStopLoading]    = useState(true)
   const [status,         setStatus]         = useState<StopStatus>('pending')
   const [toast,          setToast]          = useState<string | null>(null)
   const [gateStatus,     setGateStatus]     = useState<GateStatus>('loading')
@@ -87,50 +41,85 @@ export default function CommercialStopDetail() {
   const [adminNotes,     setAdminNotes]     = useState<string | null>(null)
 
   useEffect(() => {
-    // Demo stop IDs have no DB rows — skip the gate check
-    if (DEMO_STOP_IDS.has(stopId ?? '')) { setGateStatus('demo'); return }
+    if (!stopId) { setStopLoading(false); return }
 
-    async function checkGate() {
-      // Resolve pickup_id from the route stop
-      const { data: stopRow } = await supabase
-        .from('commercial_route_stops')
-        .select('pickup_id')
-        .eq('id', stopId)
-        .maybeSingle()
+    async function loadStop() {
+      try {
+        // Fetch the route stop row; try to join pickup + account data
+        const { data: routeStop } = await supabase
+          .from('commercial_route_stops')
+          .select('*')
+          .eq('id', stopId)
+          .maybeSingle()
 
-      if (!stopRow?.pickup_id) { setGateStatus('demo'); return }
+        if (!routeStop) { setStopLoading(false); return }
 
-      setPickupIdForNav(stopRow.pickup_id)
+        setPickupIdForNav(routeStop.pickup_id ?? null)
 
-      // Get the latest inspection for this pickup
-      const { data: insp } = await supabase
-        .from('commercial_inspections')
-        .select('overall_result, review_status, admin_notes')
-        .eq('pickup_id', stopRow.pickup_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        // Try to resolve business details from the linked pickup / account
+        let pickupRow: Record<string, unknown> | null = null
+        if (routeStop.pickup_id) {
+          const { data } = await supabase
+            .from('commercial_pickups')
+            .select('*, commercial_accounts(business_name, contact_name, phone, warehouse_id)')
+            .eq('id', routeStop.pickup_id)
+            .maybeSingle()
+          pickupRow = data as Record<string, unknown> | null
+        }
 
-      if (!insp) { setGateStatus('no_inspection'); return }
+        const account = (pickupRow?.commercial_accounts ?? {}) as Record<string, unknown>
 
-      const { overall_result, review_status } = insp
-      const isPending = review_status === null || review_status === 'pending'
+        setStopDetails({
+          name:      (account.business_name  as string) ?? (pickupRow?.business_name as string) ?? 'Commercial Stop',
+          address:   (routeStop.address      as string) ?? (pickupRow?.address       as string) ?? 'Address unavailable',
+          dock:      (routeStop.dock_instructions as string | null) ?? (pickupRow?.dock_instructions as string | null) ?? null,
+          gate:      (routeStop.gate_code    as string | null) ?? (pickupRow?.gate_code    as string | null) ?? null,
+          window:    (routeStop.pickup_window as string | null) ?? (pickupRow?.pickup_window as string | null) ?? null,
+          materials: (routeStop.materials    as string | null) ?? (pickupRow?.materials    as string | null) ?? null,
+          bins:      (routeStop.bin_count    as number | null) ?? (pickupRow?.bin_count    as number | null) ?? null,
+          weight:    (routeStop.estimated_weight as number | null) ?? (pickupRow?.estimated_weight as number | null) ?? null,
+          contact:   (account.contact_name   as string | null) ?? null,
+          phone:     (account.phone          as string | null) ?? null,
+          safety:    (routeStop.safety_notes as string | null) ?? (pickupRow?.safety_notes as string | null) ?? null,
+          warehouse: (account.warehouse_id   as string | null) ?? (pickupRow?.warehouse    as string | null) ?? null,
+        })
 
-      if (overall_result === 'pass') {
-        setGateStatus('clear')
-      } else if (overall_result === 'flag' && review_status === 'approved') {
-        setGateStatus('clear')
-      } else if (review_status === 'reinspection_required') {
-        setGateStatus('reinspection_required')
-        if (insp.admin_notes) setAdminNotes(insp.admin_notes)
-      } else if (overall_result === 'flag' && isPending) {
-        setGateStatus('pending_review')
-      } else {
-        setGateStatus('blocked')
+        // ── Inspection gate check ──────────────────────────────────────────
+        if (!routeStop.pickup_id) { setGateStatus('no_inspection'); setStopLoading(false); return }
+
+        const { data: insp } = await supabase
+          .from('commercial_inspections')
+          .select('overall_result, review_status, admin_notes')
+          .eq('pickup_id', routeStop.pickup_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (!insp) { setGateStatus('no_inspection'); setStopLoading(false); return }
+
+        const { overall_result, review_status } = insp
+        const isPending = review_status === null || review_status === 'pending'
+
+        if (overall_result === 'pass') {
+          setGateStatus('clear')
+        } else if (overall_result === 'flag' && review_status === 'approved') {
+          setGateStatus('clear')
+        } else if (review_status === 'reinspection_required') {
+          setGateStatus('reinspection_required')
+          if (insp.admin_notes) setAdminNotes(insp.admin_notes)
+        } else if (overall_result === 'flag' && isPending) {
+          setGateStatus('pending_review')
+        } else {
+          setGateStatus('blocked')
+        }
+      } catch {
+        /* silent — empty state below handles it */
+      } finally {
+        setStopLoading(false)
       }
     }
 
-    void checkGate()
+    void loadStop()
   }, [stopId])
 
   function showToast(msg: string) {
@@ -138,7 +127,9 @@ export default function CommercialStopDetail() {
     setTimeout(() => setToast(null), 2500)
   }
 
-  const truckImpactPct = Math.round((stop.weight / TRUCK_MAX) * 100)
+  const truckImpactPct = stopDetails?.weight != null
+    ? Math.round((stopDetails.weight / TRUCK_MAX) * 100)
+    : null
 
   const STATUS_BADGE: Record<StopStatus, { variant: 'cyan' | 'amber' | 'green'; label: string }> = {
     pending:  { variant: 'cyan',  label: 'Pending'     },
@@ -146,6 +137,38 @@ export default function CommercialStopDetail() {
     complete: { variant: 'green', label: 'Completed'   },
   }
   const badge = STATUS_BADGE[status]
+
+  // ── Loading ────────────────────────────────────────────────────────────────
+
+  if (stopLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>Loading stop…</p>
+      </div>
+    )
+  }
+
+  // ── Not found ──────────────────────────────────────────────────────────────
+
+  if (!stopDetails) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-4" style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}>
+        <p style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Stop not found</p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+          This stop could not be loaded. It may have been removed or you may not have access.
+        </p>
+        <button
+          onClick={() => navigate(-1)}
+          className="rounded-2xl px-6 py-3 text-sm font-bold text-white"
+          style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)' }}
+        >
+          ← Go Back
+        </button>
+      </div>
+    )
+  }
+
+  const stop = stopDetails
 
   // ── Success state ──────────────────────────────────────────────────────────
 
@@ -221,9 +244,9 @@ export default function CommercialStopDetail() {
             <StatusBadge variant={badge.variant} label={badge.label} dot />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <span style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600 }}>🕐 {stop.window}</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>·</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>🏭 {stop.warehouse}</span>
+            {stop.window && <span style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600 }}>🕐 {stop.window}</span>}
+            {stop.window && stop.warehouse && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>·</span>}
+            {stop.warehouse && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>🏭 {stop.warehouse}</span>}
           </div>
         </GlassCard>
 
@@ -234,14 +257,14 @@ export default function CommercialStopDetail() {
         <GlassCard padding="md" className="mb-4">
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             {[
-              { label: 'Materials',    value: stop.materials                              },
-              { label: 'Containers',   value: `${stop.bins} bins`                        },
-              { label: 'Est. Weight',  value: `${stop.weight.toLocaleString()} lbs`      },
-              { label: 'Truck Impact', value: `${truckImpactPct}% capacity`              },
-              { label: 'Contact',      value: stop.contact                               },
-              { label: 'Phone',        value: stop.phone                                 },
-              { label: 'Window',       value: stop.window                                },
-              { label: 'Warehouse',    value: stop.warehouse                             },
+              { label: 'Materials',    value: stop.materials ?? '—'                                           },
+              { label: 'Containers',   value: stop.bins != null ? `${stop.bins} bins` : '—'                  },
+              { label: 'Est. Weight',  value: stop.weight != null ? `${stop.weight.toLocaleString()} lbs` : '—' },
+              { label: 'Truck Impact', value: truckImpactPct != null ? `${truckImpactPct}% capacity` : '—'   },
+              { label: 'Contact',      value: stop.contact ?? '—'                                            },
+              { label: 'Phone',        value: stop.phone ?? '—'                                              },
+              { label: 'Window',       value: stop.window ?? '—'                                             },
+              { label: 'Warehouse',    value: stop.warehouse ?? '—'                                          },
             ].map(row => (
               <div key={row.label}>
                 <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -256,36 +279,46 @@ export default function CommercialStopDetail() {
         </GlassCard>
 
         {/* ── Access Instructions ── */}
-        <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
-          Access Instructions
-        </p>
-        <div className="rounded-2xl px-4 py-4 mb-4" style={{ background: 'rgba(0,200,255,0.04)', border: '1px solid rgba(0,200,255,0.18)' }}>
-          <div className="flex flex-col gap-3">
-            <div>
-              <p style={{ fontSize: 9, fontWeight: 700, color: '#00c8ff', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-                Loading Dock
-              </p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>🏗 {stop.dock}</p>
+        {(stop.dock || stop.gate) && (
+          <>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+              Access Instructions
+            </p>
+            <div className="rounded-2xl px-4 py-4 mb-4" style={{ background: 'rgba(0,200,255,0.04)', border: '1px solid rgba(0,200,255,0.18)' }}>
+              <div className="flex flex-col gap-3">
+                {stop.dock && (
+                  <div>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: '#00c8ff', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                      Loading Dock
+                    </p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>🏗 {stop.dock}</p>
+                  </div>
+                )}
+                {stop.dock && stop.gate && <div style={{ height: 1, background: 'rgba(0,200,255,0.1)' }} />}
+                {stop.gate && (
+                  <div>
+                    <p style={{ fontSize: 9, fontWeight: 700, color: '#00c8ff', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                      Gate / Access
+                    </p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>🔐 {stop.gate}</p>
+                  </div>
+                )}
+              </div>
             </div>
-            <div style={{ height: 1, background: 'rgba(0,200,255,0.1)' }} />
-            <div>
-              <p style={{ fontSize: 9, fontWeight: 700, color: '#00c8ff', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-                Gate / Access
-              </p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>🔐 {stop.gate}</p>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* ── Safety Warning ── */}
-        <div className="rounded-2xl px-4 py-4 mb-5" style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.28)' }}>
-          <p style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>
-            Safety Notes
-          </p>
-          <p style={{ fontSize: 12, color: '#fbbf24', fontWeight: 600, lineHeight: 1.5 }}>
-            ⚠️ {stop.safety}
-          </p>
-        </div>
+        {stop.safety && (
+          <div className="rounded-2xl px-4 py-4 mb-5" style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.28)' }}>
+            <p style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>
+              Safety Notes
+            </p>
+            <p style={{ fontSize: 12, color: '#fbbf24', fontWeight: 600, lineHeight: 1.5 }}>
+              ⚠️ {stop.safety}
+            </p>
+          </div>
+        )}
 
         {/* ── Action Buttons ── */}
         <div className="flex flex-col gap-2.5">
@@ -338,8 +371,8 @@ export default function CommercialStopDetail() {
             </div>
           )}
 
-          {/* ── Inspection gate banner (real stops only, non-reinspection) ── */}
-          {status === 'arrived' && gateStatus !== 'demo' && gateStatus !== 'loading' && gateStatus !== 'clear' && gateStatus !== 'reinspection_required' && (
+          {/* ── Inspection gate banner (non-reinspection states) ── */}
+          {status === 'arrived' && gateStatus !== 'loading' && gateStatus !== 'clear' && gateStatus !== 'reinspection_required' && (
             <div
               className="rounded-xl px-4 py-3 mb-1"
               style={{
@@ -348,9 +381,9 @@ export default function CommercialStopDetail() {
               }}
             >
               <p style={{ fontSize: 12, fontWeight: 700, color: gateStatus === 'no_inspection' ? '#fbbf24' : '#f87171', marginBottom: 3 }}>
-                {gateStatus === 'no_inspection'    && '⚠️ Inspection required'}
-                {gateStatus === 'pending_review'   && '⏳ Awaiting admin review'}
-                {gateStatus === 'blocked'          && '🚫 Stop blocked'}
+                {gateStatus === 'no_inspection'  && '⚠️ Inspection required'}
+                {gateStatus === 'pending_review' && '⏳ Awaiting admin review'}
+                {gateStatus === 'blocked'        && '🚫 Stop blocked'}
               </p>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
                 {gateStatus === 'no_inspection'  && 'Complete the safety inspection before finishing this stop.'}
@@ -384,11 +417,11 @@ export default function CommercialStopDetail() {
           {status === 'arrived' && (
             <PrimaryButton
               fullWidth size="lg"
-              disabled={gateStatus !== 'clear' && gateStatus !== 'demo'}
+              disabled={gateStatus !== 'clear'}
               onClick={() => setStatus('complete')}
             >
-              {gateStatus === 'loading'                ? 'Checking inspection…'
-               : gateStatus === 'clear' || gateStatus === 'demo' ? '✅ Complete Stop'
+              {gateStatus === 'loading'                  ? 'Checking inspection…'
+               : gateStatus === 'clear'                 ? '✅ Complete Stop'
                : gateStatus === 'reinspection_required' ? '🔒 Reinspection Required'
                : '🔒 Completion Blocked'}
             </PrimaryButton>

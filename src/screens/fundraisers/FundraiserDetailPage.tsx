@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import FundraiserCountdown from '../../components/FundraiserCountdown'
-import { demoFundraisers, pctFunded, fmtNum, typeAccent, getFundraiserStatus, type Fundraiser } from '../../lib/demoFundraisers'
+import { pctFunded, fmtNum, typeAccent, getFundraiserStatus, orgType, orgEmoji, type Fundraiser } from '../../lib/fundraisers'
+import { supabase } from '../../lib/supabase'
+import { Spinner } from '../../components/ui'
 import { useToast } from '../../components/ui/Toast'
 
 function ProgressBar({ raised, goal, animate }: { raised: number; goal: number; animate: boolean }) {
@@ -74,7 +77,42 @@ export default function FundraiserDetailPage() {
     return () => cancelAnimationFrame(t)
   }, [])
 
-  const fundraiser: Fundraiser | undefined = demoFundraisers.find((f) => f.id === id)
+  const { data: fundraiser, isLoading } = useQuery<Fundraiser | null>({
+    queryKey: ['fundraiser', id],
+    queryFn: async () => {
+      if (!id) return null
+      const { data, error } = await supabase
+        .from('fundraisers')
+        .select('id, name, description, organization, goal_amount, raised_amount, bag_count, percent_to_cause, start_date, end_date')
+        .eq('id', id)
+        .maybeSingle()
+      if (error) throw error
+      if (!data) return null
+      return {
+        id:             data.id,
+        name:           data.name,
+        type:           orgType(data.organization),
+        goal:           Number(data.goal_amount),
+        raised:         Number(data.raised_amount),
+        supporters:     data.bag_count ?? 0,
+        percentToCause: data.percent_to_cause ?? 30,
+        description:    data.description ?? '',
+        impact:         '',
+        emoji:          orgEmoji(data.organization),
+        startDate:      data.start_date ?? '',
+        endDate:        data.end_date ?? '',
+      }
+    },
+    enabled: !!id,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(180deg, #060e24 0%, #040a1a 100%)' }}>
+        <Spinner size="lg" />
+      </div>
+    )
+  }
 
   if (!fundraiser) return <NotFound />
 

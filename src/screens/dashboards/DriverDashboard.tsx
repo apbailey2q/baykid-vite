@@ -10,29 +10,30 @@ import {
   setDriverOnline,
   getActiveRoute,
   getRouteStops,
-  completeStop,
   pauseRoute,
   resumeRoute,
   completeRoute,
-  touchLastActive,
   startRoute,
   createRouteForDriver,
   getDriverCompletedStops,
   getDriverWeeklyEarnings,
-  getPendingBags,
   getDriverWalletBalance,
 } from '../../lib/driver'
 import { getBroadcastsForRole } from '../../lib/points'
-import { isDemoMode } from '../../lib/mode'
+import { getDriverRates } from '../../lib/systemConfig'
 import { PickupsNearYou } from '../driver/PickupsNearYou'
-import { DriverRouteView } from '../driver/DriverRouteView'
 import { logout } from '../../lib/auth'
 import { DriverHeader } from '../../components/driver/DriverHeader'
+import { DriverBottomNav } from '../../components/driver/DriverBottomNav'
 import { SectionLabel } from '../../components/ui/dashboard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type DriverTab = 'home' | 'pickups' | 'route' | 'earnings' | 'schedule' | 'account'
+
+// PendingBag interface previously typed the consumer_bag_scans query — that
+// query lives in PickupsNearYou.tsx now. If a ZIP-filtered list ships here
+// later, reintroduce the type.
 
 // ── Module-level constants ────────────────────────────────────────────────────
 
@@ -42,54 +43,6 @@ const CONFETTI_PIECES = Array.from({ length: 30 }, (_, i) => ({
   dur: `${1.5 + (i % 5) * 0.28}s`,
   size: 14 + (i % 6) * 3,
 }))
-
-type ScheduleStatus = 'active' | 'completed' | 'available' | 'day_off'
-
-function buildWeekSchedule() {
-  const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const DEFAULT_BLOCKS: string[][] = [
-    ['1 PM–5 PM'],                            // Sun
-    ['8 AM–12 PM', '1 PM–5 PM'],              // Mon
-    ['8 AM–12 PM', '1 PM–5 PM', '6 PM–10 PM'], // Tue
-    ['8 AM–12 PM', '1 PM–5 PM'],              // Wed
-    ['8 AM–12 PM', '6 PM–10 PM'],             // Thu
-    ['8 AM–12 PM', '1 PM–5 PM', '6 PM–10 PM'], // Fri
-    [],                                        // Sat (day off)
-  ]
-  const today = new Date()
-  const todayDow = today.getDay() // 0=Sun
-  // Start of current week (Mon)
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - ((todayDow + 6) % 7))
-
-  return [1, 2, 3, 4, 5, 6, 0].map((dow) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + ([1,2,3,4,5,6,0].indexOf(dow)))
-    const isToday = d.toDateString() === today.toDateString()
-    const isPast  = d < today && !isToday
-    const isSat   = dow === 6
-    const status: ScheduleStatus = isToday ? 'active' : isPast ? 'completed' : isSat ? 'day_off' : 'available'
-    return {
-      day:     DAY_LABELS[dow],
-      date:    `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`,
-      isToday,
-      status,
-      blocks:  isSat ? [] : DEFAULT_BLOCKS[dow],
-    }
-  })
-}
-
-const MOCK_SCHEDULE = buildWeekSchedule()
-
-// Demo-mode placeholder bags shown in the home tab "Available Pickups" section.
-// Only used when demoMode=true; live mode always queries Supabase directly.
-const DEMO_HOME_BAGS: Array<{ id: string; bag_code: string; city: string | null; status: string; created_at: string }> = [
-  { id: 'demo-bag-1', bag_code: 'CB-0042', city: 'East Nashville',  status: 'pending',  created_at: '' },
-  { id: 'demo-bag-2', bag_code: 'CB-0089', city: 'Midtown',          status: 'pending',  created_at: '' },
-  { id: 'demo-bag-3', bag_code: 'CB-0103', city: 'Germantown',       status: 'assigned', created_at: '' },
-  { id: 'demo-bag-4', bag_code: 'CB-0156', city: 'The Gulch',        status: 'pending',  created_at: '' },
-]
 
 const ACCOUNT_CATEGORIES = [
   { icon: '👤', title: 'Profile Details',        subtitle: 'Name, email, phone number'         },
@@ -109,119 +62,9 @@ function getInitials(name: string) {
   return name.split(' ').map((p) => p[0]).join('').toUpperCase().slice(0, 2)
 }
 
-// ── Bottom Nav ────────────────────────────────────────────────────────────────
-
-function DriverBottomNav({
-  tab,
-  onTab,
-  onRoute,
-  pickupCount,
-}: {
-  tab: DriverTab
-  onTab: (t: DriverTab) => void
-  onRoute: () => void
-  pickupCount: number
-}) {
-  const items: { id: DriverTab; label: string; icon: (a: boolean) => React.ReactNode }[] = [
-    {
-      id: 'home', label: 'Home',
-      icon: (a) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? '#3b82f6' : 'none'} stroke={a ? '#3b82f6' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-      ),
-    },
-    {
-      id: 'pickups', label: 'Pickups',
-      icon: (a) => (
-        <div className="relative">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? '#3b82f6' : 'none'} stroke={a ? '#3b82f6' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <path d="M16 10a4 4 0 0 1-8 0" />
-          </svg>
-          {pickupCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold" style={{ background: '#FF1744', color: '#fff' }}>
-              {pickupCount > 9 ? '9+' : pickupCount}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'route', label: 'Route',
-      icon: (a) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? '#3b82f6' : 'none'} stroke={a ? '#3b82f6' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="6" cy="19" r="3" />
-          <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
-          <circle cx="18" cy="5" r="3" />
-        </svg>
-      ),
-    },
-    {
-      id: 'earnings', label: 'Earnings',
-      icon: (a) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? '#3b82f6' : 'none'} stroke={a ? '#3b82f6' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="12" y1="1" x2="12" y2="23" />
-          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
-      ),
-    },
-    {
-      id: 'schedule', label: 'Schedule',
-      icon: (a) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? '#3b82f6' : 'none'} stroke={a ? '#3b82f6' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-      ),
-    },
-    {
-      id: 'account', label: 'Account',
-      icon: (a) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill={a ? '#3b82f6' : 'none'} stroke={a ? '#3b82f6' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-      ),
-    },
-  ]
-
-  return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex items-end justify-around px-2"
-      style={{
-        background: 'rgba(6,14,36,0.95)',
-        borderTop: '1px solid rgba(0,190,255,0.15)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
-        paddingTop: '8px',
-      }}
-    >
-      {items.map((item) => {
-        const active = tab === item.id
-        return (
-          <button
-            key={item.id}
-            onClick={() => item.id === 'route' ? onRoute() : onTab(item.id)}
-            className="relative flex flex-col items-center gap-0.5 min-w-[52px] py-1 transition-all duration-150 active:scale-[0.88]"
-          >
-            <span className="relative z-10" style={{ filter: active ? 'drop-shadow(0 0 6px rgba(59,130,246,0.7))' : 'none' }}>
-              {item.icon(active)}
-            </span>
-            <span className="relative z-10 text-[10px] font-semibold" style={{ color: active ? '#3b82f6' : 'rgba(255,255,255,0.35)' }}>
-              {item.label}
-            </span>
-          </button>
-        )
-      })}
-    </nav>
-  )
-}
+// Bottom nav now lives in ../../components/driver/DriverBottomNav (shared
+// between this dashboard and the standalone /dashboard/driver/route-map
+// screen so both stay pixel-identical).
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
@@ -230,12 +73,6 @@ export default function DriverDashboard() {
   const navigate  = useNavigate()
   const location  = useLocation()
   const ACCENT    = '#3b82f6'
-  // Evaluated each render so it reacts to real user being set in the auth store.
-  // The old module-level `const DEV_BYPASS_AUTH = isDemoModeActive()` was frozen
-  // at module load time when the user was still null, causing isDemoMode() to
-  // return true (ENABLE_DEMO_ACCESS=true shortcut) and permanently disabling all
-  // real Supabase queries even after a live user signed in.
-  const demoMode  = isDemoMode()
   const {
     driverStatus,
     activeRoute,
@@ -244,7 +81,6 @@ export default function DriverDashboard() {
     setDriverStatus,
     setActiveRoute,
     setActiveRouteStops,
-    updateStop,
     recordActivity,
     setAutoPaused,
   } = useDriverStore()
@@ -259,15 +95,28 @@ export default function DriverDashboard() {
   const [msgBanner, setMsgBanner]         = useState<string | null>(null)
   const [selectedPickupCount, setSelectedPickupCount] = useState(0)
   const [selectedPickupInputs, setSelectedPickupInputs] = useState<{ id: string; address: string; bags: number }[]>([])
+
+  // Stable reference for PickupsNearYou's onSelectionChange prop. An inline
+  // arrow here re-creates the function on every render → PickupsNearYou's
+  // dependent useEffect re-fires → calls these setters → triggers a re-render
+  // of this component → new callback identity → "Maximum update depth
+  // exceeded". useCallback with empty deps keeps the identity stable (the
+  // setState setters from useState are themselves stable, so no real deps).
+  const handlePickupSelection = useCallback(
+    (count: number, inputs: { id: string; address: string; bags: number }[]) => {
+      setSelectedPickupCount(count)
+      setSelectedPickupInputs(inputs)
+    },
+    [],
+  )
   const [pickupsResetKey, setPickupsResetKey] = useState(0)
-  // dev-bypass online state (replaces driverStatus.is_online in demo mode)
-  const [devIsOnline, setDevIsOnline]     = useState(() => localStorage.getItem('isOnline') === 'true')
   // earnings payout
   const [showPayoutModal, setShowPayoutModal] = useState(false)
   const [payoutDone, setPayoutDone]       = useState(false)
   const [showConfetti, setShowConfetti]   = useState(false)
-  const [_expandedZip, setExpandedZip]   = useState<string | null>(null)
-  const [selectedPickupIds, setSelectedPickupIds] = useState<Set<string>>(new Set())
+  // Note: expandedZip + selectedPickupIds state removed when the per-bag
+  // selectable list was replaced by the ZIP-grouped Available Pickups grid.
+  // Reintroduce them when the ZIP-filtered pickup list view ships.
   const [weekDropdownOpen, setWeekDropdownOpen]         = useState(false)
   const [todayDropdownOpen, setTodayDropdownOpen]       = useState(false)
   const [bagHistoryDropdownOpen, setBagHistoryDropdownOpen] = useState(false)
@@ -283,42 +132,29 @@ export default function DriverDashboard() {
   const { data: availablePayout = 0 } = useQuery({
     queryKey: ['driver-balance', user?.id],
     queryFn: () => getDriverWalletBalance(user!.id),
-    enabled: !demoMode && !!user,
+    enabled: !!user,
   })
 
   const { data: completedStops = [] } = useQuery({
     queryKey: ['driver-completed-stops', user?.id],
     queryFn: () => getDriverCompletedStops(user!.id),
-    enabled: !demoMode && !!user,
+    enabled: !!user,
   })
 
   const { data: weekHistory = [] } = useQuery({
     queryKey: ['driver-weekly-earnings', user?.id],
     queryFn: () => getDriverWeeklyEarnings(user!.id),
-    enabled: !demoMode && !!user,
+    enabled: !!user,
   })
 
-  const { data: pendingBags = [] } = useQuery({
-    queryKey: ['driver-pending-bags'],
-    queryFn: async () => {
-      const rows = await getPendingBags(30)
-      console.log('[pickup-data] source: "supabase" | count:', rows.length)
-      return rows
-    },
-    enabled: !demoMode,          // never query Supabase in demo mode
-    refetchInterval: 30_000,
+  const { data: driverRates } = useQuery({
+    queryKey: ['system-config-driver-rates'],
+    queryFn:  getDriverRates,
+    staleTime: 5 * 60 * 1000, // 5 min — rates rarely change
   })
 
-  // Home tab pickup source: real Supabase rows in live, static mock in demo.
-  // Never mix the two — no Supabase fallback from demo data, no mock fallback on errors.
-  const displayBags = demoMode ? DEMO_HOME_BAGS : pendingBags
-
-  // Log pickup data source once on mount / when mode changes
-  useEffect(() => {
-    if (demoMode) {
-      console.log('[pickup-data] source: "demo-mock" | count:', DEMO_HOME_BAGS.length)
-    }
-  }, [demoMode])
+  // Note: the live pickup feed for drivers lives in PickupsNearYou.tsx
+  // (the Pickups tab). No additional query is needed here.
 
   useBroadcastAlerts(
     profile?.role ?? null,
@@ -326,7 +162,6 @@ export default function DriverDashboard() {
   )
 
   useEffect(() => {
-    if (demoMode) return
     if (!user) return
     const init = async () => {
       try {
@@ -348,14 +183,6 @@ export default function DriverDashboard() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleToggleOnline = async () => {
-    if (demoMode) {
-      setDevIsOnline((prev) => {
-        const next = !prev
-        localStorage.setItem('isOnline', String(next))
-        return next
-      })
-      return
-    }
     if (!user || !driverStatus) return
     const goingOffline = driverStatus.is_online
     if (goingOffline && activeRoute?.status === 'active') {
@@ -372,7 +199,6 @@ export default function DriverDashboard() {
   }
 
   const handleGoOnlineOnly = async () => {
-    if (demoMode) { setDevIsOnline(true); localStorage.setItem('isOnline', 'true'); return }
     if (!user || !driverStatus) return
     setToggling(true)
     try {
@@ -423,15 +249,9 @@ export default function DriverDashboard() {
     }
   }
 
-  const handleCompleteStop = async (stopId: string) => {
-    if (!user) return
-    updateStop(stopId, { status: 'completed', completed_at: new Date().toISOString() })
-    recordActivity()
-    touchLastActive(user.id).catch(() => {})
-    completeStop(stopId).catch(() => {
-      updateStop(stopId, { status: 'pending', completed_at: null })
-    })
-  }
+  // Per-stop completion handler now lives in DriverResidentialRouteMap (the
+  // /dashboard/driver/route-map screen) since the active-route map left the
+  // Pickups tab. completeStop / updateStop are imported there.
 
   const handleSignOut = async () => {
     await logout()
@@ -455,15 +275,14 @@ export default function DriverDashboard() {
 
   const pendingCount   = activeRouteStops.filter((s) => s.status === 'pending').length
   const doneCount      = activeRouteStops.filter((s) => s.status === 'completed').length
-  const isOnline       = demoMode ? devIsOnline : (driverStatus?.is_online ?? false)
-  const hasActiveRoute = !!activeRoute && activeRoute.status !== 'completed'
+  const isOnline       = driverStatus?.is_online ?? false
   const isRouteActive  = activeRoute?.status === 'active'
   const isRoutePaused  = activeRoute?.status === 'paused'
   const isRoutePending = activeRoute?.status === 'pending'
   const nextStop       = activeRouteStops.find((s) => s.status === 'pending') ?? null
   const firstName      = profile?.full_name?.split(' ')[0] ?? 'Driver'
   const initials       = profile?.full_name ? getInitials(profile.full_name) : 'DR'
-  const weekEarnings   = (doneCount * 6.10).toFixed(2)
+  const weekEarnings   = (doneCount * (driverRates?.consumer_stop ?? 6.10)).toFixed(2)
   const isAccountPaused = (profile as { approval_status?: string } | null)?.approval_status === 'rejected'
 
   // Pinned button config
@@ -511,31 +330,7 @@ export default function DriverDashboard() {
           zIndex: 10,
         }}
       >
-        {driverTab === 'pickups' && hasActiveRoute ? (
-          <>
-            {/* Route header: back | "Route · N stops" (centered) | Optimize pill */}
-            <button
-              onClick={() => setDriverTab('home')}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80 active:scale-[0.94] shrink-0"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(0,190,255,0.2)', color: 'rgba(0,210,255,0.7)' }}
-            >
-              ‹ Back
-            </button>
-
-            <div className="absolute left-1/2" style={{ transform: 'translateX(-50%)', textAlign: 'center' }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', lineHeight: 1.1, whiteSpace: 'nowrap' }}>
-                Route · {activeRouteStops.length} stops
-              </p>
-            </div>
-
-            <button
-              className="rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-opacity hover:opacity-80 active:scale-[0.94]"
-              style={{ border: '1px solid rgba(0,190,255,0.45)', color: '#00c8ff', background: 'rgba(0,190,255,0.06)' }}
-            >
-              Optimize
-            </button>
-          </>
-        ) : driverTab === 'pickups' ? (
+        {driverTab === 'pickups' ? (
           <>
             {/* Pickups header: back | wordmark (centered) | Add Route + avatar */}
             <button
@@ -651,352 +446,65 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {/* ── Live Eco Heat Map ────────────────────────────────────── */}
-            <style>{`
-              @keyframes heatPulse   { 0%,100%{opacity:.72} 50%{opacity:1}    }
-              @keyframes heatPulse2  { 0%,100%{opacity:.5}  50%{opacity:.82}  }
-              @keyframes heatPulse3  { 0%,100%{opacity:.35} 50%{opacity:.6}   }
-              @keyframes labelBob    { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-3px)} }
-              @keyframes particlePop { 0%,100%{opacity:0} 35%,65%{opacity:.78} }
-            `}</style>
+            {/* ── Pickup Activity Card ─────────────────────────────────── */}
+            {/* TODO: Replace placeholder with real map when route optimizer is connected */}
+            <div style={{ borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(0,200,255,0.15)', background: 'rgba(0,12,30,0.7)' }}>
 
-            {/* Map container */}
-            <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', height: 310, userSelect: 'none' }}>
-
-              {/* ── SVG heat map — DoorDash-style organic zones ── */}
-              <svg width="100%" height="310" viewBox="0 0 360 310" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, display: 'block' }}>
-                <defs>
-                  <filter id="hz1" x="-80%" y="-80%" width="260%" height="260%">
-                    <feGaussianBlur stdDeviation="24" />
-                  </filter>
-                  <filter id="hz2" x="-80%" y="-80%" width="260%" height="260%">
-                    <feGaussianBlur stdDeviation="18" />
-                  </filter>
-                  <filter id="hz3" x="-80%" y="-80%" width="260%" height="260%">
-                    <feGaussianBlur stdDeviation="14" />
-                  </filter>
-                  <filter id="hz4" x="-80%" y="-80%" width="260%" height="260%">
-                    <feGaussianBlur stdDeviation="28" />
-                  </filter>
-                </defs>
-
-                {/* Very dark map base */}
-                <rect width="360" height="310" fill="#030810" />
-
-                {/* East River water hint */}
-                <path d="M 342 0 Q 356 80 360 155 Q 358 230 350 310 L 360 310 L 360 0 Z" fill="#020a1a" />
-
-                {/* === HEAT ZONES — blurred organic shapes, rendered under streets === */}
-
-                {/* Very Busy — large central/north zone, bright cyan */}
-                <polygon
-                  points="30,10 158,0 248,22 272,65 256,128 196,150 108,154 38,126 8,72"
-                  fill="rgba(0,195,255,0.48)"
-                  filter="url(#hz1)"
-                  style={{ animationName: 'heatPulse', animationDuration: '3.2s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite' }}
-                />
-
-                {/* Very Busy core — inner bright spot */}
-                <ellipse
-                  cx="148" cy="74" rx="74" ry="56"
-                  fill="rgba(0,225,255,0.38)"
-                  filter="url(#hz2)"
-                  style={{ animationName: 'heatPulse', animationDuration: '2.8s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite', animationDelay: '0.4s' }}
-                />
-
-                {/* Busy — Bed-Stuy east zone, medium cyan */}
-                <polygon
-                  points="218,50 328,34 356,98 346,182 282,207 212,180 202,124"
-                  fill="rgba(0,140,215,0.30)"
-                  filter="url(#hz2)"
-                  style={{ animationName: 'heatPulse2', animationDuration: '3.8s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite' }}
-                />
-
-                {/* Low activity — Park Slope / Gowanus, dim blue */}
-                <polygon
-                  points="0,152 92,143 115,188 106,264 50,274 0,256"
-                  fill="rgba(0,72,155,0.25)"
-                  filter="url(#hz3)"
-                  style={{ animationName: 'heatPulse3', animationDuration: '4.5s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite', animationDelay: '0.8s' }}
-                />
-
-                {/* Low activity — south Crown Heights */}
-                <polygon
-                  points="112,194 218,183 242,230 220,280 148,287 98,260"
-                  fill="rgba(0,88,160,0.22)"
-                  filter="url(#hz4)"
-                  style={{ animationName: 'heatPulse3', animationDuration: '5.2s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite', animationDelay: '1.5s' }}
-                />
-
-                {/* === STREETS — rendered on top of heat zones === */}
-
-                {/* Flatbush Ave — major diagonal */}
-                <line x1="62" y1="0" x2="192" y2="310" stroke="#0b1c38" strokeWidth="10" />
-                <line x1="62" y1="0" x2="192" y2="310" stroke="#142848" strokeWidth="5.5" />
-
-                {/* Atlantic Ave — major horizontal */}
-                <path d="M 0 100 C 90 98 180 101 360 99" stroke="#0b1c38" strokeWidth="9" fill="none" />
-                <path d="M 0 100 C 90 98 180 101 360 99" stroke="#142848" strokeWidth="5" fill="none" />
-
-                {/* Fulton St */}
-                <path d="M 0 143 C 120 141 240 144 360 142" stroke="#0b1c38" strokeWidth="7" fill="none" />
-                <path d="M 0 143 C 120 141 240 144 360 142" stroke="#132445" strokeWidth="3.5" fill="none" />
-
-                {/* Eastern Pkwy — wide boulevard */}
-                <line x1="0" y1="188" x2="360" y2="186" stroke="#0b1c38" strokeWidth="12" />
-                <line x1="0" y1="188" x2="360" y2="186" stroke="#142848" strokeWidth="7" />
-
-                {/* Church Ave */}
-                <path d="M 0 240 C 120 238 240 241 360 239" stroke="#0a1a34" strokeWidth="6.5" fill="none" />
-                <path d="M 0 240 C 120 238 240 241 360 239" stroke="#112040" strokeWidth="3" fill="none" />
-
-                {/* Nostrand Ave (N-S) */}
-                <line x1="254" y1="0" x2="258" y2="310" stroke="#0b1c38" strokeWidth="8" />
-                <line x1="254" y1="0" x2="258" y2="310" stroke="#142848" strokeWidth="4.5" />
-
-                {/* Rogers Ave (N-S) */}
-                <line x1="198" y1="0" x2="200" y2="310" stroke="#0a1a34" strokeWidth="6" />
-                <line x1="198" y1="0" x2="200" y2="310" stroke="#112040" strokeWidth="3" />
-
-                {/* Bedford Ave (N-S) */}
-                <line x1="300" y1="0" x2="302" y2="310" stroke="#0a1a34" strokeWidth="6" />
-                <line x1="300" y1="0" x2="302" y2="310" stroke="#112040" strokeWidth="3" />
-
-                {/* 4th Ave — Park Slope (N-S) */}
-                <line x1="53" y1="0" x2="53" y2="185" stroke="#0b1c38" strokeWidth="7" />
-                <line x1="53" y1="0" x2="53" y2="185" stroke="#142848" strokeWidth="4" />
-
-                {/* Secondary streets */}
-                {[38,72,118,165,215,262].map((y,i) => (
-                  <line key={`hs${i}`} x1="0" y1={y} x2="360" y2={y} stroke="#09172e" strokeWidth="2.5" />
-                ))}
-                {[28,92,155,222,278,328].map((x,i) => (
-                  <line key={`vs${i}`} x1={x} y1="0" x2={x} y2="310" stroke="#09172e" strokeWidth="2.5" />
-                ))}
-
-                {/* Prospect Park — dark overlay (no heat activity) */}
-                <ellipse cx="162" cy="252" rx="62" ry="46" fill="#02090a" opacity="0.92" />
-                <ellipse cx="162" cy="252" rx="62" ry="46" fill="none" stroke="#0a2015" strokeWidth="1.5" />
-                <text x="162" y="255" textAnchor="middle" fontSize="7" fill="rgba(0,150,60,0.4)" fontWeight="700" letterSpacing="0.5">PROSPECT PARK</text>
-
-                {/* Street labels */}
-                <text x="5"   y="96"  fontSize="6.5" fill="rgba(0,170,230,0.55)" fontWeight="700">ATLANTIC AVE</text>
-                <text x="5"   y="139" fontSize="6.5" fill="rgba(0,170,230,0.45)" fontWeight="700">FULTON ST</text>
-                <text x="5"   y="184" fontSize="6.5" fill="rgba(0,170,230,0.55)" fontWeight="700">EASTERN PKWY</text>
-                <text x="5"   y="236" fontSize="6.5" fill="rgba(0,170,230,0.42)" fontWeight="700">CHURCH AVE</text>
-                <text x="260" y="22"  fontSize="6.5" fill="rgba(0,170,230,0.45)" fontWeight="700" transform="rotate(90,260,22)">NOSTRAND AVE</text>
-                <text x="68"  y="22"  fontSize="6.5" fill="rgba(0,170,230,0.42)" fontWeight="700" transform="rotate(90,68,22)">FLATBUSH AVE</text>
-
-                {/* Neighborhood labels */}
-                <text x="12"  y="75"  fontSize="8" fill="rgba(0,195,255,0.25)" fontWeight="800" letterSpacing="0.8">DUMBO</text>
-                <text x="88"  y="52"  fontSize="8" fill="rgba(0,195,255,0.32)" fontWeight="800" letterSpacing="0.8">FORT GREENE</text>
-                <text x="215" y="80"  fontSize="8" fill="rgba(0,195,255,0.26)" fontWeight="800" letterSpacing="0.8">BED-STUY</text>
-                <text x="215" y="165" fontSize="8" fill="rgba(0,195,255,0.22)" fontWeight="800" letterSpacing="0.8">CROWN HTS</text>
-                <text x="268" y="108" fontSize="8" fill="rgba(0,195,255,0.2)"  fontWeight="800" letterSpacing="0.8">BUSHWICK</text>
-
-                {/* Location pins */}
-                <circle cx="148" cy="72"  r="6"   fill="#00D4FF" opacity="0.95" />
-                <circle cx="148" cy="72"  r="12"  fill="rgba(0,212,255,0.22)" />
-                <circle cx="148" cy="72"  r="20"  fill="rgba(0,212,255,0.07)" />
-
-                <circle cx="228" cy="98"  r="4.5" fill="#00BFFF" opacity="0.85" />
-                <circle cx="228" cy="98"  r="10"  fill="rgba(0,191,255,0.18)" />
-
-                <circle cx="72"  cy="158" r="3.5" fill="#0098D4" opacity="0.7" />
-                <circle cx="72"  cy="158" r="8"   fill="rgba(0,152,212,0.14)" />
-
-                <circle cx="258" cy="143" r="3.5" fill="#00BFFF" opacity="0.72" />
-                <circle cx="258" cy="143" r="8"   fill="rgba(0,191,255,0.14)" />
-
-                <circle cx="160" cy="195" r="3"   fill="#00CFFF" opacity="0.62" />
-                <circle cx="160" cy="195" r="7"   fill="rgba(0,207,255,0.12)" />
-
-                {/* Expanding ping rings on main hot pin */}
-                <circle cx="148" cy="72" r="26" fill="none" stroke="#00D4FF" strokeWidth="0.9"
-                  style={{ animationName: 'particlePop', animationDuration: '2.6s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite' }} />
-                <circle cx="148" cy="72" r="35" fill="none" stroke="#00D4FF" strokeWidth="0.55"
-                  style={{ animationName: 'particlePop', animationDuration: '2.6s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite', animationDelay: '0.87s' }} />
-                <circle cx="148" cy="72" r="44" fill="none" stroke="#00D4FF" strokeWidth="0.35"
-                  style={{ animationName: 'particlePop', animationDuration: '2.6s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite', animationDelay: '1.74s' }} />
-
-                {/* Ambient activity particles scattered in hot zones */}
-                {[
-                  [108, 48,  2,   '0s',    '3.2s'],
-                  [168, 88,  1.6, '0.7s',  '2.8s'],
-                  [92,  112, 1.8, '1.3s',  '3.6s'],
-                  [202, 68,  1.5, '0.4s',  '4.0s'],
-                  [252, 93,  2,   '1.6s',  '2.9s'],
-                  [138, 126, 1.5, '0.9s',  '3.4s'],
-                  [286, 128, 1.8, '0.2s',  '3.8s'],
-                  [58,  88,  1.5, '1.9s',  '2.7s'],
-                  [185, 42,  1.8, '0.6s',  '4.2s'],
-                  [228, 148, 1.5, '1.1s',  '3.1s'],
-                ].map(([cx, cy, r, delay, dur], pi) => (
-                  <circle
-                    key={`pt${pi}`}
-                    cx={cx as number} cy={cy as number} r={r as number}
-                    fill="#00D4FF"
-                    style={{ animationName: 'particlePop', animationDuration: dur as string, animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite', animationDelay: delay as string }}
-                  />
-                ))}
-              </svg>
-
-              {/* ── Floating zone labels ── */}
-              {[
-                { label: '🔥 Very Busy',          top: 38,  left: 30,  color: '#00D9FF', bg: 'rgba(0,140,220,0.18)' },
-                { label: '⚡ Eco Surge',          top: 74,  left: 174, color: '#5BFFB0', bg: 'rgba(61,255,212,0.14)' },
-                { label: '📦 High Pickup Volume', top: 164, left: 58,  color: '#3DFFD4', bg: 'rgba(0,200,200,0.14)' },
-                { label: '✦ Busy',                top: 84,  right: 16, color: '#00c8ff', bg: 'rgba(0,180,255,0.13)' },
-              ].map((z, i) => (
-                <div key={i} style={{
-                  position: 'absolute', top: z.top, left: (z as { left?: number }).left, right: (z as { right?: number }).right,
-                  background: z.bg, backdropFilter: 'blur(8px)',
-                  borderRadius: 99, padding: '3px 9px',
-                  fontSize: 9, fontWeight: 700, color: z.color,
-                  letterSpacing: '0.04em', whiteSpace: 'nowrap',
-                  boxShadow: `0 0 10px ${z.bg}`,
-                  animationName: 'labelBob',
-                  animationDuration: `${2.5 + i * 0.5}s`,
-                  animationTimingFunction: 'ease-in-out',
-                  animationIterationCount: 'infinite',
-                  animationDelay: `${i * 0.3}s`,
-                }}>
-                  {z.label}
+              {/* ── Earnings row ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(0,200,255,0.1)' }}>
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>This Week</p>
+                  <p style={{ fontSize: 28, fontWeight: 900, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.02em', marginTop: 3 }}>${weekEarnings}</p>
                 </div>
-              ))}
-
-              {/* ── Floating earnings HUD — top center ── */}
-              <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', background: 'rgba(4,10,24,0.88)', backdropFilter: 'blur(14px)', borderRadius: 16, padding: '7px 22px', textAlign: 'center', border: '1px solid rgba(0,200,255,0.22)', boxShadow: '0 4px 20px rgba(0,140,255,0.18)', zIndex: 4 }}>
-                <p style={{ fontSize: 24, fontWeight: 900, color: '#ffffff', lineHeight: 1, letterSpacing: '-0.02em' }}>${weekEarnings}</p>
-                <p style={{ fontSize: 8, color: '#00c8ff', fontWeight: 700, letterSpacing: '0.14em', marginTop: 2, textTransform: 'uppercase' }}>This Week</p>
-              </div>
-
-              {/* ── Left floating controls ── */}
-              <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 9, zIndex: 4 }}>
-                {[
-                  { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" strokeWidth="2.2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> },
-                  { icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> },
-                ].map((btn, i) => (
-                  <div key={i} style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(3,8,20,0.7)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 14px rgba(0,190,255,0.18)' }}>
-                    {btn.icon}
-                  </div>
-                ))}
-              </div>
-
-              {/* ── Right floating controls ── */}
-              <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 9, zIndex: 4 }}>
-                {[
-                  { icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" strokeWidth="2.2" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-                  { icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5BFFB0" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
-                  { icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3DFFD4" strokeWidth="2.2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
-                ].map((btn, i) => (
-                  <div key={i} style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(3,8,20,0.7)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 14px rgba(0,190,255,0.15)' }}>
-                    {btn.icon}
-                  </div>
-                ))}
-              </div>
-
-              {/* ── Bottom info panel (inside map) ── */}
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(0deg,rgba(4,10,24,0.96) 0%,rgba(4,10,24,0.7) 70%,transparent 100%)', padding: '24px 16px 14px', zIndex: 4 }}>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.3 }}>Recycling pickups are piling up</p>
-                    <p style={{ fontSize: 10, color: 'rgba(0,200,255,0.7)', marginTop: 3, fontWeight: 500 }}>
-                      {displayBags.length} requests near you
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Avg. wait</p>
-                    <p style={{ fontSize: 16, fontWeight: 800, color: '#00D9FF', lineHeight: 1.1 }}>1 min</p>
-                  </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Available</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(0,200,255,0.6)', marginTop: 8 }}>See Pickups tab</p>
                 </div>
+              </div>
+
+              {/* ── Map placeholder ── */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', minHeight: 160 }}>
+                <div style={{ width: 52, height: 52, borderRadius: 16, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="10" r="3" />
+                    <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
+                  </svg>
+                </div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Live pickup map</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: 5, maxWidth: 220, lineHeight: 1.5 }}>
+                  Available when the route optimizer is connected
+                </p>
+              </div>
+
+              {/* ── Bottom — live data only ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid rgba(0,200,255,0.08)' }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>Recycling pickups available</p>
+                <p style={{ fontSize: 12, color: 'rgba(0,200,255,0.7)', fontWeight: 500 }}>See Pickups tab</p>
               </div>
             </div>
 
 
-            {/* Available Pickups — Supabase rows in live mode, static mock in demo */}
+            {/* Available Pickups — tap Pickups tab for live data */}
             <div>
               <SectionLabel title="Available Pickups" accent={ACCENT} />
-              {displayBags.length === 0 ? (
-                <div className="rounded-2xl px-4 py-6 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
-                    {demoMode ? 'No demo pickups' : 'No live pickups available yet'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {displayBags.map((bag) => {
-                    const isSelected = selectedPickupIds.has(bag.id)
-                    return (
-                      <button
-                        key={bag.id}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-2xl active:opacity-75 transition-all"
-                        style={{
-                          background: isSelected ? 'rgba(0,200,255,0.07)' : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${isSelected ? 'rgba(0,200,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
-                          boxShadow: isSelected ? '0 0 14px rgba(0,200,255,0.18)' : 'none',
-                          transition: 'all 0.18s ease',
-                        }}
-                        onClick={() => {
-                          setSelectedPickupIds(prev => {
-                            const next = new Set(prev)
-                            if (next.has(bag.id)) next.delete(bag.id); else next.add(bag.id)
-                            return next
-                          })
-                        }}
-                      >
-                        {/* Glow checkbox */}
-                        <div style={{
-                          width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                          border: `1.5px solid ${isSelected ? '#00D9FF' : 'rgba(255,255,255,0.18)'}`,
-                          background: isSelected ? 'rgba(0,200,255,0.14)' : 'transparent',
-                          boxShadow: isSelected ? '0 0 9px rgba(0,200,255,0.38)' : 'none',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'all 0.18s ease',
-                        }}>
-                          {isSelected && (
-                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                              <path d="M2 6l3 3 5-5" stroke="#00D9FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-mono font-bold" style={{ fontSize: 13, color: isSelected ? '#00c8ff' : 'rgba(255,255,255,0.82)' }}>{bag.bag_code}</p>
-                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{bag.city ?? 'Location TBD'}</p>
-                        </div>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: bag.status === 'assigned' ? '#FFB340' : '#5BFFB0', background: bag.status === 'assigned' ? 'rgba(255,179,64,0.1)' : 'rgba(91,255,176,0.1)', borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                          {bag.status === 'assigned' ? 'Assigned' : 'Pending'}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Add to Route — appears when any pickups are selected */}
-              {selectedPickupIds.size > 0 && user && (
-                <button
-                  className="w-full mt-3 rounded-2xl py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg,#0057e7,#00c8ff)', boxShadow: '0 4px 20px rgba(0,190,255,0.32)' }}
-                  onClick={async () => {
-                    const selected = displayBags.filter(b => selectedPickupIds.has(b.id))
-                    const stops = selected.map(b => ({ address: b.city ?? 'Pickup', zipCode: '', bagCode: b.bag_code }))
-                    const routeName = `Route ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                    try {
-                      const route = await createRouteForDriver(user.id, routeName, stops)
-                      setSelectedPickupIds(new Set())
-                      setExpandedZip(null)
-                      navigate(`/dashboard/driver/route-map?routeId=${route.id}`)
-                    } catch {
-                      // silent
-                    }
-                  }}
-                >
-                  Add to Route · {selectedPickupIds.size} pickup{selectedPickupIds.size !== 1 ? 's' : ''}
-                </button>
-              )}
+              <div
+                className="rounded-2xl px-5 py-6 flex flex-col items-center gap-2 text-center"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,200,255,0.12)' }}
+              >
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
+                  Live pickups in the Pickups tab
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.55 }}>
+                  Tap "Pickups" below to see available bags near you, sorted by distance.
+                </p>
+              </div>
             </div>
 
+            {/* Old per-bag selection + "Add to Route" UI was removed when the
+                Available Pickups section switched to ZIP-grouped cards.
+                Selection state (selectedPickupIds, setSelectedPickupIds) is
+                still declared at the top of the component for compatibility
+                with other handlers; it stays an empty Set in this layout. */}
 
             {/* Active stop card */}
             {isRouteActive && nextStop && (
@@ -1060,25 +568,15 @@ export default function DriverDashboard() {
         )}
 
         {/* ── PICKUPS ───────────────────────────────────────────────────────── */}
+        {/* Pickups tab is selection-only. The active-route map lives on its */}
+        {/* own screen at /dashboard/driver/route-map (DriverResidentialRouteMap) */}
+        {/* so route actions stay under the Route tab, not Pickups. */}
         {driverTab === 'pickups' && (
-          hasActiveRoute ? (
-            <DriverRouteView
-              stops={activeRouteStops}
-              onComplete={handleCompleteStop}
-              onCompleteRoute={handleCompleteRoute}
-              isCompletingRoute={completingRoute}
-            />
-          ) : (
-            <PickupsNearYou
-              isOnline={isOnline}
-              resetKey={pickupsResetKey}
-              demoMode={demoMode}
-              onSelectionChange={(count, inputs) => {
-                setSelectedPickupCount(count)
-                setSelectedPickupInputs(inputs)
-              }}
-            />
-          )
+          <PickupsNearYou
+            isOnline={isOnline}
+            resetKey={pickupsResetKey}
+            onSelectionChange={handlePickupSelection}
+          />
         )}
 
         {/* ── EARNINGS ─────────────────────────────────────────────────────── */}
@@ -1312,60 +810,16 @@ export default function DriverDashboard() {
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
                 This Week
               </p>
-              <div className="space-y-2.5">
-                {MOCK_SCHEDULE.map((day) => {
-                  const STATUS_CONFIG = {
-                    active:    { label: 'Today',     color: '#00c8ff', bg: 'rgba(0,190,255,0.12)',    dot: '#00c8ff' },
-                    completed: { label: 'Done',       color: '#4ade80', bg: 'rgba(74,222,128,0.1)',    dot: '#4ade80' },
-                    available: { label: 'Available',  color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.05)', dot: 'rgba(255,255,255,0.3)' },
-                    day_off:   { label: 'Day Off',    color: '#f87171', bg: 'rgba(248,113,113,0.08)',  dot: '#f87171' },
-                  }
-                  const cfg = STATUS_CONFIG[day.status]
-                  return (
-                    <div
-                      key={day.day}
-                      className="rounded-2xl px-4 py-3.5"
-                      style={{
-                        background: day.isToday ? 'rgba(0,190,255,0.06)' : 'rgba(255,255,255,0.03)',
-                        boxShadow: day.isToday ? '0 0 20px rgba(0,190,255,0.1)' : 'none',
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        {/* Day + date */}
-                        <div style={{ minWidth: 56 }}>
-                          <p style={{ fontSize: 13, color: day.isToday ? '#00c8ff' : '#ffffff', fontWeight: day.isToday ? 700 : 500 }}>{day.day}</p>
-                          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{day.date}</p>
-                        </div>
-
-                        {/* Time blocks */}
-                        <div className="flex-1 flex flex-wrap gap-1.5">
-                          {day.blocks.length > 0 ? day.blocks.map((block) => (
-                            <span
-                              key={block}
-                              className="rounded-lg px-2 py-1 text-[10px] font-semibold"
-                              style={{
-                                background: day.isToday ? 'rgba(0,190,255,0.15)' : 'rgba(255,255,255,0.06)',
-                                color: day.isToday ? '#00c8ff' : day.status === 'completed' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.7)',
-                              }}
-                            >
-                              {block}
-                            </span>
-                          )) : (
-                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', alignSelf: 'center' }}>No blocks scheduled</span>
-                          )}
-                        </div>
-
-                        {/* Status pill */}
-                        <span
-                          className="rounded-full px-2.5 py-1 text-[10px] font-bold shrink-0"
-                          style={{ background: cfg.bg, color: cfg.color }}
-                        >
-                          {cfg.label}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div
+                className="rounded-2xl px-5 py-6 flex flex-col items-center gap-2 text-center"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                  No schedule configured
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', lineHeight: 1.55 }}>
+                  Your availability blocks will appear here once scheduling is set up in Account settings.
+                </p>
               </div>
             </div>
 
@@ -1381,7 +835,7 @@ export default function DriverDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>Route Forecast</p>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>~11 pickups projected for Thu–Fri in your zones</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Forecast available when route optimizer is connected</p>
               </div>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>
                 <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1478,7 +932,7 @@ export default function DriverDashboard() {
         className="fixed left-0 right-0 z-20 px-5 pb-2"
         style={{ bottom: 68 }}
       >
-        {driverTab === 'pickups' && hasActiveRoute ? null : driverTab === 'pickups' ? (
+        {driverTab === 'pickups' ? (
           !isOnline ? (
             <button
               onClick={handleGoOnlineOnly}
@@ -1524,7 +978,13 @@ export default function DriverDashboard() {
         )}
       </div>
 
-      <DriverBottomNav tab={driverTab} onTab={setDriverTab} onRoute={() => navigate('/dashboard/driver/route-map')} pickupCount={pendingCount} />
+      <DriverBottomNav
+        tab={driverTab}
+        onTab={setDriverTab}
+        onRoute={() => navigate('/dashboard/driver/route-map')}
+        routeCount={pendingCount}
+        accent={ACCENT}
+      />
 
       {/* ── Confetti overlay ─────────────────────────────────────────────── */}
       {showConfetti && (

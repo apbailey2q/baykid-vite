@@ -32,7 +32,15 @@ export default function SignupScreen() {
     setLoading(true)
     try {
       await signUp(email, password, fullName, role)
-      navigate(needsApproval ? '/pending-approval' : '/')
+      // Routing after signup:
+      //   • consumer (auto-approved) → /onboarding (the multi-step wizard)
+      //   • driver                   → /driver/pending-approval (driver-specific copy)
+      //   • every other approval-required role → /pending-approval (generic)
+      let dest = '/onboarding'
+      if (needsApproval) {
+        dest = role === 'driver' ? '/driver/pending-approval' : '/pending-approval'
+      }
+      navigate(dest)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign up failed')
     } finally {

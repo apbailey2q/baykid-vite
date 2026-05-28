@@ -1,0 +1,50 @@
+name: Uptime — SSL + Health
+
+# Runs on a 30-minute schedule against staging + production. Hits each
+# environment's /api/health endpoint and verifies:
+#   • HTTP 200 + JSON payload
+#   • TLS cert is valid and not expiring within 14 days
+#   • The reported environment matches what we expect
+#
+# Configure URLs via repository variables (Settings → Secrets and variables →
+# Actions → Variables):
+#   STAGING_URL    e.g. https://staging.baykid.com
+#   PRODUCTION_URL e.g. https://app.baykid.com
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  staging:
+    name: Staging health
+    runs-on: ubuntu-latest
+    if: ${{ vars.STAGING_URL != '' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Health
+        env: { TARGET_URL: ${{ vars.STAGING_URL }}, EXPECTED_ENV: staging }
+        run: node scripts/check-health.mjs
+      - name: SSL
+        env: { TARGET_URL: ${{ vars.STAGING_URL }} }
+        run: node scripts/check-ssl.mjs
+
+  production:
+    name: Production health
+    runs-on: ubuntu-latest
+    if: ${{ vars.PRODUCTION_URL != '' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Health
+        env: { TARGET_URL: ${{ vars.PRODUCTION_URL }}, EXPECTED_ENV: production }
+        run: node scripts/check-health.mjs
+      - name: SSL
+        env: { TARGET_URL: ${{ vars.PRODUCTION_URL }} }
+        run: node scripts/check-ssl.mjs

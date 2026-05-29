@@ -101,7 +101,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 // Cleanup stale entries every 2 minutes to prevent unbounded Map growth
-const _cleanupInterval = setInterval(() => {
+const _cleanupInterval: ReturnType<typeof setInterval> = setInterval(() => {
   const cutoff = Date.now() - RATE_WINDOW_MS
   for (const [ip, times] of ipLog.entries()) {
     const fresh = times.filter((t) => t > cutoff)
@@ -110,7 +110,7 @@ const _cleanupInterval = setInterval(() => {
   }
 }, 120_000)
 // Unref so interval doesn't block process exit in test environments
-if (typeof _cleanupInterval.unref === 'function') _cleanupInterval.unref()
+_cleanupInterval.unref()
 
 // ── Input sanitization ────────────────────────────────────────────────────────
 

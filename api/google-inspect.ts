@@ -74,8 +74,10 @@ export default async function handler(req: any, res: any) {
       throw new Error(`Google Vision ${visionRes.status}: ${errText.slice(0, 300)}`)
     }
 
-    const visionJson = await visionRes.json()
-    const response   = visionJson.responses?.[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const visionJson = await visionRes.json() as any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: any = visionJson?.responses?.[0]
 
     if (response?.error) {
       throw new Error(`Vision API: ${response.error.message}`)

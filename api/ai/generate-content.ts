@@ -16,7 +16,7 @@
 //   Anthropic error     → 502 { demo:true, details }
 //   Parse failure       → 500 { demo:true, details }
 
-import { getSystemPrompt } from '../systemPrompts'
+import { getSystemPrompt } from '../systemPrompts.js'
 
 // ── Allowed enum values ───────────────────────────────────────────────────────
 

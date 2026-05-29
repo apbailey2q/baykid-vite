@@ -70,7 +70,7 @@ const TABS: TabCfg[] = [
     id: 'reel', label: 'Reel Script', icon: '🎬',
     contentType: 'reel_script', resultLabel: 'Full Script',
     desc: '15–60 second TikTok / Reels video scripts',
-    placeholder: 'e.g. Behind the scenes at BayKid Nashville pickup day',
+    placeholder: 'e.g. Behind the scenes at Cyan\'s Brooklynn Nashville pickup day',
     btnLabel: 'Generate Reel Script',
   },
   {
@@ -98,7 +98,7 @@ const TABS: TabCfg[] = [
     id: 'thumbnail', label: 'Thumbnail Text', icon: '🎨',
     contentType: 'social_post', resultLabel: 'Thumbnail Text Ideas',
     desc: 'Bold text overlays and thumbnail copy ideas',
-    placeholder: 'e.g. Before & after a BayKid cleanout',
+    placeholder: 'e.g. Before & after a Cyan\'s Brooklynn cleanout',
     btnLabel: 'Generate Thumbnail Text',
   },
   {
@@ -717,7 +717,7 @@ export function CreativeStudio() {
                 <textarea
                   value={campGoal}
                   onChange={(e) => setCampGoal(e.target.value)}
-                  placeholder="e.g. Increase brand awareness for BayKid Nashville and drive electronics recycling sign-ups in Q3 2026"
+                  placeholder="e.g. Increase brand awareness for Cyan's Brooklynn Nashville and drive electronics recycling sign-ups in Q3 2026"
                   rows={3}
                   style={{ ...inputStyle, resize: 'vertical' }}
                 />

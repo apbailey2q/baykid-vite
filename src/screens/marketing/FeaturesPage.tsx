@@ -196,7 +196,7 @@ function PostMock() {
         Friday wins: shipped 4 new automation rules + Lead Tracker v2. The AI Marketing Center is feeling
         more like a teammate every week.
       </div>
-      <div style={{ color: '#00c8ff', fontSize: 11 }}>#BayKid #AIWorkflows #BuildInPublic</div>
+      <div style={{ color: '#00c8ff', fontSize: 11 }}>#CyansBrooklynn #AIWorkflows #BuildInPublic</div>
       <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
         <Pill bg="rgba(0,200,255,0.12)" color="#00c8ff">Pending approval</Pill>
         <Pill bg="rgba(255,255,255,0.06)" color="rgba(255,255,255,0.6)">Instagram</Pill>

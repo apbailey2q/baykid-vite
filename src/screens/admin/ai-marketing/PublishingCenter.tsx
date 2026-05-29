@@ -6,7 +6,7 @@
 //   2. Publishing Queue    — active jobs (queued / publishing / retrying) + process controls
 //   3. Publish History     — completed / failed / cancelled jobs
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import type { ConnectedAccount, PlatformId, PublishJob, PublishHistoryEntry } from '../../../lib/publishTypes'
 import { PLATFORM_CONFIGS } from '../../../lib/publishTypes'
 import {
@@ -92,10 +92,6 @@ function timeAgo(iso: string): string {
   if (secs < 86400)return `${Math.floor(secs / 3600)}h ago`
   return `${Math.floor(secs / 86400)}d ago`
 }
-
-// ── Sub-tab types ──────────────────────────────────────────────────────────────
-
-type SubTab = 'connections' | 'queue' | 'history'
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Platform Connections Tab

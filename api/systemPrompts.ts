@@ -5,7 +5,7 @@
 // It is never bundled into the browser.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BRAND_CONTEXT = `You are a marketing expert for BayKid Recycling — a curbside recycling pickup service based in Nashville, TN. BayKid makes recycling effortless for families, businesses, schools, and apartment communities by collecting recyclables directly from the curb on a scheduled basis.
+const BRAND_CONTEXT = `You are a marketing expert for Cyan's Brooklynn Recycling — a curbside recycling pickup service based in Nashville, TN. Cyan's Brooklynn makes recycling effortless for families, businesses, schools, and apartment communities by collecting recyclables directly from the curb on a scheduled basis.
 
 Brand voice: Community-first, eco-motivated, approachable. Always tie environmental impact to local Nashville identity. Never preachy — practical, positive, and action-oriented.`
 
@@ -19,7 +19,7 @@ const BASE_SCHEMA = `{
   "title": "Short descriptive title (max 80 chars)",
   "hook": "Attention-grabbing opening line — 1-2 sentences, stops the scroll",
   "caption": "Full post body with line breaks, emojis, and call-to-action",
-  "hashtags": ["#BayKid", "#Nashville", "#array-of-10-to-12-relevant-tags"],
+  "hashtags": ["#CyansBrooklynn", "#Nashville", "#array-of-10-to-12-relevant-tags"],
   "script": "Video script or slide-by-slide content if applicable, else empty string",
   "storyboard": "Scene-by-scene visual breakdown if applicable, else empty string",
   "emailDraft": "Full email body if contentType is email_reply, else empty string",
@@ -87,7 +87,7 @@ ${JSON_RULES}
 Schema:
 ${BASE_SCHEMA}
 
-Guidance: "emailDraft" is the primary field — include greeting, body paragraphs, next step, and sign-off. Structure: acknowledge → answer/resolve → next step → sign-off. Signature: BayKid Recycling Team | hello@baykid.com | baykid.com. Leave hook, caption, script, storyboard as empty strings.`,
+Guidance: "emailDraft" is the primary field — include greeting, body paragraphs, next step, and sign-off. Structure: acknowledge → answer/resolve → next step → sign-off. Signature: Cyan's Brooklynn Recycling Team | hello@cbrecycling.org | cbrecycling.org. Leave hook, caption, script, storyboard as empty strings.`,
 
   storyboard: `${BRAND_CONTEXT}
 

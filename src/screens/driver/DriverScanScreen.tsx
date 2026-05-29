@@ -102,7 +102,7 @@ function ScannerViewfinder({ scanning }: { scanning: boolean }) {
             <path d="M17 14h4M17 17h4M17 20h4M14 17h.01M14 20h.01" />
           </svg>
           <p style={{ fontSize: 12, color: 'rgba(0,188,212,0.65)', textAlign: 'center' }}>
-            Point camera at BayKid QR code
+            Point camera at Cyan's Brooklynn QR code
           </p>
           <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>
             Driver pickup scan + safety status

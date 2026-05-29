@@ -4,7 +4,7 @@
 // Tabs: Overview · Platform Breakdown · Content Performance · Hashtags ·
 //       Best Times · Campaigns · AI Insights
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { generateAIContent } from '../../../lib/aiMarketing'
 import type { Platform } from '../../../lib/aiMarketing'
 import {
@@ -22,22 +22,8 @@ import {
   getAlerts,
   PLATFORM_META,
   fmtNum,
-  pctChange,
-  sumMetric,
-  avgMetric,
   type ChartPeriod,
-  type PlatformSummary,
-  type Campaign,
 } from '../../../lib/analyticsData'
-
-// ── Style helpers ──────────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  color: '#fff', borderRadius: 8, padding: '7px 12px',
-  fontSize: 12, outline: 'none', boxSizing: 'border-box',
-}
 
 function ghostBtn(o?: React.CSSProperties): React.CSSProperties {
   return {
@@ -348,7 +334,7 @@ function OverviewTab() {
   ] as const
 
   const activeMetric = metricOptions.find((m) => m.key === metric)!
-  const barData = chartData.map((d) => ({ label: d.label, value: (d as Record<string, number | string>)[metric] as number }))
+  const barData = chartData.map((d) => ({ label: d.label, value: (d as unknown as Record<string, number | string>)[metric] as number }))
 
   return (
     <div>
@@ -855,12 +841,12 @@ const INSIGHT_CONFIGS: Array<{ id: InsightType; icon: string; label: string; des
   {
     id: 'optimization', icon: '⚡', label: 'Optimization Suggestions',
     desc: 'AI analyzes your metrics and suggests specific improvements to boost performance.',
-    topic: 'May 2026 BayKid social media performance — provide 5 specific, actionable optimization suggestions based on: TikTok 8.4% eng/19k reach leading all platforms, Facebook declining (-31%), Instagram strong saves (210 avg), LinkedIn good click rate but low reach, low-performing posts are company updates and time-utility posts. Focus on what to change, test, or double down on.',
+    topic: 'May 2026 Cyan\'s Brooklynn social media performance — provide 5 specific, actionable optimization suggestions based on: TikTok 8.4% eng/19k reach leading all platforms, Facebook declining (-31%), Instagram strong saves (210 avg), LinkedIn good click rate but low reach, low-performing posts are company updates and time-utility posts. Focus on what to change, test, or double down on.',
   },
   {
     id: 'posting', icon: '📅', label: 'Posting Recommendations',
     desc: 'Get a personalized content calendar recommendation for the next 30 days.',
-    topic: 'Create a 30-day content posting schedule for BayKid Nashville recycling. Data: Best times Tue-Thu 9-11am and 5-7pm, TikTok and Instagram are top platforms, follower growth strong on TikTok (+38/day), Facebook declining, top content types: POV videos, educational carousels, customer stories. Recommend: frequency per platform, content mix, formats to prioritize, and 3 specific post ideas with suggested captions.',
+    topic: 'Create a 30-day content posting schedule for Cyan\'s Brooklynn Recycling. Data: Best times Tue-Thu 9-11am and 5-7pm, TikTok and Instagram are top platforms, follower growth strong on TikTok (+38/day), Facebook declining, top content types: POV videos, educational carousels, customer stories. Recommend: frequency per platform, content mix, formats to prioritize, and 3 specific post ideas with suggested captions.',
   },
   {
     id: 'summary', icon: '📊', label: 'Campaign Summary',
@@ -870,7 +856,7 @@ const INSIGHT_CONFIGS: Array<{ id: InsightType; icon: string; label: string; des
   {
     id: 'hashtags', icon: '🏷️', label: 'Hashtag Strategy',
     desc: 'Claude recommends a new hashtag mix based on current performance trends.',
-    topic: 'Analyze BayKid hashtag performance and recommend an updated strategy. Current data: #RecyclingTikTok (9.2k reach, 7.8% eng, trending up), #EcoTok (7.8k reach, 7.1% eng, trending up), #Nashville (6.1k reach, 3.8%, stable), #BayKid (4.2k reach, 4.9%, trending up), #ZeroWaste (2.2k reach, 2.8%, trending down), #GreenLiving (1.4k, 1.9%, trending down). Recommend: top 15 hashtags to use, mix strategy (broad/niche/branded), hashtags to drop, and 2 new hashtags to test.',
+    topic: 'Analyze Cyan\'s Brooklynn hashtag performance and recommend an updated strategy. Current data: #RecyclingTikTok (9.2k reach, 7.8% eng, trending up), #EcoTok (7.8k reach, 7.1% eng, trending up), #Nashville (6.1k reach, 3.8%, stable), #CyansBrooklynn (4.2k reach, 4.9%, trending up), #ZeroWaste (2.2k reach, 2.8%, trending down), #GreenLiving (1.4k, 1.9%, trending down). Recommend: top 15 hashtags to use, mix strategy (broad/niche/branded), hashtags to drop, and 2 new hashtags to test.',
   },
 ]
 

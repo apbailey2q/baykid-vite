@@ -365,7 +365,7 @@ export function SocialPostGenerator() {
             ✍️ Social Post Generator
           </h2>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>
-            Generate AI-powered social media content for BayKid Recycling in seconds.
+            Generate AI-powered social media content for Cyan's Brooklynn Recycling in seconds.
           </p>
         </div>
         {/* Draft / Queue counters */}
@@ -459,7 +459,7 @@ export function SocialPostGenerator() {
             <label style={labelStyle}>Call-to-Action</label>
             <input
               style={inputStyle}
-              placeholder="e.g. Sign up at baykid.com"
+              placeholder="e.g. Sign up at cbrecycling.org"
               value={formData.callToAction}
               onChange={(e) => updateField('callToAction', e.target.value)}
             />

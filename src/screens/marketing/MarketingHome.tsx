@@ -47,7 +47,7 @@ const FEATURES = [
 ]
 
 const TESTIMONIALS = [
-  { name: 'Sarah · CMO',          company: 'EcoBrand Co.',   quote: 'BayKid cut our content production time by 70%. The brand-voice tuning means I trust what it ships.', accent: '#00c8ff' },
+  { name: 'Sarah · CMO',          company: 'EcoBrand Co.',   quote: "Cyan's Brooklynn cut our content production time by 70%. The brand-voice tuning means I trust what it ships.", accent: '#00c8ff' },
   { name: 'Marcus · Solo founder', company: 'Indie Studio',  quote: 'I run my entire content schedule solo. Automation rules and approval queue make it feel like I have a team.', accent: '#5eead4' },
   { name: 'Priya · Head of Growth', company: 'SaaS startup',  quote: 'The Lead Tracker integration is the killer feature. Comments turn into qualified leads automatically.', accent: '#a855f7' },
 ]

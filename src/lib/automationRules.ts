@@ -351,30 +351,30 @@ function evaluateCondition(condition: RuleCondition, input: TestInput, sentiment
 
 function generateMockReply(input: TestInput, categories: MessageCategory[], sentiment: SentimentValue): string {
   if (categories.includes('pricing')) {
-    return `Great question! 💚 BayKid Recycling offers flexible plans starting at just $${input.platform === 'linkedin' ? '25/month for businesses' : '12/bag for residential pickups'}. You can sign up at baykid.com or DM us for a custom quote that fits your needs. We serve Nashville and surrounding areas! ♻️`
+    return `Great question! 💚 Cyan's Brooklynn Recycling offers flexible plans starting at just $${input.platform === 'linkedin' ? '25/month for businesses' : '12/bag for residential pickups'}. You can sign up at cbrecycling.org or DM us for a custom quote that fits your needs. We serve Nashville and surrounding areas! ♻️`
   }
   if (categories.includes('complaint')) {
     return `We're so sorry to hear about your experience — this is definitely not the standard we hold ourselves to. 🙏 Please DM us your contact info and we'll have someone reach out within 24 hours to make it right. Your feedback helps us improve for everyone in our community.`
   }
   if (categories.includes('pickup')) {
-    return `We'd love to help! 🚛 You can schedule a pickup online at baykid.com or text us your zip code and we'll confirm if we serve your area. Pickups are available Mon–Sat and we always send a 30-minute heads-up before we arrive! ♻️`
+    return `We'd love to help! 🚛 You can schedule a pickup online at cbrecycling.org or text us your zip code and we'll confirm if we serve your area. Pickups are available Mon–Sat and we always send a 30-minute heads-up before we arrive! ♻️`
   }
   if (categories.includes('apartment')) {
-    return `Yes! We work with apartment complexes and HOAs across Nashville! 🏢 We can set up a community recycling program with bulk pickup options. Send us a DM or email hello@baykid.com and we'll put together a custom plan for your building. ♻️`
+    return `Yes! We work with apartment complexes and HOAs across Nashville! 🏢 We can set up a community recycling program with bulk pickup options. Send us a DM or email hello@cbrecycling.org and we'll put together a custom plan for your building. ♻️`
   }
   if (categories.includes('school')) {
-    return `We love partnering with schools! 🏫 Our school fundraiser program lets students earn money for their organization while helping Nashville go greener. Email fundraisers@baykid.com to get started — we'd love to have your school join our network! ♻️💚`
+    return `We love partnering with schools! 🏫 Our school fundraiser program lets students earn money for their organization while helping Nashville go greener. Email fundraisers@cbrecycling.org to get started — we'd love to have your school join our network! ♻️💚`
   }
   if (categories.includes('sponsor')) {
-    return `Thank you for your interest in partnering with BayKid Recycling! 🤝 We're always open to collaborations that align with our mission of making recycling accessible to every Nashville family. Please reach out to hello@baykid.com with your proposal and we'll get back to you within 2 business days. ♻️`
+    return `Thank you for your interest in partnering with Cyan's Brooklynn Recycling! 🤝 We're always open to collaborations that align with our mission of making recycling accessible to every Nashville family. Please reach out to hello@cbrecycling.org with your proposal and we'll get back to you within 2 business days. ♻️`
   }
   if (sentiment === 'positive') {
-    return `Thank you so much for the love! 💚 We're on a mission to make recycling easy and rewarding for every Nashville family. Share this with a friend who wants to make a difference — together we can keep Nashville green! ♻️✨`
+    return `Thank you so much for the love! 💚 Cyan's Brooklynn is on a mission to make recycling easy and rewarding for every Nashville family. Share this with a friend who wants to make a difference — together we can keep Nashville green! ♻️✨`
   }
   if (sentiment === 'question') {
-    return `Great question! 🙌 We'd be happy to help. For the fastest answer, visit baykid.com/faq or DM us directly — our team typically responds within a few hours. Thanks for reaching out! ♻️`
+    return `Great question! 🙌 We'd be happy to help. For the fastest answer, visit cbrecycling.org/faq or DM us directly — our team typically responds within a few hours. Thanks for reaching out! ♻️`
   }
-  return `Thanks for reaching out to BayKid Recycling! 💚 We're Nashville's community recycling service making it easy to do your part. Visit baykid.com or DM us for more info. ♻️`
+  return `Thanks for reaching out to Cyan's Brooklynn Recycling! 💚 We're Nashville's community recycling service making it easy to do your part. Visit cbrecycling.org or DM us for more info. ♻️`
 }
 
 function getPostingTimeSuggestion(platform: RulePlatform): string {

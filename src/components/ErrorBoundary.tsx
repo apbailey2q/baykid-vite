@@ -23,7 +23,7 @@ interface State {
 function reportToProd(errorId: string, error: Error, info: ErrorInfo, context?: string): void {
   // Sentry
   try {
-    const sentry = (window as Record<string, unknown>).Sentry as
+    const sentry = (window as unknown as Record<string, unknown>).Sentry as
       { captureException?: (e: Error, ctx?: object) => void } | null
     sentry?.captureException?.(error, {
       extra: { errorId, componentStack: info.componentStack, context },

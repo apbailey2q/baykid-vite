@@ -27,7 +27,7 @@ const SAMPLE_EMAILS = [
   'We\'re a property manager for a 120-unit apartment complex in Brentwood. What would recycling look like for us?',
   'I saw your post about school programs. I\'m the principal at an elementary school and we\'d love to get involved.',
   'How much does the residential subscription cost? Is there a free trial?',
-  'We\'re interested in sponsoring BayKid as part of our community sustainability initiative.',
+  'We\'re interested in sponsoring Cyan\'s Brooklynn as part of our community sustainability initiative.',
 ]
 
 function Spinner() {
@@ -72,7 +72,7 @@ export function EmailReplies() {
     <div style={{ maxWidth: 800 }}>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 20, margin: 0 }}>📧 Email Replies</h2>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>Paste an incoming email and generate a professional BayKid reply.</p>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>Paste an incoming email and generate a professional Cyan's Brooklynn reply.</p>
       </div>
 
       <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,190,255,0.15)', borderRadius: 16, padding: 20, marginBottom: 20 }}>

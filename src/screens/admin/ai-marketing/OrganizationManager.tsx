@@ -8,8 +8,9 @@ import {
   getOrgMembers, getOrgInvitations, getOrgActivity,
   inviteToOrg, resendInvitation, cancelInvitation,
   changeOrgMemberRole, removeOrgMember,
-  ORG_ROLE_META, PLANS,
+  ORG_ROLE_META, PLANS, DEFAULT_ORG_SETTINGS,
   type OrgMember, type OrgInvitation, type TeamActivityEntry, type OrgRole,
+  type OrganizationSettings,
 } from '../../../lib/organizations'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ function OverviewTab() {
 
   if (!activeOrg) return null
 
-  const plan = PLANS.find((p) => p.id === activeOrg.plan) ?? PLANS[0]
+  const plan = PLANS[activeOrg.plan] ?? PLANS.free
 
   const handleSave = async () => {
     setSaving(true)
@@ -113,7 +114,7 @@ function OverviewTab() {
               {plan.priceMonthly === 0 ? 'Free forever' : `$${(plan.priceMonthly / 100).toFixed(0)}/month · $${(plan.priceAnnual / 100).toFixed(0)}/year`}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              {plan.features.map((f) => (
+              {plan.highlights.map((f) => (
                 <span key={f} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', borderRadius: 20, padding: '2px 9px', fontSize: 11 }}>
                   ✓ {f}
                 </span>
@@ -129,10 +130,10 @@ function OverviewTab() {
       {/* Limits grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
         {[
-          { label: 'Members', value: plan.maxMembers === -1 ? '∞' : plan.maxMembers },
-          { label: 'Posts/month', value: plan.maxPostsMonth === -1 ? '∞' : plan.maxPostsMonth },
-          { label: 'Automations', value: plan.maxAutomations === -1 ? '∞' : plan.maxAutomations },
-          { label: 'AI Generations', value: plan.aiGensMonth === -1 ? '∞' : `${plan.aiGensMonth}/mo` },
+          { label: 'Members', value: plan.features.maxMembers === -1 ? '∞' : plan.features.maxMembers },
+          { label: 'Posts/month', value: plan.features.maxPostsMonth === -1 ? '∞' : plan.features.maxPostsMonth },
+          { label: 'Automations', value: plan.features.maxAutomations === -1 ? '∞' : plan.features.maxAutomations },
+          { label: 'AI Generations', value: plan.features.aiGensMonth === -1 ? '∞' : `${plan.features.aiGensMonth}/mo` },
         ].map(({ label, value }) => (
           <div key={label} style={{ ...card, textAlign: 'center', padding: '14px 12px' }}>
             <div style={{ color: '#00c8ff', fontSize: 22, fontWeight: 800 }}>{value}</div>
@@ -172,7 +173,7 @@ function TeamTab() {
     if (!activeOrg || !inviteEmail.trim()) return
     setInviting(true)
     try {
-      await inviteToOrg(activeOrg.id, inviteEmail.trim(), inviteRole)
+      await inviteToOrg(activeOrg.id, inviteEmail.trim(), inviteRole, 'Admin')
       setInviteEmail('')
       setInviteMsg({ ok: true, text: `Invitation sent to ${inviteEmail}` })
     } catch (err) {
@@ -189,7 +190,7 @@ function TeamTab() {
   }
 
   const handleRemove = async (member: OrgMember) => {
-    if (!window.confirm(`Remove ${member.userName ?? member.userEmail} from the organization?`)) return
+    if (!window.confirm(`Remove ${member.name ?? member.email} from the organization?`)) return
     await removeOrgMember(member.orgId, member.userId)
     setMembers((prev) => prev.filter((m) => m.userId !== member.userId))
   }
@@ -239,13 +240,13 @@ function TeamTab() {
               <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 {/* Avatar */}
                 <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(0,200,255,0.15)', border: '1px solid rgba(0,200,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#00c8ff', flexShrink: 0 }}>
-                  {(m.userName ?? m.userEmail ?? '?').slice(0, 2).toUpperCase()}
+                  {(m.name ?? m.email ?? '?').slice(0, 2).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {m.userName ?? m.userEmail ?? m.userId}
+                    {m.name ?? m.email ?? m.userId}
                   </div>
-                  {m.userName && <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{m.userEmail}</div>}
+                  {m.name && <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{m.email}</div>}
                   {m.joinedAt && <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 2 }}>Joined {relTime(m.joinedAt)}</div>}
                 </div>
                 {can('team:manage_roles') && m.role !== 'owner' ? (
@@ -300,13 +301,13 @@ function InvitationsTab() {
   useEffect(() => { void load() }, [load])
 
   const handleResend = async (inv: OrgInvitation) => {
-    await resendInvitation(inv.id)
+    await resendInvitation(inv.id, inv.orgId)
     setInvitations((prev) => prev.map((i) => i.id === inv.id ? { ...i, resentAt: new Date().toISOString() } : i))
   }
 
   const handleCancel = async (inv: OrgInvitation) => {
     if (!window.confirm(`Cancel invitation to ${inv.email}?`)) return
-    await cancelInvitation(inv.id)
+    await cancelInvitation(inv.id, inv.orgId)
     setInvitations((prev) => prev.filter((i) => i.id !== inv.id))
   }
 
@@ -392,7 +393,7 @@ function ActivityTab() {
               <div style={{ flex: 1 }}>
                 <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>
                   <span style={{ color: '#fff', fontWeight: 600 }}>{entry.actorName ?? 'Someone'}</span>
-                  {' '}{entry.description}
+                  {' '}{entry.action}{entry.entityName ? ` ${entry.entityName}` : ''}
                 </div>
                 <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 }}>{relTime(entry.createdAt)}</div>
               </div>
@@ -415,7 +416,7 @@ const TIMEZONES = [
 function OrgSettingsTab() {
   const { activeOrg, patchActiveOrg } = useOrg()
   const { can } = usePermission()
-  const [settings, setSettings] = useState(activeOrg?.settings ?? {})
+  const [settings, setSettings] = useState<OrganizationSettings>(activeOrg?.settings ?? DEFAULT_ORG_SETTINGS)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -445,8 +446,8 @@ function OrgSettingsTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 14 }}>
           <Field label="Default Timezone">
             <select
-              value={(settings as Record<string, string>).timezone ?? 'UTC'}
-              onChange={(e) => setSettings((s) => ({ ...s, timezone: e.target.value }))}
+              value={(settings as unknown as Record<string, string>).timezone ?? 'UTC'}
+              onChange={(e) => setSettings((s) => ({ ...s, timezone: e.target.value }) as unknown as OrganizationSettings)}
               disabled={disabled}
               style={selectStyle}
             >
@@ -456,8 +457,8 @@ function OrgSettingsTab() {
 
           <Field label="Brand Voice">
             <textarea
-              value={(settings as Record<string, string>).brandVoice ?? ''}
-              onChange={(e) => setSettings((s) => ({ ...s, brandVoice: e.target.value }))}
+              value={(settings as unknown as Record<string, string>).brandVoice ?? ''}
+              onChange={(e) => setSettings((s) => ({ ...s, brandVoice: e.target.value }) as unknown as OrganizationSettings)}
               disabled={disabled}
               rows={3}
               placeholder="Describe your brand's tone and voice…"
@@ -467,8 +468,8 @@ function OrgSettingsTab() {
 
           <Field label="Default Post Language">
             <select
-              value={(settings as Record<string, string>).defaultLanguage ?? 'en'}
-              onChange={(e) => setSettings((s) => ({ ...s, defaultLanguage: e.target.value }))}
+              value={(settings as unknown as Record<string, string>).defaultLanguage ?? 'en'}
+              onChange={(e) => setSettings((s) => ({ ...s, defaultLanguage: e.target.value }) as unknown as OrganizationSettings)}
               disabled={disabled}
               style={selectStyle}
             >
@@ -483,8 +484,8 @@ function OrgSettingsTab() {
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: disabled ? 'default' : 'pointer' }}>
                 <input
                   type="checkbox"
-                  checked={Boolean((settings as Record<string, boolean>)[key])}
-                  onChange={(e) => setSettings((s) => ({ ...s, [key]: e.target.checked }))}
+                  checked={Boolean((settings as unknown as Record<string, boolean>)[key])}
+                  onChange={(e) => setSettings((s) => ({ ...s, [key]: e.target.checked }) as unknown as OrganizationSettings)}
                   disabled={disabled}
                   style={{ accentColor: '#00c8ff', width: 14, height: 14 }}
                 />

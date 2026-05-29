@@ -67,7 +67,7 @@ export default function LaunchCenter() {
           <div>
             <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: 0 }}>🚀 Launch Execution</h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 6 }}>
-              Operational command center for the BayKid AI Marketing beta. Live data, computed scoring, internal tasks — all in one place.
+              Operational command center for the Cyan's Brooklynn Marketing beta. Live data, computed scoring, internal tasks — all in one place.
             </p>
           </div>
           <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>

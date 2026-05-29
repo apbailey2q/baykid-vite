@@ -230,8 +230,8 @@ export const DEFAULT_ORG_SETTINGS: OrganizationSettings = {
   brandVoice: {
     toneKeywords:    ['eco-conscious', 'community-first', 'approachable'],
     avoidKeywords:   ['trash', 'garbage'],
-    signaturePhrase: 'BayKid — Nashville\'s easiest recycling pickup',
-    callToAction:    'Sign up at baykid.com',
+    signaturePhrase: 'Cyan\'s Brooklynn — Nashville\'s easiest recycling pickup',
+    callToAction:    'Sign up at cbrecycling.org',
     emojiUsage:      'moderate',
   },
   notifPrefs: {
@@ -324,7 +324,7 @@ export async function getUserOrganizations(): Promise<Organization[]> {
     // Return a sensible default single org
     return [{
       id:                 DEFAULT_ORG_ID,
-      name:               'BayKid Nashville',
+      name:               'Cyan\'s Brooklynn',
       slug:               'baykid',
       plan:               'starter',
       subscriptionStatus: 'active',

@@ -165,7 +165,7 @@ interface PublishModalProps {
 function PublishModal({ post, onClose, onQueued }: PublishModalProps) {
   const accounts = loadAccounts().filter((a) => a.isActive)
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
-  const [publishNow, setPublishNow] = useState(true)
+  const [publishNow] = useState(true)
   const [error, setError] = useState('')
 
   function handleConfirm() {

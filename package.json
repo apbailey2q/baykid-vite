@@ -7,15 +7,18 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:branding": "node scripts/brandingAudit.mjs"
   },
   "dependencies": {
+    "@sentry/browser": "^10.55.0",
     "@supabase/supabase-js": "^2.105.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-query": "^5.100.5",
     "canvas-confetti": "^1.9.4",
     "html5-qrcode": "^2.3.8",
     "openai": "^6.37.0",
+    "posthog-js": "^1.376.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",

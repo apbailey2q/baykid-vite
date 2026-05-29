@@ -93,7 +93,7 @@ function dbToPost(row: DbPost): AIContentResult {
     commentReply:     row.comment_reply ?? '',
     status:           row.status,
     platform:         row.platform ?? undefined,
-    tone:             row.tone ?? undefined,
+    tone:             (row.tone ?? undefined) as AIContentResult['tone'],
     goal:             row.goal ?? undefined,
     callToAction:     row.call_to_action ?? undefined,
     createdAt:        row.created_at,

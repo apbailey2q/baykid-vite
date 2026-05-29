@@ -26,7 +26,7 @@ function buildReportRows(stats: PartnerStats, generatedAt: string): string[][] {
   const co2Saved = (stats.completedBags * LBS_PER_BAG * CO2_PER_LB).toFixed(1)
 
   return [
-    ['BayKid Recycling Partner Report'],
+    ['Cyan\'s Brooklynn Recycling Partner Report'],
     ['Generated', generatedAt],
     [],
     ['--- Volume Summary ---'],
@@ -70,7 +70,7 @@ export function PartnerReports() {
         month: 'long', day: 'numeric', year: 'numeric',
         hour: 'numeric', minute: '2-digit',
       })
-      const filename = `baykid-report-${new Date().toISOString().slice(0, 10)}.csv`
+      const filename = `cbrecycling-report-${new Date().toISOString().slice(0, 10)}.csv`
       downloadCsv(filename, buildReportRows(stats, now))
     } finally {
       setExporting(false)

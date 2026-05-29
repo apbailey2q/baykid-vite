@@ -8,7 +8,7 @@ const SECTIONS: Section[] = [
     icon:   '📱',
     title:  'App Use Rules',
     points: [
-      'The BayKid platform is for legal residential and commercial recycling only.',
+      'The Cyan\'s Brooklynn platform is for legal residential and commercial recycling only.',
       'You must be 13 years or older to create an account.',
       'Account sharing is not permitted — each account represents one individual.',
       'Commercial waste disposal requires a separate partner agreement.',
@@ -33,7 +33,7 @@ const SECTIONS: Section[] = [
       'Bag value credits are applied only after a successful AI inspection review.',
       'Rewards shown on screen are estimates and are not guaranteed until marked "Approved."',
       'Points and wallet credits are non-transferable between accounts.',
-      'BayKid reserves the right to adjust reward amounts based on material quality.',
+      'Cyan\'s Brooklynn reserves the right to adjust reward amounts based on material quality.',
       'Bonus credits for fundraiser contributions are subject to campaign rules.',
     ],
   },
@@ -45,7 +45,7 @@ const SECTIONS: Section[] = [
       'Submitting bags that do not belong to you is strictly prohibited.',
       'Suspected fraudulent activity results in immediate account review and potential suspension.',
       'Fraudulent accounts may forfeit all accumulated wallet balances and points.',
-      'BayKid cooperates with law enforcement in cases of suspected fraud.',
+      'Cyan\'s Brooklynn cooperates with law enforcement in cases of suspected fraud.',
     ],
   },
   {
@@ -53,10 +53,10 @@ const SECTIONS: Section[] = [
     title:  'Payouts & Approval',
     points: [
       'Payout requests require a minimum wallet balance of $25.00.',
-      'All payout requests are reviewed by a BayKid administrator before processing.',
+      'All payout requests are reviewed by a Cyan\'s Brooklynn administrator before processing.',
       'Approved payouts are processed within 5–10 business days.',
       'Payout method availability (bank transfer, Cash App, PayPal, gift card) may vary by region.',
-      'BayKid reserves the right to delay or deny payouts pending identity or fraud verification.',
+      'Cyan\'s Brooklynn reserves the right to delay or deny payouts pending identity or fraud verification.',
     ],
   },
 ]
@@ -112,7 +112,7 @@ export default function TermsPage() {
         style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Terms of Service</span>
         </div>
@@ -134,7 +134,7 @@ export default function TermsPage() {
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Terms of Service</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Last updated May 2026. By using BayKid you agree to these terms.
+              Last updated May 2026. By using Cyan's Brooklynn you agree to these terms.
             </p>
           </div>
 

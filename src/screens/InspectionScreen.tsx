@@ -165,7 +165,7 @@ export default function InspectionScreen() {
         }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00BCD4' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00BCD4' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,188,212,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: '#7B909C' }}>
             Inspect{' '}

@@ -68,7 +68,7 @@ function WelcomeStep() {
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 56, marginBottom: 12 }}>🤖</div>
         <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: '0 0 8px' }}>
-          Welcome to BayKid AI Marketing
+          Welcome to Cyan's Brooklynn Marketing
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
           Let's get you set up in a few quick steps so your team can start generating
@@ -220,7 +220,7 @@ function BrandVoiceStep() {
   return (
     <div>
       <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 14, lineHeight: 1.6, marginTop: 0, marginBottom: 20 }}>
-        Tell the AI how BayKid communicates. This shapes every post, reply, and caption it generates.
+        Tell the AI how Cyan's Brooklynn communicates. This shapes every post, reply, and caption it generates.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -232,7 +232,7 @@ function BrandVoiceStep() {
             onChange={(e) => setToneInput(e.target.value)}
             placeholder="eco-conscious, community-first, approachable…"
           />
-          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 4 }}>Words that describe BayKid's personality and voice</div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 4 }}>Words that describe Cyan's Brooklynn's personality and voice</div>
         </div>
 
         <div>
@@ -251,7 +251,7 @@ function BrandVoiceStep() {
             style={inputStyle}
             value={signature}
             onChange={(e) => setSignature(e.target.value)}
-            placeholder="BayKid — Nashville's easiest recycling pickup"
+            placeholder="Cyan's Brooklynn — Nashville's easiest recycling pickup"
           />
         </div>
 
@@ -261,7 +261,7 @@ function BrandVoiceStep() {
             style={inputStyle}
             value={cta}
             onChange={(e) => setCta(e.target.value)}
-            placeholder="Sign up at baykid.com"
+            placeholder="Sign up at cbrecycling.org"
           />
         </div>
 
@@ -463,7 +463,7 @@ function DoneStep({ onFinish }: { onFinish: () => void }) {
           You're all set!
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-          BayKid AI Marketing is ready to go. Start exploring or jump straight to a feature.
+          Cyan's Brooklynn Marketing is ready to go. Start exploring or jump straight to a feature.
         </p>
       </div>
 

@@ -3,14 +3,14 @@
 // Views: home, category, article, search, faq, tutorials, support, admin
 // All state is local (no context needed); data comes from helpContent.ts.
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   HELP_CATEGORIES, HELP_ARTICLES, FAQS, TUTORIALS,
   type HelpArticle, type HelpCategory, type HelpBlock,
-  type FAQ, type Tutorial, type TutorialStep, type SupportTicket,
-  searchArticles, getArticlesByCategory, getArticleById, getVisibleArticles,
+  type Tutorial, type TutorialStep, type SupportTicket,
+  searchArticles, getArticlesByCategory, getArticleById,
   getRecentlyViewed, trackArticleView, voteArticle, getArticleVote,
-  getAllArticles, getOverrides, saveOverride, getCustomArticles,
+  getAllArticles, getOverrides, saveOverride,
   saveCustomArticle, deleteCustomArticle, getSupportTickets,
   saveSupportTicket, updateTicketStatus,
 } from '../../../lib/helpContent'
@@ -292,7 +292,7 @@ function HomeView({ onCategory, onArticle, onSearch, onFaq, onTutorials, onSuppo
       <div style={{ textAlign: 'center', padding: '32px 0 28px' }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
         <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, marginBottom: 8, fontFamily: 'inherit' }}>
-          BayKid Help Center
+          Cyan's Brooklynn Help Center
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 24, fontFamily: 'inherit' }}>
           Documentation, tutorials, and support for the AI Marketing Center
@@ -827,7 +827,7 @@ function SupportView({ onHome }: { onHome: () => void }) {
   const priorityColor: Record<string, string> = { low: '#6b7280', medium: '#fbbf24', high: '#f97316', urgent: '#ef4444' }
   const statusColor:   Record<string, string> = { open: '#00c8ff', in_progress: '#fbbf24', resolved: '#22c55e' }
 
-  const field = (label: string, key: keyof typeof form, el: JSX.Element) => (
+  const field = (label: string, key: keyof typeof form, el: React.ReactElement) => (
     <div style={{ marginBottom: 16 }}>
       <label style={{ ...S.label, display: 'block', marginBottom: 6, fontFamily: 'inherit' }}>{label}</label>
       {el}

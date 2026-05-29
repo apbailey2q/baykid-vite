@@ -392,7 +392,7 @@ function TestPanel({ rule, onClose }: TestPanelProps) {
           <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 700, display: 'block', marginBottom: 4 }}>Sample Comment or Message</label>
           <textarea
             style={{ ...inputStyle, minHeight: 72, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
-            placeholder="e.g. How much does BayKid cost? Do you serve Green Hills apartments?"
+            placeholder="e.g. How much does Cyan's Brooklynn cost? Do you serve Green Hills apartments?"
             value={testText}
             onChange={e => { setTestText(e.target.value); setRan(false); setResult(null) }}
           />

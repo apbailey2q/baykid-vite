@@ -140,7 +140,7 @@ function AIMarketingCenterInner() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
           <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>
-            🤖 AI Marketing Center
+            🤖 Cyan's Brooklynn Marketing
           </span>
           {IS_DEMO ? (
             <span

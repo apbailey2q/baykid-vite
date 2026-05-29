@@ -427,7 +427,7 @@ export default function CommercialOnboarding() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-10" style={{ background: 'rgba(4,10,24,0.95)', borderBottom: '1px solid rgba(0,200,255,0.1)', backdropFilter: 'blur(12px)' }}>
         <div className="flex items-center gap-3">
-          <span className="font-extrabold" style={{ color: '#00c8ff', fontSize: 17 }}>BayKid</span>
+          <span className="font-extrabold" style={{ color: '#00c8ff', fontSize: 17 }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Commercial Onboarding</span>
         </div>
         <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.35)' }}>Step {step} of {TOTAL_STEPS}</span>

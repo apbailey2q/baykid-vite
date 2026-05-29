@@ -127,9 +127,9 @@ export default function ContactPage() {
 
               {/* Sidebar info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SideInfo icon="📧" title="Email us"      body="hello@baykid.example" />
+                <SideInfo icon="📧" title="Email us"      body="hello@cbrecycling.org" />
                 <SideInfo icon="💬" title="In-app support" body={<Link to="/support/contact" style={{ color: '#00c8ff' }}>Open a ticket</Link>} />
-                <SideInfo icon="🐦" title="Follow along"   body="@baykid_ai" />
+                <SideInfo icon="🐦" title="Follow along"   body="@CyansBrooklynn" />
               </div>
             </div>
 

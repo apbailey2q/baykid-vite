@@ -72,7 +72,7 @@ export const PLAN_CATALOG: Array<{
   {
     code: 'free',
     name: 'Free',
-    description: 'Try BayKid AI Marketing risk-free.',
+    description: 'Try Cyan\'s Brooklynn Marketing risk-free.',
     priceMonthlyCents: 0, priceYearlyCents: 0,
     limits: {
       ai_generations_per_month: 10,  scheduled_posts_per_month: 5,

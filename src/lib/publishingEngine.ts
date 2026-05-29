@@ -170,7 +170,7 @@ async function mockPublishToPlatform(
   const handles: Record<PlatformId, string> = {
     instagram: 'instagram.com/p',
     facebook:  'facebook.com/permalink',
-    tiktok:    'tiktok.com/@baykidnashville/video',
+    tiktok:    'tiktok.com/@CyansBrooklynn/video',
     linkedin:  'linkedin.com/feed/update',
     twitter:   'twitter.com/i/web/status',
   }

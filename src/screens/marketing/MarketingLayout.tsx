@@ -65,7 +65,7 @@ export function MarketingLayout({ children }: { children: React.ReactNode }) {
           <Link to="/marketing" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <Logo />
             <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em' }}>
-              BayKid <span style={{ color: '#00c8ff' }}>AI</span>
+              Cyan's Brooklynn <span style={{ color: '#00c8ff' }}>AI</span>
             </span>
           </Link>
 
@@ -183,7 +183,7 @@ function Footer() {
             <Link to="/marketing" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', marginBottom: 12 }}>
               <Logo />
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>
-                BayKid <span style={{ color: '#00c8ff' }}>AI</span>
+                Cyan's Brooklynn <span style={{ color: '#00c8ff' }}>AI</span>
               </span>
             </Link>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 1.6 }}>
@@ -244,7 +244,7 @@ function Footer() {
         </div>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 18, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>© {new Date().getFullYear()} BayKid AI Marketing. All rights reserved.</span>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>© {new Date().getFullYear()} Cyan's Brooklynn Recycling. All rights reserved.</span>
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
             <Link to="/legal/privacy" style={{ color: 'inherit', marginRight: 14 }}>Privacy</Link>
             <Link to="/legal/terms"   style={{ color: 'inherit' }}>Terms</Link>

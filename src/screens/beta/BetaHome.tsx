@@ -42,7 +42,7 @@ export default function BetaHome() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest" style={{ background: 'rgba(94,234,212,0.12)', border: '1px solid rgba(94,234,212,0.3)', color: '#5eead4' }}>
             Beta
@@ -66,7 +66,7 @@ export default function BetaHome() {
               <p className="text-sm mb-2" style={{ color: '#00c8ff' }}>{profile.full_name}</p>
             )}
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              You're helping shape the BayKid platform before public launch. Thank you. Use the tools below to track your testing progress and report issues.
+              You're helping shape the Cyan's Brooklynn platform before public launch. Thank you. Use the tools below to track your testing progress and report issues.
             </p>
           </div>
 

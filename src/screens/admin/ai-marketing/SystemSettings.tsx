@@ -4,14 +4,14 @@
 // Tabs:
 //   Organization · API · Brand Voice · Automation Defaults · Notifications · Team · Audit Log
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
-  loadOrgSettings, saveOrgSettings, patchOrgSettings,
+  loadOrgSettings, saveOrgSettings,
   inviteTeamMember, updateMemberRole, removeMember, getActiveTeam,
   type OrgSettings, type TeamMember,
 } from '../../../lib/orgSettings'
 import {
-  loadUserProfile, saveUserProfile, ALL_ROLES, ROLE_META, type UserRole,
+  loadUserProfile, ALL_ROLES, ROLE_META, type UserRole,
   usePermission,
 } from '../../../lib/permissions'
 import { loadAuditLog, clearAuditLog, AUDIT_ACTION_META, type AuditEntry } from '../../../lib/auditLog'

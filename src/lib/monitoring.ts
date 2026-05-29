@@ -44,7 +44,8 @@ const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
 
 function getSentry(): { captureException?: (err: Error, ctx?: object) => void; captureMessage?: (msg: string, level?: string, ctx?: object) => void } | null {
   if (typeof window === 'undefined') return null
-  return (window as Record<string, unknown>).Sentry as typeof import('@sentry/browser') | null
+  return (window as unknown as Record<string, unknown>).Sentry as
+    { captureException?: (err: Error, ctx?: object) => void; captureMessage?: (msg: string, level?: string, ctx?: object) => void } | null
 }
 
 function sendToSentry(entry: LogEntry): void {
@@ -65,7 +66,7 @@ function sendToSentry(entry: LogEntry): void {
 
 function getPostHog(): { capture?: (event: string, props?: Record<string, unknown>) => void } | null {
   if (typeof window === 'undefined') return null
-  return (window as Record<string, unknown>).posthog as { capture?: (event: string, props?: Record<string, unknown>) => void } | null
+  return (window as unknown as Record<string, unknown>).posthog as { capture?: (event: string, props?: Record<string, unknown>) => void } | null
 }
 
 function sendToPostHog(entry: LogEntry): void {
@@ -161,7 +162,7 @@ export async function initPostHog(): Promise<void> {
       session_recording:     { maskAllInputs: true },   // mask all PII
       persistence:           'localStorage',
     });
-    (window as Record<string, unknown>).posthog = posthog
+    (window as unknown as Record<string, unknown>).posthog = posthog
   } catch { /* PostHog not installed — skip silently */ }
 }
 
@@ -184,6 +185,6 @@ export async function initSentry(): Promise<void> {
       // Don't capture console.log noise
       integrations: [],
     });
-    (window as Record<string, unknown>).Sentry = Sentry
+    (window as unknown as Record<string, unknown>).Sentry = Sentry
   } catch { /* @sentry/browser not installed — skip silently */ }
 }

@@ -256,13 +256,13 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'gs.overview',
     categoryId: 'getting-started',
     title: 'Platform Overview',
-    summary: 'What BayKid AI Marketing Center is, how it works, and who it\'s for.',
+    summary: 'What Cyan\'s Brooklynn Marketing Center is, how it works, and who it\'s for.',
     featured: true,
     readMinutes: 3,
     updatedAt: '2026-05-28',
     tags: ['overview', 'intro', 'what is', 'platform'],
     content: [
-      { type: 'p', text: 'BayKid AI Marketing Center is a multi-tenant AI content generation and publishing platform built for recycling and environmental organizations. It uses Claude AI (Anthropic) to generate on-brand social media content, then routes that content through a human approval workflow before publishing.' },
+      { type: 'p', text: 'Cyan\'s Brooklynn Marketing Center is a multi-tenant AI content generation and publishing platform built for recycling and environmental organizations. It uses Claude AI (Anthropic) to generate on-brand social media content, then routes that content through a human approval workflow before publishing.' },
       { type: 'h2', text: 'Three Core Concepts' },
       { type: 'table', headers: ['Concept', 'What it means'], rows: [
         ['Generate', 'Claude AI creates draft content based on your topic, platform, tone, and brand voice'],
@@ -281,7 +281,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         'System Health Monitor — real-time status of all connected services',
       ]},
       { type: 'h2', text: 'Who Is It For?' },
-      { type: 'p', text: 'BayKid is designed for recycling organizations, environmental nonprofits, and sustainability-focused businesses that need to produce consistent social media content without a full-time marketing team. AI handles the first draft; your team handles the final call.' },
+      { type: 'p', text: 'Cyan\'s Brooklynn is designed for recycling organizations, environmental nonprofits, and sustainability-focused businesses that need to produce consistent social media content without a full-time marketing team. AI handles the first draft; your team handles the final call.' },
     ],
   },
 
@@ -297,7 +297,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     content: [
       { type: 'h2', text: 'Accepting an Invitation' },
       { type: 'steps', items: [
-        'Check your email for a BayKid invitation from your organization admin.',
+        'Check your email for a Cyan\'s Brooklynn invitation from your organization admin.',
         'Click the invitation link. You\'ll be taken to the password setup page.',
         'Set a strong password and click Create Account.',
         'You\'ll be automatically signed in and redirected to the AI Marketing Center.',
@@ -429,7 +429,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         'Click the Org Switcher in the header (shows your current org name).',
         'Click "＋ Create Organization" at the bottom of the dropdown.',
         'The Org Setup wizard opens. Enter:',
-        '  • Organization name (e.g. "BayKid Nashville")',
+        '  • Organization name (e.g. "Cyan\'s Brooklynn Nashville")',
         '  • URL slug — auto-generated from the name, can be customized',
         '  • Timezone — used for scheduling and calendar display',
         'Click Create Organization.',
@@ -542,9 +542,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
         ['Tone', 'The emotional register', 'Match your brand voice setting'],
         ['Topic', 'What the post is about', 'Be specific — the #1 factor in output quality'],
         ['Goal (optional)', 'What action you want', 'e.g. "Drive drop-off registrations"'],
-        ['CTA (optional)', 'Call to action text', 'e.g. "Visit baykid.org to schedule"'],
+        ['CTA (optional)', 'Call to action text', 'e.g. "Visit cbrecycling.org to schedule"'],
       ]},
-      { type: 'tip', text: 'Specific topic → better output. "Benefits of e-waste recycling at BayKid locations in Nashville" beats "recycling" every time.' },
+      { type: 'tip', text: 'Specific topic → better output. "Benefits of e-waste recycling at Cyan\'s Brooklynn locations in Nashville" beats "recycling" every time.' },
       { type: 'h2', text: 'Reading the Output' },
       { type: 'p', text: 'After generating, results appear in tabs:' },
       { type: 'list', items: [
@@ -596,7 +596,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     updatedAt: '2026-05-28',
     tags: ['instagram', 'tiktok', 'facebook', 'linkedin', 'twitter', 'youtube', 'platforms'],
     content: [
-      { type: 'p', text: 'BayKid tailors generated content to each platform\'s norms automatically. Here\'s what to expect:' },
+      { type: 'p', text: 'Cyan\'s Brooklynn tailors generated content to each platform\'s norms automatically. Here\'s what to expect:' },
       { type: 'h2', text: 'Instagram' },
       { type: 'list', items: [
         'Caption up to ~2,200 characters with paragraph breaks',
@@ -671,7 +671,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         'Redeploy the project for the change to take effect.',
         'After redeploy, the badge should switch to ⚡ LIVE.',
       ]},
-      { type: 'tip', text: 'If you\'re a team member (not the site admin), contact your system administrator or the person who deployed BayKid to configure the API key.' },
+      { type: 'tip', text: 'If you\'re a team member (not the site admin), contact your system administrator or the person who deployed Cyan\'s Brooklynn to configure the API key.' },
     ],
   },
 
@@ -826,7 +826,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { type: 'h2', text: 'How Rules Work' },
       { type: 'steps', items: [
         'A trigger fires (e.g. new comment detected)',
-        'BayKid checks all enabled rules for matching conditions',
+        'Cyan\'s Brooklynn checks all enabled rules for matching conditions',
         'If conditions match, the configured action runs',
         'Action outputs a draft to the Approval Queue or Lead Tracker',
         'Your team reviews and takes action from there',
@@ -932,7 +932,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         'The plan selection cards appear with pricing.',
         'Click the plan you want.',
         'If Stripe is connected, you\'ll be redirected to Stripe Checkout.',
-        'Complete payment — you\'ll return to BayKid with the new plan active.',
+        'Complete payment — you\'ll return to Cyan\'s Brooklynn with the new plan active.',
         'New limits (members, posts, AI generations) take effect immediately.',
       ]},
       { type: 'h2', text: 'Downgrading' },
@@ -970,7 +970,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'ts.common',
     categoryId: 'troubleshooting',
     title: 'Common Issues and Solutions',
-    summary: 'Fixes for the most frequently encountered problems in BayKid.',
+    summary: 'Fixes for the most frequently encountered problems in Cyan\'s Brooklynn.',
     featured: true,
     readMinutes: 5,
     updatedAt: '2026-05-28',
@@ -1128,8 +1128,8 @@ export const FAQS: FAQ[] = [
   {
     id: 'faq.mobile',
     categoryId: 'getting-started',
-    question: 'Does BayKid work on mobile devices?',
-    answer: 'BayKid AI Marketing Center is optimized for desktop and laptop screens. The interface is accessible on tablets in landscape mode, but the full feature set — especially content generation, calendar management, and team management — works best on a desktop browser.',
+    question: 'Does Cyan\'s Brooklynn work on mobile devices?',
+    answer: 'Cyan\'s Brooklynn Marketing Center is optimized for desktop and laptop screens. The interface is accessible on tablets in landscape mode, but the full feature set — especially content generation, calendar management, and team management — works best on a desktop browser.',
   },
   {
     id: 'faq.data-loss',
@@ -1277,7 +1277,7 @@ export const TUTORIALS: Tutorial[] = [
       },
       {
         title: 'Review the default rules',
-        description: 'BayKid ships with two default rules: "Pricing Inquiry Auto-Reply" and "High-Risk Comment Flag". Read through them to understand the structure before creating your own.',
+        description: 'Cyan\'s Brooklynn ships with two default rules: "Pricing Inquiry Auto-Reply" and "High-Risk Comment Flag". Read through them to understand the structure before creating your own.',
       },
       {
         title: 'Create a new rule',
@@ -1294,7 +1294,7 @@ export const TUTORIALS: Tutorial[] = [
       },
       {
         title: 'Choose an action',
-        description: 'Set the action to "Generate Reply". This tells BayKid to use Claude AI to draft a reply to the comment and send it to the Approval Queue.',
+        description: 'Set the action to "Generate Reply". This tells Cyan\'s Brooklynn to use Claude AI to draft a reply to the comment and send it to the Approval Queue.',
       },
       {
         title: 'Save the rule',
@@ -1355,7 +1355,7 @@ export const TUTORIALS: Tutorial[] = [
       },
       {
         title: 'Check Publishing queue',
-        description: 'Navigate to 🚀 Publishing → Queue tab. If the scheduled time is in the past or very near, your post may already appear here. At the scheduled time, BayKid processes it.',
+        description: 'Navigate to 🚀 Publishing → Queue tab. If the scheduled time is in the past or very near, your post may already appear here. At the scheduled time, Cyan\'s Brooklynn processes it.',
         appSection: 'publish',
       },
       {

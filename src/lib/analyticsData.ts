@@ -259,17 +259,17 @@ export function getPlatformSummaries(days = 30): PlatformSummary[] {
 
 const POST_POOL: Omit<PostPerf, 'score'>[] = [
   { id: 'p1', title: '"POV: Curbside Pickup That Actually Shows Up"',            platform: 'tiktok',    postedAt: '2026-05-01T14:00:00Z', impressions: 19800, engagement: 0.084, clicks: 89,  shares: 312, saves: 198, comments: 44 },
-  { id: 'p2', title: '"Why Nashville Families Choose BayKid"',                   platform: 'instagram', postedAt: '2026-05-04T10:00:00Z', impressions: 6200,  engagement: 0.051, clicks: 47,  shares: 78,  saves: 210, comments: 22 },
-  { id: 'p3', title: '"5 Items You Didn\'t Know BayKid Recycles"',               platform: 'instagram', postedAt: '2026-05-07T09:00:00Z', impressions: 4100,  engagement: 0.048, clicks: 38,  shares: 62,  saves: 180, comments: 18 },
+  { id: 'p2', title: '"Why Nashville Families Choose Cyan\'s Brooklynn"',         platform: 'instagram', postedAt: '2026-05-04T10:00:00Z', impressions: 6200,  engagement: 0.051, clicks: 47,  shares: 78,  saves: 210, comments: 22 },
+  { id: 'p3', title: '"5 Items You Didn\'t Know Cyan\'s Brooklynn Recycles"',     platform: 'instagram', postedAt: '2026-05-07T09:00:00Z', impressions: 4100,  engagement: 0.048, clicks: 38,  shares: 62,  saves: 180, comments: 18 },
   { id: 'p4', title: '"Recycling Myths Nashville Still Believes"',               platform: 'instagram', postedAt: '2026-05-10T11:00:00Z', impressions: 5400,  engagement: 0.057, clicks: 54,  shares: 91,  saves: 240, comments: 31 },
   { id: 'p5', title: '"Commercial Recycling for Nashville Businesses"',          platform: 'linkedin',  postedAt: '2026-05-13T09:00:00Z', impressions: 1840,  engagement: 0.031, clicks: 42,  shares: 28,  saves: 14,  comments: 9 },
   { id: 'p6', title: '"Greenview Apartments Recycles 2,000 lbs/month"',         platform: 'facebook',  postedAt: '2026-05-15T12:00:00Z', impressions: 1200,  engagement: 0.014, clicks: 11,  shares: 6,   saves: 3,   comments: 2 },
-  { id: 'p7', title: '"Summer Recycling Challenge — Win a BayKid Year"',         platform: 'instagram', postedAt: '2026-05-18T16:00:00Z', impressions: 7800,  engagement: 0.073, clicks: 62,  shares: 140, saves: 320, comments: 48 },
+  { id: 'p7', title: '"Summer Recycling Challenge — Win a Cyan\'s Brooklynn Year"',platform: 'instagram', postedAt: '2026-05-18T16:00:00Z', impressions: 7800,  engagement: 0.073, clicks: 62,  shares: 140, saves: 320, comments: 48 },
   { id: 'p8', title: '"Nashville\'s E-waste Problem (And How to Fix It)"',      platform: 'tiktok',    postedAt: '2026-05-21T15:00:00Z', impressions: 14200, engagement: 0.069, clicks: 78,  shares: 220, saves: 160, comments: 39 },
-  { id: 'p9', title: '"When to Put Your BayKid Bin Out"',                        platform: 'facebook',  postedAt: '2026-05-22T08:00:00Z', impressions: 980,   engagement: 0.010, clicks: 6,   shares: 3,   saves: 1,   comments: 1 },
+  { id: 'p9', title: '"When to Put Your Cyan\'s Brooklynn Bin Out"',              platform: 'facebook',  postedAt: '2026-05-22T08:00:00Z', impressions: 980,   engagement: 0.010, clicks: 6,   shares: 3,   saves: 1,   comments: 1 },
   { id: 'p10',title: '"What Your Recycling Actually Becomes"',                   platform: 'instagram', postedAt: '2026-05-24T10:00:00Z', impressions: 3200,  engagement: 0.038, clicks: 28,  shares: 44,  saves: 98,  comments: 14 },
-  { id: 'p11',title: '"BayKid Company Update: May 2026"',                        platform: 'linkedin',  postedAt: '2026-05-25T13:00:00Z', impressions: 420,   engagement: 0.009, clicks: 4,   shares: 1,   saves: 0,   comments: 0 },
-  { id: 'p12',title: '"3 Reasons Nashville Parents Love BayKid"',                platform: 'tiktok',    postedAt: '2026-05-26T18:00:00Z', impressions: 11600, engagement: 0.062, clicks: 67,  shares: 178, saves: 130, comments: 28 },
+  { id: 'p11',title: '"Cyan\'s Brooklynn Company Update: May 2026"',              platform: 'linkedin',  postedAt: '2026-05-25T13:00:00Z', impressions: 420,   engagement: 0.009, clicks: 4,   shares: 1,   saves: 0,   comments: 0 },
+  { id: 'p12',title: '"3 Reasons Nashville Parents Love Cyan\'s Brooklynn"',     platform: 'tiktok',    postedAt: '2026-05-26T18:00:00Z', impressions: 11600, engagement: 0.062, clicks: 67,  shares: 178, saves: 130, comments: 28 },
 ]
 
 function scorePost(p: Omit<PostPerf, 'score'>): number {
@@ -300,7 +300,7 @@ export function getLowPosts(n = 3): PostPerf[] {
 // ── Hashtag performance ───────────────────────────────────────────────────────
 
 export const HASHTAG_PERF: HashtagPerf[] = [
-  { tag: '#BayKid',              uses: 42, avgReach: 4200,  avgEngagement: 0.049, trend: 'up'     },
+  { tag: '#CyansBrooklynn',      uses: 42, avgReach: 4200,  avgEngagement: 0.049, trend: 'up'     },
   { tag: '#RecycleNashville',    uses: 38, avgReach: 3800,  avgEngagement: 0.044, trend: 'up'     },
   { tag: '#Nashville',           uses: 35, avgReach: 6100,  avgEngagement: 0.038, trend: 'stable' },
   { tag: '#CurbsideRecycling',   uses: 30, avgReach: 3100,  avgEngagement: 0.042, trend: 'up'     },

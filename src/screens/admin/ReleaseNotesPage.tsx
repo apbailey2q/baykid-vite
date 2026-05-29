@@ -85,7 +85,7 @@ export default function ReleaseNotesPage() {
           <div>
             <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: 0 }}>📝 Release notes</h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 6 }}>
-              What changed in BayKid AI Marketing — for the team.
+              What changed in Cyan's Brooklynn Marketing — for the team.
             </p>
           </div>
           {isAdmin && (

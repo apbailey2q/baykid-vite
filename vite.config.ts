@@ -301,7 +301,7 @@ function aiApiPlugin(apiKey: string, model: string): Plugin {
       server.middlewares.use('/api/ai/generate-content', (req, res) => {
         void handleRequest(req, res)
       })
-      server.middlewares.use('/api/health', (req, res) => {
+      server.middlewares.use('/api/health', (_req, res) => {
         void handleHealth(apiKey, model, res)
       })
     },
@@ -309,7 +309,7 @@ function aiApiPlugin(apiKey: string, model: string): Plugin {
       server.middlewares.use('/api/ai/generate-content', (req, res) => {
         void handleRequest(req, res)
       })
-      server.middlewares.use('/api/health', (req, res) => {
+      server.middlewares.use('/api/health', (_req, res) => {
         void handleHealth(apiKey, model, res)
       })
     },

@@ -44,13 +44,13 @@ export default function AboutPage() {
         <Container>
           <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto' }}>
             <span style={{ color: '#00c8ff', fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
-              About BayKid
+              About Cyan's Brooklynn
             </span>
             <h1 style={{ color: '#fff', fontSize: 40, fontWeight: 900, lineHeight: 1.1, marginTop: 10, marginBottom: 16, letterSpacing: '-0.02em' }}>
               We're building the marketing tool we wished we had.
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, lineHeight: 1.6 }}>
-              BayKid is for small teams that need to ship content fast — without losing brand voice, control, or quality.
+              Cyan's Brooklynn is for small teams that need to ship content fast — without losing brand voice, control, or quality.
               We use Claude under the hood, but we built every workflow around the marketer, not the model.
             </p>
           </div>
@@ -93,12 +93,12 @@ export default function AboutPage() {
               Built by founders who got tired of stitching together 7 SaaS tools.
             </h3>
             <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
-              We ran marketing at two startups before BayKid. Both times we duct-taped together a CMS,
+              We ran marketing at two startups before Cyan's Brooklynn. Both times we duct-taped together a CMS,
               a scheduler, a lead form, a CRM, an analytics tool, an approval workflow, and an AI writer.
               Every tool was great in isolation. None of them talked to each other.
             </p>
             <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 1.7 }}>
-              BayKid is the workspace we wanted: one place to write, schedule, automate, approve, and learn —
+              Cyan's Brooklynn is the workspace we wanted: one place to write, schedule, automate, approve, and learn —
               all wired into the same brand voice and the same lead pipeline. Built on Claude, designed for
               the team that wishes they were a team of 10.
             </p>
@@ -109,7 +109,7 @@ export default function AboutPage() {
       {/* Team */}
       <section style={{ paddingTop: 32, paddingBottom: 60 }}>
         <Container>
-          <SectionHeading eyebrow="Team" title="The humans behind BayKid" kicker="Placeholder bios — swap with real ones before public launch." />
+          <SectionHeading eyebrow="Team" title="The humans behind Cyan's Brooklynn" kicker="Placeholder bios — swap with real ones before public launch." />
           <div className="grid md:grid-cols-4 sm:grid-cols-2 grid-cols-1" style={{ gap: 16 }}>
             {TEAM.map((m, i) => (
               <div key={i} style={{

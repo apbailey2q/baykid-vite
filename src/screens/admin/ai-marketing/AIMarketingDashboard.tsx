@@ -7,7 +7,7 @@ import { loadLeads } from '../../../lib/leadStorage'
 import { loadRules } from '../../../lib/automationRules'
 import {
   activeNotifications, markRead, dismissNotification, markAllRead,
-  autoGenerateNotifications, unreadCount,
+  autoGenerateNotifications,
   type AppNotification, NOTIF_META,
 } from '../../../lib/notifications'
 import { recentEvents, EVENT_META, fmtEventTime, type ActivityEvent } from '../../../lib/activityLog'
@@ -164,7 +164,7 @@ export function AIMarketingDashboard() {
         <div>
           <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 20, margin: 0 }}>Marketing Overview</h2>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>
-            BayKid AI Marketing Center — Nashville, TN
+            Cyan's Brooklynn Marketing Center
           </p>
         </div>
         <button

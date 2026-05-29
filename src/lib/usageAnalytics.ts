@@ -52,7 +52,7 @@ function appendEvent(event: UsageEvent): void {
 
 function getPostHog(): { capture?: (event: string, props?: Record<string, unknown>) => void } | null {
   // PostHog loads as window.posthog if the snippet is installed
-  return (typeof window !== 'undefined' && (window as Record<string, unknown>).posthog) as
+  return (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).posthog) as
     { capture?: (event: string, props?: Record<string, unknown>) => void } | null
 }
 

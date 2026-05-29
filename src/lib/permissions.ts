@@ -160,8 +160,8 @@ export function loadUserProfile(): UserProfile {
   // Default: admin so existing users lose no access
   return {
     id:         'local-user',
-    email:      'admin@baykid.com',
-    name:       'BayKid Admin',
+    email:      'admin@cbrecycling.org',
+    name:       'Cyan\'s Brooklynn Admin',
     role:       'admin',
     orgId:      '00000000-0000-0000-0000-00000000ba47',
     createdAt:  new Date().toISOString(),

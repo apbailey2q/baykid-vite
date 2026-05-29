@@ -19,7 +19,7 @@ export interface TeamMember {
 export interface BrandVoiceSettings {
   toneKeywords:   string[]   // e.g. ['friendly', 'local', 'eco-conscious']
   avoidKeywords:  string[]   // words/phrases to never use
-  signaturePhrase: string    // e.g. "BayKid — making Nashville greener"
+  signaturePhrase: string    // e.g. "Cyan's Brooklynn — Nashville's easiest recycling pickup"
   callToAction:   string     // default CTA
   emojiUsage:     'heavy' | 'moderate' | 'minimal' | 'none'
 }
@@ -64,15 +64,15 @@ export interface OrgSettings {
 
 export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   orgId:          '00000000-0000-0000-0000-00000000ba47',
-  orgName:        'BayKid Nashville',
+  orgName:        'Cyan\'s Brooklynn',
   primaryColor:   '#00c8ff',
   timezone:       'America/Chicago',
   locale:         'en-US',
   teamMembers: [
     {
       id:        'member-001',
-      email:     'admin@baykid.com',
-      name:      'BayKid Admin',
+      email:     'admin@cbrecycling.org',
+      name:      'Cyan\'s Brooklynn Admin',
       role:      'admin',
       status:    'active',
       invitedAt: '2026-01-01T00:00:00Z',
@@ -82,8 +82,8 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   brandVoice: {
     toneKeywords:    ['eco-conscious', 'community-first', 'approachable', 'Nashville-proud'],
     avoidKeywords:   ['trash', 'garbage', 'waste removal'],
-    signaturePhrase: 'BayKid — Nashville\'s easiest recycling pickup',
-    callToAction:    'Sign up at baykid.com',
+    signaturePhrase: 'Cyan\'s Brooklynn — Nashville\'s easiest recycling pickup',
+    callToAction:    'Sign up at cbrecycling.org',
     emojiUsage:      'moderate',
   },
   apiSettings: {

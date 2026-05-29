@@ -237,6 +237,6 @@ export const TIMEZONES = [
 export const CORS_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4173',
-  ...(process.env?.VITE_APP_URL ? [process.env.VITE_APP_URL] : []),
+  ...(import.meta.env.VITE_APP_URL ? [import.meta.env.VITE_APP_URL as string] : []),
   'https://baykid.vercel.app',
 ] as const

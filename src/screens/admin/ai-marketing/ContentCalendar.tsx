@@ -134,7 +134,7 @@ function calItemToPost(item: ContentCalendarItem): AIContentResult {
     title: item.title,
     hook: item.title,
     caption: `CTA: ${item.callToAction}`,
-    hashtags: ['#BayKid', '#Nashville'],
+    hashtags: ['#CyansBrooklynn', '#Nashville'],
     script: '', storyboard: '', emailDraft: '', commentReply: '',
     status: item.status,
     platform: item.platform,

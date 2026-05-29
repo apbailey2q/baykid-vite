@@ -63,7 +63,7 @@ export const POSTHOG_KEY: string =
   (import.meta.env.VITE_POSTHOG_KEY as string | undefined) ?? ''
 
 export const SUPPORT_EMAIL: string =
-  (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) ?? 'support@baykid.local'
+  (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) ?? 'support@cbrecycling.org'
 
 // ── Health snapshot (used by api/health.ts + the in-app status surface) ─────
 

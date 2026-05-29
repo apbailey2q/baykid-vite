@@ -25,7 +25,7 @@ const labelStyle: React.CSSProperties = {
 const SAMPLE_COMMENTS = [
   `Do you guys serve Antioch? I've been looking for curbside recycling for months.`,
   'What materials do you actually accept? I have a lot of cardboard and plastics.',
-  'How much does BayKid cost per month? Is there a family plan?',
+  'How much does Cyan\'s Brooklynn cost per month? Is there a family plan?',
   'This sounds great but do you take electronics? I have old phones and laptops.',
   'Can apartments sign up or is this only for houses?',
 ]
@@ -70,7 +70,7 @@ export function CommentReplies() {
     <div style={{ maxWidth: 800 }}>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 20, margin: 0 }}>💬 Comment Replies</h2>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>Paste a social media comment and generate an on-brand BayKid reply.</p>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 }}>Paste a social media comment and generate an on-brand Cyan's Brooklynn reply.</p>
       </div>
 
       {/* Sample comments */}

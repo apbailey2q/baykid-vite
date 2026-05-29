@@ -45,7 +45,7 @@ export default function TermsOfService() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Terms of Service</span>
         </div>
@@ -64,20 +64,20 @@ export default function TermsOfService() {
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Terms of Service</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Last updated May 2026. These Terms of Service ("Terms") govern your use of the BayKid platform operated by Cyan's Brooklynn Recycling Enterprise ("we", "us", "our"). By accessing or using the platform, you agree to these Terms.
+              Last updated May 2026. These Terms of Service ("Terms") govern your use of the Cyan's Brooklynn platform operated by Cyan's Brooklynn Recycling Enterprise ("we", "us", "our"). By accessing or using the platform, you agree to these Terms.
             </p>
           </div>
 
           {/* 1. Acceptance */}
           <Section title="1. Acceptance of Terms" delay={60} a={a}>
             <p>
-              By creating an account or using any part of the BayKid platform, you confirm that you are at least 18 years old (or have parental consent), that you have read and understood these Terms, and that you agree to be bound by them. If you do not agree, do not use the platform.
+              By creating an account or using any part of the Cyan's Brooklynn platform, you confirm that you are at least 18 years old (or have parental consent), that you have read and understood these Terms, and that you agree to be bound by them. If you do not agree, do not use the platform.
             </p>
           </Section>
 
           {/* 2. User Responsibilities */}
           <Section title="2. General User Responsibilities" delay={90} a={a}>
-            <p>All users of the BayKid platform agree to:</p>
+            <p>All users of the Cyan's Brooklynn platform agree to:</p>
             <Ul items={[
               'Provide accurate, truthful account information and keep it up to date.',
               'Use the platform only for lawful recycling and logistics purposes.',
@@ -92,7 +92,7 @@ export default function TermsOfService() {
           {/* 3. Prohibited Materials */}
           <Section title="3. Prohibited Materials" delay={120} a={a}>
             <p>
-              The following materials are strictly prohibited from all recycling bags, bins, and loads submitted through the BayKid platform:
+              The following materials are strictly prohibited from all recycling bags, bins, and loads submitted through the Cyan's Brooklynn platform:
             </p>
             <Ul items={[
               'Medical waste, sharps, needles, or biohazardous materials.',
@@ -112,7 +112,7 @@ export default function TermsOfService() {
           <Section title="4. Consumer User Terms" delay={150} a={a}>
             <p>As a consumer account holder, you agree to:</p>
             <Ul items={[
-              'Place only clean, sortable recyclables in BayKid-issued bags.',
+              'Place only clean, sortable recyclables in Cyan\'s Brooklynn-issued bags.',
               'Not tamper with, resell, or transfer assigned QR-coded bags.',
               'Provide accurate pickup location information.',
               'Not attempt to scan bags not assigned to your account.',
@@ -163,7 +163,7 @@ export default function TermsOfService() {
           <Section title="7. Warehouse Staff Terms" delay={240} a={a}>
             <p>Warehouse employees and supervisors agree to:</p>
             <Ul items={[
-              'Perform intake inspections on all incoming commercial loads using the BayKid platform.',
+              'Perform intake inspections on all incoming commercial loads using the Cyan\'s Brooklynn platform.',
               'Accurately record load weights, classifications (green/yellow/red), and contamination observations.',
               'Quarantine red-classified loads and escalate to a supervisor before processing.',
               'Not process loads that have not been formally received and classified.',
@@ -176,7 +176,7 @@ export default function TermsOfService() {
           {/* 8. AI Disclaimer */}
           <Section title="8. AI Inspection Disclaimer" delay={270} a={a}>
             <p>
-              The BayKid platform uses AI image analysis to assist with load inspection and safety classification. AI results are <strong style={{ color: 'rgba(255,255,255,0.85)' }}>advisory only</strong> and do not constitute a final determination of load safety, contamination, or acceptability.
+              The Cyan's Brooklynn platform uses AI image analysis to assist with load inspection and safety classification. AI results are <strong style={{ color: 'rgba(255,255,255,0.85)' }}>advisory only</strong> and do not constitute a final determination of load safety, contamination, or acceptability.
             </p>
             <p className="mt-2">
               AI results must always be reviewed by a qualified driver, warehouse staff member, or administrator before action is taken. AI systems may generate incorrect results. Cyan's Brooklynn Recycling Enterprise is not liable for outcomes resulting from reliance on AI results without human review.
@@ -227,7 +227,7 @@ export default function TermsOfService() {
           {/* 11. Limitation of Liability */}
           <Section title="11. Limitation of Liability" delay={360} a={a}>
             <p>
-              To the fullest extent permitted by applicable law, Cyan's Brooklynn Recycling Enterprise's liability to you for any claim arising out of or related to your use of the BayKid platform is limited to the fees you paid for the service in the three months preceding the claim.
+              To the fullest extent permitted by applicable law, Cyan's Brooklynn Recycling Enterprise's liability to you for any claim arising out of or related to your use of the Cyan's Brooklynn platform is limited to the fees you paid for the service in the three months preceding the claim.
             </p>
             <p className="mt-2">We are not liable for:</p>
             <Ul items={[
@@ -246,7 +246,7 @@ export default function TermsOfService() {
           {/* 12. Governing Law */}
           <Section title="12. Governing Law" delay={390} a={a}>
             <p>
-              These Terms are governed by the laws of the State of Tennessee. Disputes shall be resolved in the courts of Davidson County, Tennessee. If any provision of these Terms is found to be unenforceable, the remaining provisions continue in full effect. These Terms constitute the entire agreement between you and Cyan's Brooklynn Recycling Enterprise regarding your use of the BayKid platform.
+              These Terms are governed by the laws of the State of Tennessee. Disputes shall be resolved in the courts of Davidson County, Tennessee. If any provision of these Terms is found to be unenforceable, the remaining provisions continue in full effect. These Terms constitute the entire agreement between you and Cyan's Brooklynn Recycling Enterprise regarding your use of the Cyan's Brooklynn platform.
             </p>
           </Section>
 

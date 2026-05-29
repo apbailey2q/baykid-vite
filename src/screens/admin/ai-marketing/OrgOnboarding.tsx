@@ -132,7 +132,7 @@ function CreateOrgStep({ onNext }: { onNext: () => void }) {
           <input
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="e.g. BayKid Recycling"
+            placeholder="e.g. Cyan's Brooklynn Recycling"
             style={inputStyle}
             autoFocus
           />
@@ -141,7 +141,7 @@ function CreateOrgStep({ onNext }: { onNext: () => void }) {
         <div>
           <label style={labelStyle}>URL Slug</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, whiteSpace: 'nowrap' }}>baykid.app/</span>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, whiteSpace: 'nowrap' }}>cbrecycling.org/</span>
             <input
               value={slug}
               onChange={(e) => { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setSlugManual(true) }}
@@ -212,7 +212,7 @@ function ChoosePlanStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => 
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
-        {PLANS.map((plan) => {
+        {Object.values(PLANS).map((plan) => {
           const active = selected === plan.id
           return (
             <button
@@ -366,7 +366,7 @@ function InviteTeamStep({ onComplete }: { onComplete: () => void }) {
     const valid = emails.filter((r) => r.email.trim())
     if (valid.length === 0) return onComplete()
     setSending(true)
-    await Promise.allSettled(valid.map((r) => inviteToOrg(activeOrg.id, r.email.trim(), r.role)))
+    await Promise.allSettled(valid.map((r) => inviteToOrg(activeOrg.id, r.email.trim(), r.role, 'Admin')))
     setSending(false)
     setSent(true)
     setTimeout(onComplete, 1200)

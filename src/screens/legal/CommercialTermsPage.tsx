@@ -32,7 +32,7 @@ const SECTIONS = [
   },
   {
     title: '6. AI Advisory Systems',
-    body:  'The BayKid platform uses AI image analysis to assist with load inspection and safety classification. AI results are advisory only. CB Recycling\'s drivers and warehouse staff retain final judgment on load acceptance. Commercial accounts may not request that AI results be suppressed or bypassed. AI classification records are retained in the audit trail for a minimum of 2 years.',
+    body:  'The Cyan\'s Brooklynn platform uses AI image analysis to assist with load inspection and safety classification. AI results are advisory only. CB Recycling\'s drivers and warehouse staff retain final judgment on load acceptance. Commercial accounts may not request that AI results be suppressed or bypassed. AI classification records are retained in the audit trail for a minimum of 2 years.',
   },
   {
     title: '7. Data Sharing & Audit Access',
@@ -72,7 +72,7 @@ export default function CommercialTermsPage() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Commercial Terms</span>
         </div>
@@ -90,7 +90,7 @@ export default function CommercialTermsPage() {
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Commercial Service Terms</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Last updated May 2026. These terms apply to all commercial recycling accounts on the BayKid platform operated by CB Recycling, Nashville, TN.
+              Last updated May 2026. These terms apply to all commercial recycling accounts on the Cyan's Brooklynn platform operated by CB Recycling, Nashville, TN.
             </p>
           </div>
 

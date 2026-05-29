@@ -225,7 +225,7 @@ export function DataTable<T>({
                     ...rowStyle?.(row),
                   }}
                   onMouseEnter={(e) => { if (onRowClick) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = rowStyle?.(row)?.background ?? 'transparent' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = (rowStyle?.(row)?.background as string | undefined) ?? 'transparent' }}
                 >
                   {visibleCols.map((col) => (
                     <td

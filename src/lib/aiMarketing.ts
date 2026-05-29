@@ -181,11 +181,11 @@ export const MOCK_POSTS: AIContentResult[] = [
     title: 'Why Nashville Families Are Choosing Curbside Recycling',
     hook: 'Did you know the average Nashville family throws away 4.4 lbs of recyclables every single day? 😱',
     caption:
-      `That's over 1,600 lbs a year going straight to the landfill — and it doesn't have to be that way.\n\nBayKid makes recycling effortless. We pick up right from your curb, so there's no sorting, no hauling, and no guesswork.\n\n♻️ Cardboard, plastic, glass, e-waste — we handle it all.\n📍 Now serving Nashville and surrounding communities.\n\nReady to make a real difference without the extra effort? Link in bio to sign up in under 2 minutes.`,
+      `That's over 1,600 lbs a year going straight to the landfill — and it doesn't have to be that way.\n\nCyan's Brooklynn makes recycling effortless. We pick up right from your curb, so there's no sorting, no hauling, and no guesswork.\n\n♻️ Cardboard, plastic, glass, e-waste — we handle it all.\n📍 Now serving Nashville and surrounding communities.\n\nReady to make a real difference without the extra effort? Link in bio to sign up in under 2 minutes.`,
     hashtags: [
       '#Nashville',
       '#RecycleNashville',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#CurbsideRecycling',
       '#EcoFriendly',
       '#GreenLiving',
@@ -195,16 +195,16 @@ export const MOCK_POSTS: AIContentResult[] = [
       '#NashvilleGreen',
     ],
     script:
-      'Open on a family putting recyclables in a bin outside their Nashville home. Cut to BayKid truck pulling up. Driver smiles, grabs bin, waves. Text overlay: "We handle the recycling — you handle the living." Close on BayKid logo with website URL.',
+      `Open on a family putting recyclables in a bin outside their Nashville home. Cut to Cyan's Brooklynn truck pulling up. Driver smiles, grabs bin, waves. Text overlay: "We handle the recycling — you handle the living." Close on Cyan's Brooklynn logo with website URL.`,
     storyboard:
-      'Scene 1: Family sorting items at kitchen table (5s). Scene 2: Dad placing bin at curb (3s). Scene 3: BayKid truck arrives — bright logo visible (4s). Scene 4: Driver loads bin, gives thumbs up (3s). Scene 5: Family relaxing inside, text overlay "Recycling handled." (5s). Scene 6: Logo + baykid.com CTA (3s).',
+      `Scene 1: Family sorting items at kitchen table (5s). Scene 2: Dad placing bin at curb (3s). Scene 3: Cyan's Brooklynn truck arrives — bright logo visible (4s). Scene 4: Driver loads bin, gives thumbs up (3s). Scene 5: Family relaxing inside, text overlay "Recycling handled." (5s). Scene 6: Logo + cbrecycling.org CTA (3s).`,
     emailDraft: '',
     commentReply: '',
     status: 'approved',
     platform: 'instagram',
     tone: 'friendly',
     goal: 'Increase signups',
-    callToAction: 'Sign up at baykid.com',
+    callToAction: 'Sign up at cbrecycling.org',
     createdAt: '2026-05-20T10:00:00Z',
     scheduledFor: '2026-05-28T14:00:00Z',
   },
@@ -214,12 +214,12 @@ export const MOCK_POSTS: AIContentResult[] = [
     title: 'POV: You Finally Found a Recycling Service That Actually Shows Up',
     hook: 'POV: You scheduled a curbside recycling pickup and they actually showed up on time 👀',
     caption:
-      `No more excuses. No more "I'll drop it off later." BayKid shows up so you don't have to go anywhere.\n\n✅ Reliable weekly or bi-weekly pickups\n✅ Text reminders so you never forget\n✅ Eco-certified handling for every material\n\nNashville — your recycling game just leveled up. 🙌\n\nComment "PICKUP" and we'll send you our service area map!`,
+      `No more excuses. No more "I'll drop it off later." Cyan's Brooklynn shows up so you don't have to go anywhere.\n\n✅ Reliable weekly or bi-weekly pickups\n✅ Text reminders so you never forget\n✅ Eco-certified handling for every material\n\nNashville — your recycling game just leveled up. 🙌\n\nComment "PICKUP" and we'll send you our service area map!`,
     hashtags: [
       '#RecyclingTikTok',
       '#NashvilleTikTok',
       '#EcoTok',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#SustainableLiving',
       '#RecyclePOV',
       '#GreenTok',
@@ -228,9 +228,9 @@ export const MOCK_POSTS: AIContentResult[] = [
       '#NashvilleLife',
     ],
     script:
-      'Hook (0–3s): Close-up of phone notification: "Your BayKid pickup is scheduled for tomorrow!" React with surprise and excitement.\nBody (3–18s): Time-lapse of filling recycling bin — cardboard boxes, plastic bottles, old electronics. Cut to morning: bin at curb. BayKid truck rolls up exactly at scheduled time. Driver loads everything efficiently.\nClose (18–25s): Back inside — cozy, relaxed. Text: "That\'s it. That\'s the whole video." Logo + "baykid.com" fades in.',
+      `Hook (0–3s): Close-up of phone notification: "Your Cyan's Brooklynn pickup is scheduled for tomorrow!" React with surprise and excitement.\nBody (3–18s): Time-lapse of filling recycling bin — cardboard boxes, plastic bottles, old electronics. Cut to morning: bin at curb. Cyan's Brooklynn truck rolls up exactly at scheduled time. Driver loads everything efficiently.\nClose (18–25s): Back inside — cozy, relaxed. Text: "That's it. That's the whole video." Logo + "cbrecycling.org" fades in.`,
     storyboard:
-      'Frame 1: Phone screen with pickup notification (POV). Frame 2: Montage of filling bin with recyclables. Frame 3: Bin placed at curb at dawn. Frame 4: BayKid truck arrives — wide shot of neighborhood. Frame 5: Driver loads bin, waves at camera. Frame 6: Creator relaxes indoors, smiles. Frame 7: CTA overlay + logo.',
+      `Frame 1: Phone screen with pickup notification (POV). Frame 2: Montage of filling bin with recyclables. Frame 3: Bin placed at curb at dawn. Frame 4: Cyan's Brooklynn truck arrives — wide shot of neighborhood. Frame 5: Driver loads bin, waves at camera. Frame 6: Creator relaxes indoors, smiles. Frame 7: CTA overlay + logo.`,
     emailDraft: '',
     commentReply: '',
     status: 'pending_approval',
@@ -243,14 +243,14 @@ export const MOCK_POSTS: AIContentResult[] = [
   {
     id: 'post-003',
     contentType: 'carousel',
-    title: `5 Items You Didn't Know BayKid Recycles`,
+    title: `5 Items You Didn't Know Cyan's Brooklynn Recycles`,
     hook: 'Most people recycle bottles and cans. But what about these? 👇 (Swipe to see what we take)',
     caption:
-      `You'd be surprised what can be recycled with BayKid.\n\nSwipe through to see 5 items most people throw away — that we pick up for free as part of your subscription.\n\nFrom old electronics to foam packaging, we've got you covered.\n\n📍 Nashville-area pickup available now.\n👇 Drop a "🙋" if one of these surprised you!`,
+      `You'd be surprised what can be recycled with Cyan's Brooklynn.\n\nSwipe through to see 5 items most people throw away — that we pick up for free as part of your subscription.\n\nFrom old electronics to foam packaging, we've got you covered.\n\n📍 Nashville-area pickup available now.\n👇 Drop a "🙋" if one of these surprised you!`,
     hashtags: [
       '#RecyclingFacts',
       '#Nashville',
-      '#BayKidRecycling',
+      '#CyansBrooklynnRecycling',
       '#EWaste',
       '#SustainableHome',
       '#ZeroWasteTips',
@@ -260,29 +260,29 @@ export const MOCK_POSTS: AIContentResult[] = [
       '#GoGreen',
     ],
     script:
-      `Slide 1: "5 Things BayKid Recycles That You're Probably Throwing Away" (title card). Slide 2: Electronics — old phones, chargers, keyboards. Slide 3: Foam packaging — packing peanuts, styrofoam trays. Slide 4: Shredded paper — yes, even the confetti kind. Slide 5: Batteries — AA, AAA, rechargeable. Slide 6: Broken glass — handled safely so you don't cut yourself. Slide 7: CTA — "Sign up at baykid.com. We pick it all up."`,
+      `Slide 1: "5 Things Cyan's Brooklynn Recycles That You're Probably Throwing Away" (title card). Slide 2: Electronics — old phones, chargers, keyboards. Slide 3: Foam packaging — packing peanuts, styrofoam trays. Slide 4: Shredded paper — yes, even the confetti kind. Slide 5: Batteries — AA, AAA, rechargeable. Slide 6: Broken glass — handled safely so you don't cut yourself. Slide 7: CTA — "Sign up at cbrecycling.org. We pick it all up."`,
     storyboard:
-      'Carousel layout: 7 slides. Each slide has a large emoji icon, bold item name, short description (2 lines), and BayKid brand color accent. Final slide is CTA with gradient background and website URL.',
+      `Carousel layout: 7 slides. Each slide has a large emoji icon, bold item name, short description (2 lines), and Cyan's Brooklynn brand color accent. Final slide is CTA with gradient background and website URL.`,
     emailDraft: '',
     commentReply: '',
     status: 'draft',
     platform: 'instagram',
     tone: 'educational',
     goal: 'Educate audience, reduce stigma about recycling complexity',
-    callToAction: 'Sign up at baykid.com',
+    callToAction: 'Sign up at cbrecycling.org',
     createdAt: '2026-05-23T14:30:00Z',
   },
   {
     id: 'post-004',
     contentType: 'social_post',
-    title: 'BayKid Partners With Local Nashville Schools',
-    hook: '🏫 Big news, Nashville! BayKid is now partnering with local schools to bring recycling education AND pickup right to the campus.',
+    title: `Cyan's Brooklynn Partners With Local Nashville Schools`,
+    hook: `🏫 Big news, Nashville! Cyan's Brooklynn is now partnering with local schools to bring recycling education AND pickup right to the campus.`,
     caption:
-      'We believe the next generation of eco-warriors is in classrooms right now — and we want to help them make an impact today.\n\nOur school program includes:\n📦 Weekly curbside pickup for the cafeteria, classrooms, and offices\n📚 Free recycling curriculum for K–8 students\n🏆 School leaderboard — compete for the most recycled materials in Nashville!\n\nInterested in bringing BayKid to your school? Email us at schools@baykid.com or tag a teacher below. 🙌',
+      `We believe the next generation of eco-warriors is in classrooms right now — and we want to help them make an impact today.\n\nOur school program includes:\n📦 Weekly curbside pickup for the cafeteria, classrooms, and offices\n📚 Free recycling curriculum for K–8 students\n🏆 School leaderboard — compete for the most recycled materials in Nashville!\n\nInterested in bringing Cyan's Brooklynn to your school? Email us at schools@cbrecycling.org or tag a teacher below. 🙌`,
     hashtags: [
       '#NashvilleSchools',
       '#EducationForSustainability',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#SchoolRecycling',
       '#MetroNashville',
       '#GreenSchools',
@@ -299,7 +299,7 @@ export const MOCK_POSTS: AIContentResult[] = [
     platform: 'facebook',
     tone: 'inspiring',
     goal: 'Partnerships with schools',
-    callToAction: 'Email schools@baykid.com',
+    callToAction: 'Email schools@cbrecycling.org',
     createdAt: '2026-05-21T11:00:00Z',
     scheduledFor: '2026-05-29T09:00:00Z',
   },
@@ -307,15 +307,15 @@ export const MOCK_POSTS: AIContentResult[] = [
     id: 'post-005',
     contentType: 'social_post',
     title: 'Summer Recycling Challenge — Nashville Edition',
-    hook: `☀️ This summer, Nashville — let's see who can recycle the most. We're issuing the BayKid Summer Challenge.`,
+    hook: `☀️ This summer, Nashville — let's see who can recycle the most. We're issuing the Cyan's Brooklynn Summer Challenge.`,
     caption:
-      `Here's how it works:\n\n1️⃣ Sign up for BayKid curbside pickup\n2️⃣ Track your recycling weight each week (we log it for you)\n3️⃣ Share your progress with #BayKidSummerChallenge\n\nTop recycling household each month wins a $50 gift card to a local Nashville restaurant. 🍕\n\nChallenge starts June 1st. Don't wait — spots are limited for new subscribers this month!\n\n👇 Tag a neighbor to compete with!`,
+      `Here's how it works:\n\n1️⃣ Sign up for Cyan's Brooklynn curbside pickup\n2️⃣ Track your recycling weight each week (we log it for you)\n3️⃣ Share your progress with #CyansBrooklynnSummerChallenge\n\nTop recycling household each month wins a $50 gift card to a local Nashville restaurant. 🍕\n\nChallenge starts June 1st. Don't wait — spots are limited for new subscribers this month!\n\n👇 Tag a neighbor to compete with!`,
     hashtags: [
-      '#BayKidSummerChallenge',
+      '#CyansBrooklynnSummerChallenge',
       '#NashvilleRecycles',
       '#SummerChallenge',
       '#EcoChallenge',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#GreenSummer',
       '#NashvilleContest',
       '#RecycleToWin',
@@ -330,20 +330,20 @@ export const MOCK_POSTS: AIContentResult[] = [
     platform: 'instagram',
     tone: 'urgent',
     goal: 'Drive new subscriptions before summer',
-    callToAction: 'Sign up before June 1st at baykid.com',
+    callToAction: 'Sign up before June 1st at cbrecycling.org',
     createdAt: '2026-05-24T08:45:00Z',
   },
   {
     id: 'post-006',
     contentType: 'social_post',
-    title: 'Why Your Business Should Recycle With BayKid',
+    title: `Why Your Business Should Recycle With Cyan's Brooklynn`,
     hook: '📊 Nashville businesses: Did you know proper recycling can reduce your waste disposal costs by up to 30%?',
     caption:
-      `BayKid's commercial recycling program is built for Nashville businesses that want to do right by the planet — and their bottom line.\n\nWhat's included:\n🏢 Scheduled pickups that fit your operating hours\n📋 Monthly recycling reports for sustainability reporting\n♻️ Certified handling for regulated materials (electronics, batteries, metals)\n💼 Dedicated account manager for your business\n\nWe serve restaurants, offices, retail stores, apartments, and more across Greater Nashville.\n\nDM us or visit baykid.com/business to request a free quote.`,
+      `Cyan's Brooklynn's commercial recycling program is built for Nashville businesses that want to do right by the planet — and their bottom line.\n\nWhat's included:\n🏢 Scheduled pickups that fit your operating hours\n📋 Monthly recycling reports for sustainability reporting\n♻️ Certified handling for regulated materials (electronics, batteries, metals)\n💼 Dedicated account manager for your business\n\nWe serve restaurants, offices, retail stores, apartments, and more across Greater Nashville.\n\nDM us or visit cbrecycling.org/business to request a free quote.`,
     hashtags: [
       '#NashvilleBusiness',
       '#CommercialRecycling',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#SustainableBusiness',
       '#NashvilleEntrepreneur',
       '#GreenBusiness',
@@ -360,7 +360,7 @@ export const MOCK_POSTS: AIContentResult[] = [
     platform: 'linkedin',
     tone: 'professional',
     goal: 'Generate commercial leads',
-    callToAction: 'Visit baykid.com/business for a free quote',
+    callToAction: 'Visit cbrecycling.org/business for a free quote',
     createdAt: '2026-05-25T13:00:00Z',
   },
 ]
@@ -427,7 +427,7 @@ export const MOCK_LEADS: Lead[] = [
     phone: '(615) 555-0578',
     city: 'Nashville',
     platform: 'linkedin',
-    need: 'Sponsorship / grant funding for BayKid community program',
+    need: `Sponsorship / grant funding for Cyan's Brooklynn community program`,
     status: 'contacted',
     followUpDate: '2026-06-01',
     notes: 'Program officer at Nashville Green Fund. Interested in co-sponsoring free recycling for 3 low-income zip codes. Needs impact numbers.',
@@ -482,7 +482,7 @@ export const MOCK_CALENDAR: ContentCalendarItem[] = [
     platform: 'instagram',
     title: 'Why Nashville Families Are Choosing Curbside Recycling',
     status: 'scheduled',
-    callToAction: 'Sign up at baykid.com',
+    callToAction: 'Sign up at cbrecycling.org',
     scheduledFor: '2026-05-28T14:00:00Z',
     contentType: 'social_post',
   },
@@ -498,34 +498,34 @@ export const MOCK_CALENDAR: ContentCalendarItem[] = [
   {
     id: 'cal-003',
     platform: 'facebook',
-    title: 'BayKid Partners With Local Nashville Schools',
+    title: `Cyan's Brooklynn Partners With Local Nashville Schools`,
     status: 'scheduled',
-    callToAction: 'Email schools@baykid.com',
+    callToAction: 'Email schools@cbrecycling.org',
     scheduledFor: '2026-05-29T09:00:00Z',
     contentType: 'social_post',
   },
   {
     id: 'cal-004',
     platform: 'instagram',
-    title: `5 Items You Didn't Know BayKid Recycles`,
+    title: `5 Items You Didn't Know Cyan's Brooklynn Recycles`,
     status: 'draft',
-    callToAction: 'Sign up at baykid.com',
+    callToAction: 'Sign up at cbrecycling.org',
     scheduledFor: '2026-05-30T12:00:00Z',
     contentType: 'carousel',
   },
   {
     id: 'cal-005',
     platform: 'linkedin',
-    title: 'Why Your Business Should Recycle With BayKid',
+    title: `Why Your Business Should Recycle With Cyan's Brooklynn`,
     status: 'pending_approval',
-    callToAction: 'Visit baykid.com/business',
+    callToAction: 'Visit cbrecycling.org/business',
     scheduledFor: '2026-05-30T14:00:00Z',
     contentType: 'social_post',
   },
   {
     id: 'cal-006',
     platform: 'youtube',
-    title: 'BayKid Behind the Scenes: A Day on the Route',
+    title: `Cyan's Brooklynn Behind the Scenes: A Day on the Route`,
     status: 'draft',
     callToAction: 'Subscribe for weekly eco tips',
     scheduledFor: '2026-06-01T10:00:00Z',
@@ -545,7 +545,7 @@ export const MOCK_CALENDAR: ContentCalendarItem[] = [
     platform: 'instagram',
     title: 'Summer Recycling Challenge — Nashville Edition',
     status: 'draft',
-    callToAction: 'Sign up before June 1st at baykid.com',
+    callToAction: 'Sign up before June 1st at cbrecycling.org',
     scheduledFor: '2026-06-03T13:00:00Z',
     contentType: 'social_post',
   },
@@ -554,7 +554,7 @@ export const MOCK_CALENDAR: ContentCalendarItem[] = [
     platform: 'facebook',
     title: 'Customer Spotlight: Greenview Apartments',
     status: 'draft',
-    callToAction: 'Get a free quote at baykid.com/business',
+    callToAction: 'Get a free quote at cbrecycling.org/business',
     scheduledFor: '2026-06-05T09:00:00Z',
     contentType: 'social_post',
   },
@@ -563,7 +563,7 @@ export const MOCK_CALENDAR: ContentCalendarItem[] = [
     platform: 'instagram',
     title: 'Friday Recycling Tip: What to Do With Old Batteries',
     status: 'approved',
-    callToAction: 'Schedule a pickup at baykid.com',
+    callToAction: 'Schedule a pickup at cbrecycling.org',
     scheduledFor: '2026-06-06T11:00:00Z',
     contentType: 'social_post',
   },
@@ -572,7 +572,7 @@ export const MOCK_CALENDAR: ContentCalendarItem[] = [
 // ── Claude Prompts ─────────────────────────────────────────────────────────────
 
 export const CLAUDE_PROMPTS: Record<ContentType, string> = {
-  social_post: `You are a social media marketing expert for BayKid Recycling — a curbside recycling pickup service based in Nashville, TN. BayKid makes recycling effortless for families, businesses, schools, and apartment communities by picking up recyclables directly from the curb on a scheduled basis.
+  social_post: `You are a social media marketing expert for Cyan's Brooklynn Recycling — a curbside recycling pickup service based in Nashville, TN. Cyan's Brooklynn makes recycling effortless for families, businesses, schools, and apartment communities by picking up recyclables directly from the curb on a scheduled basis.
 
 Your task: Write a compelling social media post based on the topic and parameters provided.
 
@@ -596,9 +596,9 @@ Return ONLY valid JSON matching this exact structure:
   "createdAt": "ISO timestamp"
 }
 
-BayKid voice: Community-first, eco-motivated, approachable. Always tie environmental impact to local Nashville identity. Never preachy — practical and positive.`,
+Cyan's Brooklynn voice: Community-first, eco-motivated, approachable. Always tie environmental impact to local Nashville identity. Never preachy — practical and positive.`,
 
-  reel_script: `You are a video content strategist for BayKid Recycling — a Nashville, TN curbside recycling pickup service. Your specialty is writing short-form video scripts (15–60 seconds) optimized for TikTok and Instagram Reels.
+  reel_script: `You are a video content strategist for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. Your specialty is writing short-form video scripts (15–60 seconds) optimized for TikTok and Instagram Reels.
 
 Your task: Write a compelling reel script based on the topic and parameters provided.
 
@@ -624,7 +624,7 @@ Return ONLY valid JSON matching this exact structure:
 
 Script style: Authentic, fast-paced, mobile-first. Use trending formats (POV, Day-in-the-life, Myth vs. Fact) adapted for recycling content.`,
 
-  carousel: `You are a social media designer and copywriter for BayKid Recycling — a Nashville, TN curbside recycling pickup service. Your specialty is educational Instagram carousel posts that teach and convert.
+  carousel: `You are a social media designer and copywriter for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. Your specialty is educational Instagram carousel posts that teach and convert.
 
 Your task: Write a multi-slide carousel post (5–8 slides) based on the topic and parameters provided.
 
@@ -650,7 +650,7 @@ Return ONLY valid JSON matching this exact structure:
 
 Carousel style: Each slide should deliver one clear insight. Use numbers, bold claims, and visual contrast. Final slide is always CTA.`,
 
-  comment_reply: `You are a community manager for BayKid Recycling — a Nashville, TN curbside recycling pickup service. Your role is to respond to comments on social media in a way that builds community, answers questions accurately, and occasionally converts commenters into customers.
+  comment_reply: `You are a community manager for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. Your role is to respond to comments on social media in a way that builds community, answers questions accurately, and occasionally converts commenters into customers.
 
 Your task: Write a thoughtful, on-brand reply to the comment or question provided.
 
@@ -676,7 +676,7 @@ Return ONLY valid JSON matching this exact structure:
 
 Reply style: Warm, helpful, never defensive. Use the commenter's name if provided. Address concerns directly. Always end with an invitation (to DM, visit the site, or ask more questions).`,
 
-  email_reply: `You are a customer success specialist for BayKid Recycling — a Nashville, TN curbside recycling pickup service. You write professional, friendly email replies that solve problems, answer questions, and move prospects toward conversion.
+  email_reply: `You are a customer success specialist for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. You write professional, friendly email replies that solve problems, answer questions, and move prospects toward conversion.
 
 Your task: Write a polished email reply based on the context provided.
 
@@ -700,9 +700,9 @@ Return ONLY valid JSON matching this exact structure:
   "createdAt": "ISO timestamp"
 }
 
-Email voice: Professional but warm. Clear structure: acknowledge → answer/resolve → next step → sign-off. Signature: [Name], BayKid Recycling Team | hello@baykid.com | baykid.com`,
+Email voice: Professional but warm. Clear structure: acknowledge → answer/resolve → next step → sign-off. Signature: [Name], Cyan's Brooklynn Recycling Team | hello@cbrecycling.org | cbrecycling.org`,
 
-  storyboard: `You are a video director and content strategist for BayKid Recycling — a Nashville, TN curbside recycling pickup service. You create detailed storyboards for brand videos, explainers, and social content.
+  storyboard: `You are a video director and content strategist for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. You create detailed storyboards for brand videos, explainers, and social content.
 
 Your task: Write a detailed storyboard based on the topic and parameters provided.
 
@@ -726,9 +726,9 @@ Return ONLY valid JSON matching this exact structure:
   "createdAt": "ISO timestamp"
 }
 
-Storyboard style: Cinematic but achievable with a smartphone and basic editing. Focus on real Nashville locations and authentic BayKid moments.`,
+Storyboard style: Cinematic but achievable with a smartphone and basic editing. Focus on real Nashville locations and authentic Cyan's Brooklynn moments.`,
 
-  voiceover: `You are a voiceover scriptwriter for BayKid Recycling — a Nashville, TN curbside recycling pickup service. You write punchy, professional voiceover scripts for ads, explainers, and social videos.
+  voiceover: `You are a voiceover scriptwriter for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. You write punchy, professional voiceover scripts for ads, explainers, and social videos.
 
 Your task: Write a voiceover script based on the topic and parameters provided.
 
@@ -754,7 +754,7 @@ Return ONLY valid JSON matching this exact structure:
 
 Voiceover style: Conversational yet polished. Rhythm matters — write to be spoken aloud. Match tone to the platform (energetic for TikTok, warm for Facebook, authoritative for LinkedIn).`,
 
-  analytics_review: `You are a digital marketing analyst for BayKid Recycling — a Nashville, TN curbside recycling pickup service. You analyze social media and marketing performance data and provide actionable recommendations.
+  analytics_review: `You are a digital marketing analyst for Cyan's Brooklynn Recycling — a Nashville, TN curbside recycling pickup service. You analyze social media and marketing performance data and provide actionable recommendations.
 
 Your task: Write a marketing analytics review and recommendation report based on the metrics and context provided.
 
@@ -787,14 +787,14 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
   social_post: {
     id: `mock-${Date.now()}`,
     contentType: 'social_post',
-    title: `BayKid Recycling — Nashville's Easiest Green Habit`,
+    title: `Cyan's Brooklynn Recycling — Nashville's Easiest Green Habit`,
     hook: '♻️ Nashville, what if recycling was as easy as putting your trash out?',
     caption:
-      'With BayKid, it is.\n\nWe pick up your recyclables right from your curb — cardboard, glass, plastic, e-waste — on a schedule that works for you.\n\nNo sorting stress. No drop-off trips. Just easy, reliable recycling that actually makes a difference for our city.\n\n📍 Serving Nashville and surrounding communities.\n✅ Weekly and bi-weekly plans available.\n\nSign up in under 2 minutes at baykid.com — your neighborhood (and your conscience) will thank you. 🌿',
+      `With Cyan's Brooklynn, it is.\n\nWe pick up your recyclables right from your curb — cardboard, glass, plastic, e-waste — on a schedule that works for you.\n\nNo sorting stress. No drop-off trips. Just easy, reliable recycling that actually makes a difference for our city.\n\n📍 Serving Nashville and surrounding communities.\n✅ Weekly and bi-weekly plans available.\n\nSign up in under 2 minutes at cbrecycling.org — your neighborhood (and your conscience) will thank you. 🌿`,
     hashtags: [
       '#Nashville',
       '#RecycleNashville',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#CurbsideRecycling',
       '#EcoFriendly',
       '#SustainableNashville',
@@ -804,39 +804,39 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
       '#RecyclingMadeEasy',
     ],
     script:
-      'Open on Nashville skyline at sunrise. Cut to a family placing their BayKid recycling bin at the curb. BayKid truck pulls up — driver waves. Text overlay: "Recycling, handled." Close on baykid.com CTA with bright green logo.',
+      `Open on Nashville skyline at sunrise. Cut to a family placing their Cyan's Brooklynn recycling bin at the curb. Cyan's Brooklynn truck pulls up — driver waves. Text overlay: "Recycling, handled." Close on cbrecycling.org CTA with bright green logo.`,
     storyboard:
-      'Scene 1 (3s): Aerial Nashville at dawn. Scene 2 (4s): Family carries full recycling bin to curb — smiling. Scene 3 (3s): BayKid truck arrives, logo visible. Scene 4 (4s): Driver loads bin efficiently, gives thumbs up. Scene 5 (5s): Family inside looking relaxed — text: "Recycling handled. baykid.com." Scene 6 (3s): Logo card with website and subscribe CTA.',
+      `Scene 1 (3s): Aerial Nashville at dawn. Scene 2 (4s): Family carries full recycling bin to curb — smiling. Scene 3 (3s): Cyan's Brooklynn truck arrives, logo visible. Scene 4 (4s): Driver loads bin efficiently, gives thumbs up. Scene 5 (5s): Family inside looking relaxed — text: "Recycling handled. cbrecycling.org." Scene 6 (3s): Logo card with website and subscribe CTA.`,
     emailDraft: '',
     commentReply: '',
     status: 'draft',
     platform: 'instagram',
     tone: 'friendly',
     goal: 'Increase signups',
-    callToAction: 'Sign up at baykid.com',
+    callToAction: 'Sign up at cbrecycling.org',
     createdAt: new Date().toISOString(),
   },
   reel_script: {
     id: `mock-${Date.now()}`,
     contentType: 'reel_script',
-    title: 'A Day With BayKid — Nashville Curbside Recycling',
+    title: `A Day With Cyan's Brooklynn — Nashville Curbside Recycling`,
     hook: `What if your recycling actually got picked up? 👀 (Nashville, this one's for you)`,
     caption:
-      `We know, we know — you've been meaning to recycle more. BayKid makes it effortless.\n\n♻️ Schedule. Set out. Done.\n\nComment "PICKUP" for our Nashville service map!`,
+      `We know, we know — you've been meaning to recycle more. Cyan's Brooklynn makes it effortless.\n\n♻️ Schedule. Set out. Done.\n\nComment "PICKUP" for our Nashville service map!`,
     hashtags: [
       '#RecyclingTikTok',
       '#NashvilleTikTok',
       '#EcoTok',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#CurbsidePickup',
       '#SustainableLiving',
       '#GreenTok',
       '#NashvilleLife',
     ],
     script:
-      `Hook (0-3s): Creator holds up overflowing recycling bag. "Okay, Nashville — I finally found a recycling service that doesn't cancel on you."\nBody (3-22s): Show phone — schedule pickup in the BayKid app. Next morning: bin placed at curb (time-lapse sunrise). BayKid truck rolls up exactly on time. Driver loads everything. Creator waves from front door.\nCTA (22-28s): Text overlay "baykid.com — curbside recycling in Nashville." Creator: "Link in bio. Thank me later."`,
+      `Hook (0-3s): Creator holds up overflowing recycling bag. "Okay, Nashville — I finally found a recycling service that doesn't cancel on you."\nBody (3-22s): Show phone — schedule pickup in the Cyan's Brooklynn app. Next morning: bin placed at curb (time-lapse sunrise). Cyan's Brooklynn truck rolls up exactly on time. Driver loads everything. Creator waves from front door.\nCTA (22-28s): Text overlay "cbrecycling.org — curbside recycling in Nashville." Creator: "Link in bio. Thank me later."`,
     storyboard:
-      `Frame 1: Creator with full recycling bag, talking to camera (hook). Frame 2: Phone screen — scheduling pickup in app. Frame 3: Time-lapse — sun rising, bin appears at curb. Frame 4: BayKid truck arrives — wide residential shot. Frame 5: Driver loads bin, waves. Frame 6: Creator at door giving thumbs up. Frame 7: Text CTA overlay + logo.`,
+      `Frame 1: Creator with full recycling bag, talking to camera (hook). Frame 2: Phone screen — scheduling pickup in app. Frame 3: Time-lapse — sun rising, bin appears at curb. Frame 4: Cyan's Brooklynn truck arrives — wide residential shot. Frame 5: Driver loads bin, waves. Frame 6: Creator at door giving thumbs up. Frame 7: Text CTA overlay + logo.`,
     emailDraft: '',
     commentReply: '',
     status: 'draft',
@@ -852,11 +852,11 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
     title: '5 Recycling Myths Nashville Residents Still Believe',
     hook: '🚨 Swipe before you put anything in the recycling bin. These myths are costing Nashville tons of landfill space.',
     caption:
-      `Recycling is more confusing than it should be — and that's not your fault.\n\nSwipe through to bust 5 common myths and learn what BayKid actually accepts. 👇\n\nSave this post the next time you're unsure what goes where! ♻️`,
+      `Recycling is more confusing than it should be — and that's not your fault.\n\nSwipe through to bust 5 common myths and learn what Cyan's Brooklynn actually accepts. 👇\n\nSave this post the next time you're unsure what goes where! ♻️`,
     hashtags: [
       '#RecyclingMyths',
       '#Nashville',
-      '#BayKid',
+      '#CyansBrooklynn',
       '#RecyclingFacts',
       '#SustainableLiving',
       '#ZeroWasteTips',
@@ -864,16 +864,16 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
       '#NashvilleGreen',
     ],
     script:
-      `Slide 1: "5 Recycling Myths Nashville Residents Still Believe" (bold title card, BayKid branding).\nSlide 2: Myth #1 — "Greasy pizza boxes can't be recycled." Truth: Tear off the clean top half — that can be recycled!\nSlide 3: Myth #2 — "All plastics are recyclable." Truth: Look for #1 and #2 — those are the most accepted.\nSlide 4: Myth #3 — "You have to rinse containers perfectly." Truth: A quick rinse is enough. Bone dry isn't needed.\nSlide 5: Myth #4 — "Small items like bottle caps are too small to recycle." Truth: Screw caps back on the bottle before recycling.\nSlide 6: Myth #5 — "Recycling doesn't actually make a difference." Truth: Nashville diverted 12,000 tons of recyclables last year — every bin counts.\nSlide 7: "BayKid picks up what others leave behind. Start your Nashville recycling pickup at baykid.com."`,
+      `Slide 1: "5 Recycling Myths Nashville Residents Still Believe" (bold title card, Cyan's Brooklynn branding).\nSlide 2: Myth #1 — "Greasy pizza boxes can't be recycled." Truth: Tear off the clean top half — that can be recycled!\nSlide 3: Myth #2 — "All plastics are recyclable." Truth: Look for #1 and #2 — those are the most accepted.\nSlide 4: Myth #3 — "You have to rinse containers perfectly." Truth: A quick rinse is enough. Bone dry isn't needed.\nSlide 5: Myth #4 — "Small items like bottle caps are too small to recycle." Truth: Screw caps back on the bottle before recycling.\nSlide 6: Myth #5 — "Recycling doesn't actually make a difference." Truth: Nashville diverted 12,000 tons of recyclables last year — every bin counts.\nSlide 7: "Cyan's Brooklynn picks up what others leave behind. Start your Nashville recycling pickup at cbrecycling.org."`,
     storyboard:
-      `Each slide: Dark background with BayKid cyan accent. Bold myth in red/crossed-out font. Truth in white below. Icon per category (pizza, plastic bottle, water drop, cap, globe). Final slide: gradient background, logo centered, website URL large.`,
+      `Each slide: Dark background with Cyan's Brooklynn cyan accent. Bold myth in red/crossed-out font. Truth in white below. Icon per category (pizza, plastic bottle, water drop, cap, globe). Final slide: gradient background, logo centered, website URL large.`,
     emailDraft: '',
     commentReply: '',
     status: 'draft',
     platform: 'instagram',
     tone: 'educational',
     goal: 'Educate audience',
-    callToAction: 'Start pickup at baykid.com',
+    callToAction: 'Start pickup at cbrecycling.org',
     createdAt: new Date().toISOString(),
   },
   comment_reply: {
@@ -887,12 +887,12 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
     storyboard: '',
     emailDraft: '',
     commentReply:
-      `Hey! Great question 🙌 We currently serve Nashville proper, Brentwood, Antioch, Madison, and Hermitage — with more neighborhoods being added monthly. You can check our full service map at baykid.com/service-area or DM us your zip code and we'll let you know instantly! We'd love to have you on board. ♻️`,
+      `Hey! Great question 🙌 We currently serve Nashville proper, Brentwood, Antioch, Madison, and Hermitage — with more neighborhoods being added monthly. You can check our full service map at cbrecycling.org/service-area or DM us your zip code and we'll let you know instantly! We'd love to have you on board. ♻️`,
     status: 'draft',
     platform: 'instagram',
     tone: 'friendly',
     goal: 'Convert commenter to customer',
-    callToAction: 'Check baykid.com/service-area',
+    callToAction: 'Check cbrecycling.org/service-area',
     createdAt: new Date().toISOString(),
   },
   email_reply: {
@@ -905,7 +905,7 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
     script: '',
     storyboard: '',
     emailDraft:
-      `Hi [Name],\n\nThank you so much for reaching out — we love hearing from Nashville businesses that want to make recycling part of their operations!\n\nBayKid's commercial program is designed to be completely hassle-free. We offer scheduled weekly or bi-weekly pickups at times that work around your business hours, and we handle cardboard, plastics, glass, e-waste, metals, and more.\n\nHere's how we'd get started:\n1. Quick 15-minute call to understand your volume and materials\n2. We'll send over a custom quote within 24 hours\n3. First pickup can happen within the week\n\nWould you have 15 minutes this week for a quick call? I'd love to put together a proposal that works for your business.\n\nLooking forward to hearing from you!\n\nBest,\nBayKid Recycling Team\nhello@baykid.com | baykid.com/business`,
+      `Hi [Name],\n\nThank you so much for reaching out — we love hearing from Nashville businesses that want to make recycling part of their operations!\n\nCyan's Brooklynn's commercial program is designed to be completely hassle-free. We offer scheduled weekly or bi-weekly pickups at times that work around your business hours, and we handle cardboard, plastics, glass, e-waste, metals, and more.\n\nHere's how we'd get started:\n1. Quick 15-minute call to understand your volume and materials\n2. We'll send over a custom quote within 24 hours\n3. First pickup can happen within the week\n\nWould you have 15 minutes this week for a quick call? I'd love to put together a proposal that works for your business.\n\nLooking forward to hearing from you!\n\nBest,\nCyan's Brooklynn Recycling Team\nhello@cbrecycling.org | cbrecycling.org/business`,
     commentReply: '',
     status: 'draft',
     platform: 'instagram',
@@ -917,12 +917,12 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
   storyboard: {
     id: `mock-${Date.now()}`,
     contentType: 'storyboard',
-    title: 'BayKid: A Day on the Route — Nashville',
-    hook: 'Aerial shot of Nashville at 6:00 AM — city waking up. BayKid truck rolls out of the depot, logo gleaming in morning light.',
+    title: `Cyan's Brooklynn: A Day on the Route — Nashville`,
+    hook: `Aerial shot of Nashville at 6:00 AM — city waking up. Cyan's Brooklynn truck rolls out of the depot, logo gleaming in morning light.`,
     caption:
-      `Follow BayKid's recycling crew through a full day of pickups across Nashville. From East Nashville bungalows to Brentwood apartment complexes — we show up, every time.\n\n🎥 Behind the scenes of Nashville's favorite recycling pickup service.`,
+      `Follow Cyan's Brooklynn's recycling crew through a full day of pickups across Nashville. From East Nashville bungalows to Brentwood apartment complexes — we show up, every time.\n\n🎥 Behind the scenes of Nashville's favorite recycling pickup service.`,
     hashtags: [
-      '#BayKid',
+      '#CyansBrooklynn',
       '#NashvilleRecycles',
       '#BehindTheScenes',
       '#EcoNashville',
@@ -930,27 +930,27 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
       '#NashvilleLife',
     ],
     script:
-      `VO: "Every morning in Nashville, something good is happening."\n[Scene: Sunrise, truck leaves depot]\nVO: "The BayKid team hits the road before most people have their coffee."\n[Scene: Route through East Nashville neighborhoods]\nVO: "We pick up recyclables from families, businesses, and schools — so they don't have to make a single trip."\n[Scene: Driver loading bins from apartment complex]\nVO: "By noon, we've collected enough material to fill a small warehouse."\n[Scene: Materials sorted at facility]\nVO: "And by end of day, that's hundreds of pounds of plastic, glass, and cardboard that won't end up in a landfill."\n[Scene: BayKid team high-fiving at depot at sunset]\nVO: "BayKid. Nashville's recycling crew. Join us at baykid.com."`,
+      `VO: "Every morning in Nashville, something good is happening."\n[Scene: Sunrise, truck leaves depot]\nVO: "The Cyan's Brooklynn team hits the road before most people have their coffee."\n[Scene: Route through East Nashville neighborhoods]\nVO: "We pick up recyclables from families, businesses, and schools — so they don't have to make a single trip."\n[Scene: Driver loading bins from apartment complex]\nVO: "By noon, we've collected enough material to fill a small warehouse."\n[Scene: Materials sorted at facility]\nVO: "And by end of day, that's hundreds of pounds of plastic, glass, and cardboard that won't end up in a landfill."\n[Scene: Cyan's Brooklynn team high-fiving at depot at sunset]\nVO: "Cyan's Brooklynn. Nashville's recycling crew. Join us at cbrecycling.org."`,
     storyboard:
-      `Scene 1 (5s): Aerial Nashville dawn. BG music begins soft and building. | VO intro.\nScene 2 (4s): Wide shot of BayKid depot — truck pulls out. Logo visible. | VO: "before most people have their coffee."\nScene 3 (6s): Truck drives through tree-lined East Nashville street. | VO: pickup benefits.\nScene 4 (5s): Driver exits truck, loads bins from front porch. Homeowner waves. | VO: "families and businesses."\nScene 5 (5s): Time-lapse of sorting facility — materials flowing. | VO: "enough material to fill a warehouse."\nScene 6 (4s): Crew high-fives at end of shift — golden hour lighting. | VO: impact stats.\nScene 7 (5s): Logo card. baykid.com URL. "Join the route." | Music resolves.`,
+      `Scene 1 (5s): Aerial Nashville dawn. BG music begins soft and building. | VO intro.\nScene 2 (4s): Wide shot of Cyan's Brooklynn depot — truck pulls out. Logo visible. | VO: "before most people have their coffee."\nScene 3 (6s): Truck drives through tree-lined East Nashville street. | VO: pickup benefits.\nScene 4 (5s): Driver exits truck, loads bins from front porch. Homeowner waves. | VO: "families and businesses."\nScene 5 (5s): Time-lapse of sorting facility — materials flowing. | VO: "enough material to fill a warehouse."\nScene 6 (4s): Crew high-fives at end of shift — golden hour lighting. | VO: impact stats.\nScene 7 (5s): Logo card. cbrecycling.org URL. "Join the route." | Music resolves.`,
     emailDraft: '',
     commentReply: '',
     status: 'draft',
     platform: 'youtube',
     tone: 'inspiring',
     goal: 'Brand storytelling',
-    callToAction: 'Visit baykid.com',
+    callToAction: 'Visit cbrecycling.org',
     createdAt: new Date().toISOString(),
   },
   voiceover: {
     id: `mock-${Date.now()}`,
     contentType: 'voiceover',
-    title: 'BayKid 30-Second Radio / Pre-Roll Ad',
+    title: `Cyan's Brooklynn 30-Second Radio / Pre-Roll Ad`,
     hook: 'Nashville — what if recycling was the easiest thing you did all week?',
-    caption: '30-second BayKid voiceover ad. Perfect for Instagram pre-roll, YouTube, or local radio.',
-    hashtags: ['#BayKid', '#Nashville', '#RecyclingAd'],
+    caption: `30-second Cyan's Brooklynn voiceover ad. Perfect for Instagram pre-roll, YouTube, or local radio.`,
+    hashtags: ['#CyansBrooklynn', '#Nashville', '#RecyclingAd'],
     script:
-      '[MUSIC: Upbeat acoustic guitar fades in]\n\nVO: "Nashville — what if recycling was the easiest thing you did all week?"\n\n[PAUSE 0.5s]\n\nVO: "With BayKid, it is. We pick up your recyclables right from your curb — cardboard, plastic, glass, even old electronics — on a schedule that works for you."\n\n[MUSIC: Slightly brighter]\n\nVO: "No sorting. No drop-off trips. Just curbside recycling that actually shows up."\n\n[PAUSE 0.5s]\n\nVO: "Join thousands of Nashville families and businesses already making a difference with BayKid."\n\n[MUSIC: Resolves to logo sting]\n\nVO: "Sign up today at bay-kid-dot-com. BayKid — recycling, handled."\n\n[MUSIC OUT]\n\n[Total runtime: ~28 seconds]',
+      `[MUSIC: Upbeat acoustic guitar fades in]\n\nVO: "Nashville — what if recycling was the easiest thing you did all week?"\n\n[PAUSE 0.5s]\n\nVO: "With Cyan's Brooklynn, it is. We pick up your recyclables right from your curb — cardboard, plastic, glass, even old electronics — on a schedule that works for you."\n\n[MUSIC: Slightly brighter]\n\nVO: "No sorting. No drop-off trips. Just curbside recycling that actually shows up."\n\n[PAUSE 0.5s]\n\nVO: "Join thousands of Nashville families and businesses already making a difference with Cyan's Brooklynn."\n\n[MUSIC: Resolves to logo sting]\n\nVO: "Sign up today at cbrecycling.org. Cyan's Brooklynn — recycling, handled."\n\n[MUSIC OUT]\n\n[Total runtime: ~28 seconds]`,
     storyboard: '',
     emailDraft: '',
     commentReply: '',
@@ -958,19 +958,19 @@ const MOCK_RESPONSES: Partial<Record<ContentType, AIContentResult>> = {
     platform: 'youtube',
     tone: 'friendly',
     goal: 'Brand awareness and signups',
-    callToAction: 'Sign up at baykid.com',
+    callToAction: 'Sign up at cbrecycling.org',
     createdAt: new Date().toISOString(),
   },
   analytics_review: {
     id: `mock-${Date.now()}`,
     contentType: 'analytics_review',
-    title: 'Analytics Review: May 2026 — BayKid Social Performance',
+    title: `Analytics Review: May 2026 — Cyan's Brooklynn Social Performance`,
     hook: 'TikTok drove 68% of new website visits in May — but Instagram remains the top conversion channel.',
     caption:
-      'May 2026 social media performance summary for BayKid Recycling. TikTok growth is accelerating while Instagram continues converting leads. Facebook engagement is declining and needs a content refresh.',
+      `May 2026 social media performance summary for Cyan's Brooklynn Recycling. TikTok growth is accelerating while Instagram continues converting leads. Facebook engagement is declining and needs a content refresh.`,
     hashtags: [],
     script:
-      `PERFORMANCE SUMMARY — MAY 2026\n\nTotal Reach: 41,200 (up 22% vs April)\nInstagram: 18,400 reach | 312 profile visits | 47 link clicks | 8 signups\nTikTok: 19,800 reach | 1,240 video completions | 89 profile visits | 4 signups\nFacebook: 3,000 reach | 44 engagements | 2 signups\nLinkedIn: 1,200 reach | 34 engagements | 3 commercial inquiries\n\nTOP PERFORMERS:\n1. "POV: Curbside Pickup That Actually Shows Up" (TikTok) — 19,800 views, 8.4% engagement rate\n2. "Why Nashville Families Choose BayKid" (Instagram) — 6,200 reach, 12 signups attributed\n3. "5 Items You Didn't Know BayKid Recycles" (Instagram carousel) — 4,100 reach, saved 340 times\n\nAREAS FOR IMPROVEMENT:\nFacebook reach dropped 31% — current content format is not optimized for Facebook's algorithm. Video content performs 4x better than static images on this platform.\nLinkedIn commercial lead quality is high but volume is low — posting frequency needs to increase from 2x/month to 1x/week.\n\nRECOMMENDATIONS:\n1. Increase TikTok posting to 4x/week — this platform has the lowest competition and highest organic reach for BayKid content.\n2. Convert top Instagram carousels to Facebook video format — use the existing storyboard assets.\n3. Launch LinkedIn thought leadership series: "Sustainable Business in Nashville" — 1 post/week targeting property managers and business owners.\n4. A/B test Instagram Stories with swipe-up link vs. "DM for info" CTA — measure conversion rate difference.\n\nNEXT 30-DAY PLAN:\n- Week 1: Launch Summer Recycling Challenge on all platforms\n- Week 2: School partnership announcement (organic + boosted Facebook post)\n- Week 3: Behind-the-scenes YouTube video + TikTok clips\n- Week 4: Customer spotlight series begins (Greenview Apartments)`,
+      `PERFORMANCE SUMMARY — MAY 2026\n\nTotal Reach: 41,200 (up 22% vs April)\nInstagram: 18,400 reach | 312 profile visits | 47 link clicks | 8 signups\nTikTok: 19,800 reach | 1,240 video completions | 89 profile visits | 4 signups\nFacebook: 3,000 reach | 44 engagements | 2 signups\nLinkedIn: 1,200 reach | 34 engagements | 3 commercial inquiries\n\nTOP PERFORMERS:\n1. "POV: Curbside Pickup That Actually Shows Up" (TikTok) — 19,800 views, 8.4% engagement rate\n2. "Why Nashville Families Choose Cyan's Brooklynn" (Instagram) — 6,200 reach, 12 signups attributed\n3. "5 Items You Didn't Know Cyan's Brooklynn Recycles" (Instagram carousel) — 4,100 reach, saved 340 times\n\nAREAS FOR IMPROVEMENT:\nFacebook reach dropped 31% — current content format is not optimized for Facebook's algorithm. Video content performs 4x better than static images on this platform.\nLinkedIn commercial lead quality is high but volume is low — posting frequency needs to increase from 2x/month to 1x/week.\n\nRECOMMENDATIONS:\n1. Increase TikTok posting to 4x/week — this platform has the lowest competition and highest organic reach for Cyan's Brooklynn content.\n2. Convert top Instagram carousels to Facebook video format — use the existing storyboard assets.\n3. Launch LinkedIn thought leadership series: "Sustainable Business in Nashville" — 1 post/week targeting property managers and business owners.\n4. A/B test Instagram Stories with swipe-up link vs. "DM for info" CTA — measure conversion rate difference.\n\nNEXT 30-DAY PLAN:\n- Week 1: Launch Summer Recycling Challenge on all platforms\n- Week 2: School partnership announcement (organic + boosted Facebook post)\n- Week 3: Behind-the-scenes YouTube video + TikTok clips\n- Week 4: Customer spotlight series begins (Greenview Apartments)`,
     storyboard: '',
     emailDraft: '',
     commentReply: '',
@@ -1049,30 +1049,30 @@ function _buildCaption(
   const g = goal ? `\n\nOur goal: ${goal}.` : ''
 
   const templates: Record<NonNullable<Tone>, string> = {
-    friendly: `When it comes to ${t}, BayKid makes it simple.\n\nWe pick up your recyclables right from your curb — no sorting stress, no extra trips. Nashville families deserve a recycling service that actually shows up.${g}\n\n♻️ Cardboard, plastic, glass, e-waste — handled.\n📍 Now serving Nashville and surrounding areas.\n\n${cta}`,
-    professional: `${t} is a critical component of Nashville's sustainability strategy.\n\nBayKid provides reliable curbside recycling pickup for families, businesses, schools, and apartment communities — with full material traceability and monthly impact reports.${g}\n\n📋 Certified handling\n📍 Nashville metro coverage\n📊 Monthly reporting available\n\n${cta}`,
-    urgent: `Nashville — ${t} cannot wait.\n\nEvery week, our city sends thousands of recyclable items to the landfill simply because pickup is inconvenient. BayKid eliminates that excuse entirely.${g}\n\n⏰ New subscriptions limited this month.\n📍 Service area expanding soon — lock in your spot.\n\n${cta}`,
-    educational: `Let's clear up the confusion around ${t}.\n\nMany Nashville residents want to recycle more but aren't sure how. BayKid removes every barrier — we handle collection, sorting, and certified disposal so you don't have to think about it.${g}\n\n📚 What we accept: cardboard, plastic (#1&#2), glass, electronics, metals, and more.\n📍 Nashville pickup available now.\n\n${cta}`,
-    inspiring: `${t} is proof that small actions create real change.\n\nEvery bag BayKid collects is a bag that doesn't end up in a Nashville landfill. Together, our community has already diverted thousands of pounds of recyclables — and we're just getting started.${g}\n\n🌱 Join Nashville's growing recycling community.\n✨ Your curb. Our truck. Real impact.\n\n${cta}`,
-    humorous: `Okay Nashville, real talk about ${t}:\n\nYou've been meaning to recycle more. We've been waiting to pick it up. This is the most low-effort environmental win of your week.${g}\n\nStep 1: Fill your bin.\nStep 2: Put it at the curb.\nStep 3: That's it. That's the whole step.\n\n♻️ BayKid does the rest. Promise.\n\n${cta}`,
+    friendly: `When it comes to ${t}, Cyan's Brooklynn makes it simple.\n\nWe pick up your recyclables right from your curb — no sorting stress, no extra trips. Nashville families deserve a recycling service that actually shows up.${g}\n\n♻️ Cardboard, plastic, glass, e-waste — handled.\n📍 Now serving Nashville and surrounding areas.\n\n${cta}`,
+    professional: `${t} is a critical component of Nashville's sustainability strategy.\n\nCyan's Brooklynn provides reliable curbside recycling pickup for families, businesses, schools, and apartment communities — with full material traceability and monthly impact reports.${g}\n\n📋 Certified handling\n📍 Nashville metro coverage\n📊 Monthly reporting available\n\n${cta}`,
+    urgent: `Nashville — ${t} cannot wait.\n\nEvery week, our city sends thousands of recyclable items to the landfill simply because pickup is inconvenient. Cyan's Brooklynn eliminates that excuse entirely.${g}\n\n⏰ New subscriptions limited this month.\n📍 Service area expanding soon — lock in your spot.\n\n${cta}`,
+    educational: `Let's clear up the confusion around ${t}.\n\nMany Nashville residents want to recycle more but aren't sure how. Cyan's Brooklynn removes every barrier — we handle collection, sorting, and certified disposal so you don't have to think about it.${g}\n\n📚 What we accept: cardboard, plastic (#1&#2), glass, electronics, metals, and more.\n📍 Nashville pickup available now.\n\n${cta}`,
+    inspiring: `${t} is proof that small actions create real change.\n\nEvery bag Cyan's Brooklynn collects is a bag that doesn't end up in a Nashville landfill. Together, our community has already diverted thousands of pounds of recyclables — and we're just getting started.${g}\n\n🌱 Join Nashville's growing recycling community.\n✨ Your curb. Our truck. Real impact.\n\n${cta}`,
+    humorous: `Okay Nashville, real talk about ${t}:\n\nYou've been meaning to recycle more. We've been waiting to pick it up. This is the most low-effort environmental win of your week.${g}\n\nStep 1: Fill your bin.\nStep 2: Put it at the curb.\nStep 3: That's it. That's the whole step.\n\n♻️ Cyan's Brooklynn does the rest. Promise.\n\n${cta}`,
   }
 
   let caption = templates[tone ?? 'friendly']
 
   // Platform-specific hashtag density
   if (platform === 'instagram') {
-    caption += '\n\n#BayKid #Nashville #Recycling #EcoFriendly #CurbsidePickup #SustainableNashville #GreenLiving'
+    caption += '\n\n#CyansBrooklynn #Nashville #Recycling #EcoFriendly #CurbsidePickup #SustainableNashville #GreenLiving'
   } else if (platform === 'tiktok') {
-    caption += '\n\n#BayKid #NashvilleTikTok #EcoTok #RecyclingTikTok #GreenTok'
+    caption += '\n\n#CyansBrooklynn #NashvilleTikTok #EcoTok #RecyclingTikTok #GreenTok'
   } else if (platform === 'facebook') {
-    caption += '\n\n#BayKid #Nashville #Recycling'
+    caption += '\n\n#CyansBrooklynn #Nashville #Recycling'
   }
 
   return caption
 }
 
 function _buildHashtags(topic: string, platform: Platform | undefined): string[] {
-  const base = ['#BayKid', '#Nashville', '#CurbsideRecycling', '#EcoFriendly', '#SustainableNashville']
+  const base = ['#CyansBrooklynn', '#Nashville', '#CurbsideRecycling', '#EcoFriendly', '#SustainableNashville']
   const topicLower = topic.toLowerCase()
   const extra: string[] = []
 
@@ -1110,13 +1110,13 @@ function _buildScript(topic: string, platform: Platform | undefined, cta: string
   if (platform === 'tiktok' || platform === 'instagram') {
     return [
       `Hook (0-3s): Talk directly to camera — "${_buildHook(t, platform, 'humorous')}"`,
-      `Body (3-20s): Quick visual walkthrough of ${t} — show the problem, then the BayKid solution. Fast cuts, upbeat music.`,
-      `CTA (20-28s): Text overlay + voiceover — "${cta}". End on BayKid logo.`,
+      `Body (3-20s): Quick visual walkthrough of ${t} — show the problem, then the Cyan's Brooklynn solution. Fast cuts, upbeat music.`,
+      `CTA (20-28s): Text overlay + voiceover — "${cta}". End on Cyan's Brooklynn logo.`,
     ].join('\n')
   }
   return [
     `INTRO: Establish context — ${t} in Nashville.`,
-    `MIDDLE: BayKid's approach explained — curbside pickup, certified handling, community impact.`,
+    `MIDDLE: Cyan's Brooklynn's approach explained — curbside pickup, certified handling, community impact.`,
     `CLOSE: CTA — ${cta}. Logo card with website.`,
   ].join('\n\n')
 }
@@ -1203,7 +1203,7 @@ async function _generateMock(params: AIContentParams, apiError?: string): Promis
   await new Promise((resolve) => setTimeout(resolve, 600 + Math.random() * 600))
 
   const id  = `gen-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-  const cta = params.callToAction?.trim() || 'Visit baykid.com to get started'
+  const cta = params.callToAction?.trim() || 'Visit cbrecycling.org to get started'
   const now = new Date().toISOString()
 
   // If a dedicated mock exists AND no custom topic was provided, use the mock
@@ -1235,13 +1235,13 @@ async function _generateMock(params: AIContentParams, apiError?: string): Promis
   const caption   = _buildCaption(topic, platform, tone, params.goal, cta)
   const hashtags  = _buildHashtags(topic, platform)
   const script    = _buildScript(topic, platform, cta)
-  const storyboard = `Scene 1: Establish Nashville neighborhood context (3s).\nScene 2: Illustrate "${topic}" — show the problem or opportunity (5s).\nScene 3: BayKid truck arrives — driver loads bins, waves (4s).\nScene 4: Text overlay: "Recycling, handled." Logo card. CTA: ${cta} (3s).`
+  const storyboard = `Scene 1: Establish Nashville neighborhood context (3s).\nScene 2: Illustrate "${topic}" — show the problem or opportunity (5s).\nScene 3: Cyan's Brooklynn truck arrives — driver loads bins, waves (4s).\nScene 4: Text overlay: "Recycling, handled." Logo card. CTA: ${cta} (3s).`
 
   let emailDraft   = ''
   let commentReply = ''
 
   if (params.contentType === 'email_reply') {
-    emailDraft = `Hi [Name],\n\nThank you for reaching out about ${topic}.\n\nAt BayKid, we're passionate about making recycling effortless for Nashville families and businesses. Here's how we can help:\n\n• Scheduled weekly or bi-weekly curbside pickup\n• Certified handling for all accepted materials\n• Transparent monthly recycling reports\n\nI'd love to set up a quick 15-minute call to understand your needs and put together a custom proposal.\n\nLooking forward to connecting!\n\nBest,\nBayKid Recycling Team\nhello@baykid.com | ${cta}`
+    emailDraft = `Hi [Name],\n\nThank you for reaching out about ${topic}.\n\nAt Cyan's Brooklynn, we're passionate about making recycling effortless for Nashville families and businesses. Here's how we can help:\n\n• Scheduled weekly or bi-weekly curbside pickup\n• Certified handling for all accepted materials\n• Transparent monthly recycling reports\n\nI'd love to set up a quick 15-minute call to understand your needs and put together a custom proposal.\n\nLooking forward to connecting!\n\nBest,\nCyan's Brooklynn Recycling Team\nhello@cbrecycling.org | ${cta}`
   }
 
   if (params.contentType === 'comment_reply') {

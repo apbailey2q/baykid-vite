@@ -15,7 +15,7 @@ import { getSystemPrompt } from './api/systemPrompts'
 //
 // Configurable via .env.local (no VITE_ prefix, server-only):
 //   ANTHROPIC_API_KEY   = sk-ant-...
-//   ANTHROPIC_MODEL     = claude-sonnet-4-5   (default; override any time)
+//   ANTHROPIC_MODEL     = claude-sonnet-4-6   (default; override any time)
 //
 // Fallback chain (client side):
 //   Key missing / placeholder  → 503 { demo:true }              → mock
@@ -325,7 +325,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   const apiKey = env.ANTHROPIC_API_KEY ?? ''
-  const model  = env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-5'
+  const model  = env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-6'
 
   // Startup banner — visible in the terminal when `npm run dev` starts
   const keyStatus = !apiKey || apiKey === 'your_key_here'

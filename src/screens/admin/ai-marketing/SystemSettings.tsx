@@ -140,9 +140,11 @@ function APITab({ settings, onSave }: { settings: OrgSettings; onSave: (s: OrgSe
   const [temperature, setTemperature] = useState(settings.apiSettings.temperature)
   const [rateLimit,   setRateLimit]   = useState(settings.apiSettings.rateLimitPerMin)
 
+  // Display-preference only — the live model is controlled by ANTHROPIC_MODEL in Vercel env vars,
+  // not this setting. Keep these in sync with Anthropic's current model list.
   const MODELS = [
-    { value: 'claude-opus-4-5',       label: 'Claude Opus 4.5  — Most capable'    },
-    { value: 'claude-sonnet-4-5',     label: 'Claude Sonnet 4.5 — Balanced (recommended)' },
+    { value: 'claude-sonnet-4-6',     label: 'Claude Sonnet 4.6 — Balanced (recommended)' },
+    { value: 'claude-opus-4-5',       label: 'Claude Opus 4.5   — Most capable'    },
     { value: 'claude-haiku-3-5',      label: 'Claude Haiku 3.5  — Fastest / cheapest' },
   ]
 

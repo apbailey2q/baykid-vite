@@ -66,7 +66,7 @@ export const API_ENDPOINTS = {
 // ── Anthropic / AI settings ───────────────────────────────────────────────────
 
 export const AI = {
-  DEFAULT_MODEL:     'claude-sonnet-4-5',
+  DEFAULT_MODEL:     'claude-sonnet-4-6',
   MAX_TOPIC_CHARS:   1_000,
   MAX_CTA_CHARS:     200,
   MAX_GOAL_CHARS:    500,

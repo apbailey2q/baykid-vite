@@ -130,7 +130,7 @@ export default async function handler(req: any, res: any): Promise<void> {
   }
 
   const apiKey     = process.env.ANTHROPIC_API_KEY ?? ''
-  const model      = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
+  const model      = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6'
   const supaUrl    = process.env.VITE_SUPABASE_URL ?? ''
   const supaKey    = process.env.VITE_SUPABASE_ANON_KEY ?? ''
   const env        = process.env.VITE_ENVIRONMENT ?? 'unknown'

@@ -25,7 +25,7 @@ export interface BrandVoiceSettings {
 }
 
 export interface APISettings {
-  claudeModel:    string    // 'claude-opus-4-5' | 'claude-sonnet-4-5' | etc.
+  claudeModel:    string    // e.g. 'claude-sonnet-4-6' — display preference only; actual model is set via ANTHROPIC_MODEL env var in Vercel
   maxTokens:      number
   temperature:    number
   rateLimitPerMin: number
@@ -87,7 +87,7 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
     emojiUsage:      'moderate',
   },
   apiSettings: {
-    claudeModel:     'claude-sonnet-4-5',
+    claudeModel:     'claude-sonnet-4-6',
     maxTokens:       2048,
     temperature:     0.7,
     rateLimitPerMin: 10,

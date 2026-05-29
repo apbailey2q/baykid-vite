@@ -22,7 +22,7 @@ const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!
 const ANON_KEY        = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE_KEY     = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANTHROPIC_KEY   = Deno.env.get('ANTHROPIC_API_KEY')!
-const MODEL           = 'claude-opus-4-7'
+const MODEL           = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-6'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024   // Anthropic base64 limit
 const AI_TIMEOUT_MS   = 30_000             // 30-second Anthropic call timeout
 

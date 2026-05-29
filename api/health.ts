@@ -103,7 +103,7 @@ async function checkPublishingAPIs(): Promise<ServiceCheck> {
       return { name: 'Publishing APIs', status: 'ok', latencyMs }
     }
     return { name: 'Publishing APIs', status: 'degraded', latencyMs, message: `Meta API HTTP ${res.status}` }
-  } catch (err) {
+  } catch {
     return {
       name: 'Publishing APIs', status: 'degraded',
       latencyMs: Date.now() - t0,

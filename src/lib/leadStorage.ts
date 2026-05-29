@@ -70,16 +70,19 @@ export function saveLeads(leads: Lead[]): void {
   } catch { /* quota / disabled storage — silent */ }
 }
 
-// Seed MOCK_LEADS once. Subsequent calls return the persisted set.
+// Seed MOCK_LEADS once. Only when VITE_SEED_MOCK_DATA=true — never in production.
+// Subsequent calls always return the persisted set regardless of seed flag.
 export function initializeLeads(): Lead[] {
+  const seedEnabled = import.meta.env.VITE_SEED_MOCK_DATA === 'true'
+
   try {
     const seeded   = localStorage.getItem(SEEDED_FLAG) === 'true'
     const existing = loadLeads()
 
-    if (!seeded) {
+    if (!seeded && seedEnabled) {
       // User-created leads (if any survived from a prior session without the
       // seed flag) win on id conflict so we don't clobber real data.
-      const userIds = new Set(existing.map((l) => l.id))
+      const userIds  = new Set(existing.map((l) => l.id))
       const seedRows = MOCK_LEADS.filter((m) => !userIds.has(m.id))
       const merged   = [...existing, ...seedRows]
       saveLeads(merged)
@@ -87,9 +90,12 @@ export function initializeLeads(): Lead[] {
       return merged
     }
 
+    // Mark as seeded even when skipping — prevents re-checks on every load
+    if (!seeded) localStorage.setItem(SEEDED_FLAG, 'true')
+
     return existing
   } catch {
-    return [...MOCK_LEADS]
+    return seedEnabled ? [...MOCK_LEADS] : []
   }
 }
 

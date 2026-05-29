@@ -197,11 +197,7 @@ function RecentScansPanel({
   const history = scans.filter(s =>  HISTORY_STATUSES.has(s.scan_status))
   const list    = tab === 'active' ? active : history
 
-  console.log('[scan] activeBags updated count', active.length)
-  console.log('[scan] historyBags updated count', history.length)
-  console.log('[scan] display rendered', {
-    tab, activeCount: active.length, historyCount: history.length, loading, error,
-  })
+  // (dev-only diagnostics removed from production render path)
 
   return (
     <div className="px-5 mt-6">
@@ -304,8 +300,7 @@ function SubTab({ label, active, onClick }: { label: string; active: boolean; on
 
 function DashboardAvatar({ src, onClick }: { src: string | null; onClick: () => void }) {
   const isImg = !!src && /^https?:\/\//i.test(src)
-  // Debug log so future devs can trace which branch rendered.
-  console.log('[dashboard] avatar render source:', isImg ? 'upload' : src ? 'emoji' : 'default')
+  // Avatar source (upload / emoji / default)
   return (
     <button
       type="button"
@@ -542,8 +537,6 @@ export default function ConsumerDashboard() {
   const activeBags  = recentScans.filter(s => !HISTORY_STATUSES.has(s.scan_status))
   const historyBags = recentScans.filter(s =>  HISTORY_STATUSES.has(s.scan_status))
   const filteredBags = bagTab === 'history' ? historyBags : activeBags
-  console.log('[render] activeBags length', activeBags.length)
-  console.log('[render] historyBags length', historyBags.length)
 
   const newsItems = broadcasts.length > 0
     ? broadcasts.slice(0, 2).map((b) => ({ title: 'Admin Update', desc: b.message }))
@@ -579,14 +572,6 @@ export default function ConsumerDashboard() {
   const fetchRecentScans = useCallback(async () => {
     if (!user) return
     setRecentScansError(null)
-    // Log the Supabase URL the app is actually talking to. If the schema
-    // cache 404 persists after running the SQL, this proves whether the
-    // frontend is pointing at the SAME project where the table was created.
-    console.log('[scan] table query started', {
-      table:        'consumer_bag_scans',
-      userId:       user.id,
-      supabaseUrl:  import.meta.env.VITE_SUPABASE_URL,
-    })
     const { data, error } = await supabase
       .from('consumer_bag_scans')
       .select('id, qr_code, bag_id, scan_status, scanned_at')
@@ -594,7 +579,6 @@ export default function ConsumerDashboard() {
       .order('scanned_at', { ascending: false })
       .limit(50)
     if (error) {
-      console.error('[scan] recent scans fetch failed:', error)
       // Special-case the most likely "you forgot to run the SQL" failure
       if (/schema cache|relation .* does not exist/i.test(error.message)) {
         setRecentScansError(
@@ -607,7 +591,6 @@ export default function ConsumerDashboard() {
       }
       return
     }
-    console.log('[scan] fetch scans count', data?.length ?? 0)
     setRecentScans((data ?? []) as RecentScan[])
   }, [user])
 
@@ -635,7 +618,6 @@ export default function ConsumerDashboard() {
         },
         (payload) => {
           const row = payload.new as RecentScan
-          console.log('[scan] realtime insert received', row)
           setRecentScans(prev => {
             if (prev.some(s => s.id === row.id)) return prev   // de-dupe vs optimistic
             return [row, ...prev].slice(0, 20)
@@ -649,10 +631,8 @@ export default function ConsumerDashboard() {
 
   // ── Bag scan logic ────────────────────────────────────────────────────────
   async function handleConsumerScan(rawCode: string) {
-    console.log('[scan] QR code scanned', { rawCode })
     const code = normalizeBagCode(rawCode)
     if (!user || !code) { setScanError('Invalid bag code.'); return }
-    console.log('[scan] user id found', { userId: user.id, normalized: code })
     setScanSaving(true)
     setScanError(null)
     try {
@@ -673,10 +653,8 @@ export default function ConsumerDashboard() {
       }
 
       // ── Log the scan into consumer_bag_scans ──────────────────────────────
-      // The previous code wrote to `bag_scans` without `scan_type` (NOT NULL),
-      // which failed silently. consumer_bag_scans is the per-user log that
-      // powers the Recent Scans panel + realtime feed.
-      console.log('[scan] inserting into consumer_bag_scans', { qr_code: code, bag_id: bag.id })
+      // consumer_bag_scans is the per-user log that powers the Recent Scans
+      // panel + realtime feed.
       const { data: inserted, error: scanErr } = await supabase
         .from('consumer_bag_scans')
         .insert({
@@ -689,7 +667,6 @@ export default function ConsumerDashboard() {
         .single()
 
       if (scanErr) {
-        console.error('[scan] consumer_bag_scans insert failed (full):', scanErr)
         if (/schema cache|relation .* does not exist/i.test(scanErr.message ?? '')) {
           setScanError(
             'Scan saved locally but Supabase says the consumer_bag_scans ' +
@@ -700,16 +677,11 @@ export default function ConsumerDashboard() {
           setScanError(`Scan saved partially: ${scanErr.message}`)
         }
       } else {
-        console.log('[scan] insert row returned', inserted)
         if (inserted) {
           // Optimistic UI: prepend immediately so the user sees it before the
           // realtime broadcast catches up.
           setRecentScans(prev => {
             const next = [inserted as RecentScan, ...prev.filter(s => s.id !== inserted.id)].slice(0, 50)
-            const active  = next.filter(s => !HISTORY_STATUSES.has(s.scan_status)).length
-            const history = next.length - active
-            console.log('[scan] activeBags updated count', active)
-            console.log('[scan] historyBags updated count', history)
             return next
           })
           // Belt-and-suspenders refetch — pulls the canonical server state

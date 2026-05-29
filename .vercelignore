@@ -1,0 +1,18 @@
+# Vercel deployment ignore
+# These files are excluded from the deployment bundle.
+
+# Developer tools — never ship to production
+public/devlogin.html
+
+# Scripts directory (Node.js dev tools, branding audit, etc.)
+scripts/
+
+# Local environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Development artifacts
+node_modules/
+.git/

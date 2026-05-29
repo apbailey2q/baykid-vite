@@ -360,6 +360,19 @@ function NotificationsTab({ settings, onSave }: { settings: OrgSettings; onSave:
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* ── Push notification beta notice ── */}
+      <div style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🔔</span>
+        <div>
+          <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 13, margin: 0, marginBottom: 3 }}>
+            Push Notifications — Beta
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+            Push notification delivery is being prepared and may not send live alerts yet.
+            In-app notifications below are active. Push dispatch will be enabled in a future update.
+          </p>
+        </div>
+      </div>
       <div style={{ ...card({ padding: '18px 20px' }) }}>
         <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, margin: '0 0 16px' }}>In-App Notifications</h3>
         <div style={{ display: 'flex', flexDirection: 'column' }}>

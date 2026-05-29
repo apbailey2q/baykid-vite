@@ -74,12 +74,9 @@ export default function WelcomeBack() {
 
   useEffect(() => {
     const to = destinationRef.current
-    console.log('[welcome-back] mounted', { destination: to })
-    console.log('[welcome-back] auto redirect timer started')
 
     const primary = window.setTimeout(() => {
       setRedirecting(true)
-      console.log('[welcome-back] redirecting to', to)
       navigateRef.current(to, { replace: true })
 
       // Safety fallback: if some upstream guard swallowed the React Router
@@ -87,16 +84,12 @@ export default function WelcomeBack() {
       // hard reload to the destination. Belt + suspenders.
       window.setTimeout(() => {
         if (typeof window !== 'undefined' && window.location.pathname === '/welcome-back') {
-          console.warn('[welcome-back] navigate appears blocked — forcing window.location.href')
           window.location.href = to
         }
       }, FALLBACK_MS)
     }, AUTO_DELAY_MS)
 
-    return () => {
-      console.log('[welcome-back] unmount — clearing timer')
-      window.clearTimeout(primary)
-    }
+    return () => { window.clearTimeout(primary) }
   }, [])  // ← intentional: mount-only
 
   // ── 2. Confetti + pop (separate effect, ref-guarded for StrictMode) ──────
@@ -107,9 +100,7 @@ export default function WelcomeBack() {
     celebratedRef.current = true
     const t = window.setTimeout(() => {
       playPop()
-      console.log('[welcome-back] sound played')
       celebrate()
-      console.log('[welcome-back] confetti fired')
     }, 180)
     return () => window.clearTimeout(t)
   }, [])

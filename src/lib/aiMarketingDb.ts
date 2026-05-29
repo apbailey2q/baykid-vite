@@ -20,8 +20,8 @@ import type { AIContentResult, Lead, ActivityEvent } from './aiMarketing'
 import type { AppNotification } from './notifications'
 import type { AutomationRule } from './automationRules'
 import { monitor } from './monitoring'
+import { getActiveOrgId } from './organizations'
 import {
-  BAYKID_ORG_ID,
   type DbPost, type DbLead, type DbAutomationRule,
   type DbNotification, type DbDashboardStats,
   type DbLogAction, type DbLogEntityType,
@@ -42,6 +42,12 @@ async function currentUserId(): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+// Returns the active org ID — reads from localStorage (set on login) with
+// fallback to the canonical org UUID so existing data is never stranded.
+function activeOrgId(): string {
+  return getActiveOrgId()
 }
 
 // ── Serializers: TypeScript ↔ Postgres ────────────────────────────────────────
@@ -215,7 +221,7 @@ export async function sbUpsertPost(post: AIContentResult): Promise<void> {
   if (!isSupabaseConfigured) return
   try {
     const userId = await currentUserId()
-    const row = postToDb(post, BAYKID_ORG_ID, userId)
+    const row = postToDb(post, activeOrgId(), userId)
     const { error } = await supabase
       .from('ai_posts')
       .upsert(row, { onConflict: 'id' })
@@ -246,7 +252,7 @@ export async function sbLoadPosts(): Promise<AIContentResult[]> {
     const { data, error } = await supabase
       .from('ai_posts')
       .select('*')
-      .eq('organization_id', BAYKID_ORG_ID)
+      .eq('organization_id', activeOrgId())
       .order('created_at', { ascending: false })
     if (error) { warn('loadPosts failed', error.message); return [] }
     return (data as DbPost[]).map(dbToPost)
@@ -262,7 +268,7 @@ export async function sbUpsertLead(lead: Lead): Promise<void> {
   if (!isSupabaseConfigured) return
   try {
     const userId = await currentUserId()
-    const row = leadToDb(lead, BAYKID_ORG_ID, userId)
+    const row = leadToDb(lead, activeOrgId(), userId)
     const { error } = await supabase
       .from('ai_leads')
       .upsert(row, { onConflict: 'id' })
@@ -288,7 +294,7 @@ export async function sbLoadLeads(): Promise<Lead[]> {
     const { data, error } = await supabase
       .from('ai_leads')
       .select('*')
-      .eq('organization_id', BAYKID_ORG_ID)
+      .eq('organization_id', activeOrgId())
       .order('created_at', { ascending: false })
     if (error) { warn('loadLeads failed', error.message); return [] }
     return (data as DbLead[]).map(dbToLead)
@@ -304,7 +310,7 @@ export async function sbUpsertRule(rule: AutomationRule): Promise<void> {
   if (!isSupabaseConfigured) return
   try {
     const userId = await currentUserId()
-    const row = ruleToDb(rule, BAYKID_ORG_ID, userId)
+    const row = ruleToDb(rule, activeOrgId(), userId)
     const { error } = await supabase
       .from('ai_automation_rules')
       .upsert(row, { onConflict: 'id' })
@@ -330,7 +336,7 @@ export async function sbLoadRules(): Promise<AutomationRule[]> {
     const { data, error } = await supabase
       .from('ai_automation_rules')
       .select('*')
-      .eq('organization_id', BAYKID_ORG_ID)
+      .eq('organization_id', activeOrgId())
       .order('created_at', { ascending: false })
     if (error) { warn('loadRules failed', error.message); return [] }
     return (data as DbAutomationRule[]).map(dbToRule)
@@ -350,7 +356,7 @@ export async function sbInsertNotification(notif: AppNotification): Promise<void
       NOTIF_KIND_MAP[notif.type] ?? 'system'
 
     await supabase.rpc('ai_upsert_notification', {
-      p_org_id:       BAYKID_ORG_ID,
+      p_org_id:       activeOrgId(),
       p_user_id:      userId,
       p_kind:         kind,
       p_title:        notif.title,
@@ -396,7 +402,7 @@ export async function sbLoadNotifications(): Promise<DbNotification[]> {
     const { data, error } = await supabase
       .from('ai_notifications')
       .select('*')
-      .eq('organization_id', BAYKID_ORG_ID)
+      .eq('organization_id', activeOrgId())
       .eq('dismissed', false)
       .or(userId ? `user_id.eq.${userId},user_id.is.null` : 'user_id.is.null')
       .order('created_at', { ascending: false })
@@ -420,7 +426,7 @@ export async function sbLogActivity(
   if (!isSupabaseConfigured) return
   try {
     await supabase.rpc('ai_log_activity', {
-      p_org_id:      BAYKID_ORG_ID,
+      p_org_id:      activeOrgId(),
       p_action:      action,
       p_entity_type: entityType,
       p_entity_id:   entityId,
@@ -437,7 +443,7 @@ export async function sbDashboardStats(): Promise<DbDashboardStats | null> {
   if (!isSupabaseConfigured) return null
   try {
     const { data, error } = await supabase
-      .rpc('ai_dashboard_stats', { p_org_id: BAYKID_ORG_ID })
+      .rpc('ai_dashboard_stats', { p_org_id: activeOrgId() })
     if (error) { warn('dashboardStats failed', error.message); return null }
     return data as DbDashboardStats
   } catch (e) {

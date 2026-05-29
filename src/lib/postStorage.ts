@@ -99,14 +99,17 @@ export function duplicatePost(post: AIContentResult): { copy: AIContentResult; a
 /**
  * Initialize posts for the Approval Queue.
  * Seeds MOCK_POSTS into localStorage exactly once (controlled by baykid_ai_seeded flag).
+ * Seeding only runs when VITE_SEED_MOCK_DATA=true — never in production.
  * After seeding, all CRUD operations work exclusively on localStorage.
  */
 export function initializePosts(): AIContentResult[] {
+  const seedEnabled = import.meta.env.VITE_SEED_MOCK_DATA === 'true'
+
   try {
     const seeded   = localStorage.getItem(SEEDED_FLAG) === 'true'
     const existing = loadPosts()
 
-    if (!seeded) {
+    if (!seeded && seedEnabled) {
       // Merge mocks with any existing user posts (user posts win on ID conflict)
       const userIds  = new Set(existing.map((p) => p.id))
       const newMocks = MOCK_POSTS.filter((m) => !userIds.has(m.id))
@@ -116,8 +119,11 @@ export function initializePosts(): AIContentResult[] {
       return merged
     }
 
+    // Mark as seeded even when skipping — prevents re-checks on every load
+    if (!seeded) localStorage.setItem(SEEDED_FLAG, 'true')
+
     return [...existing].sort(byDateDesc)
   } catch {
-    return [...MOCK_POSTS].sort(byDateDesc)
+    return seedEnabled ? [...MOCK_POSTS].sort(byDateDesc) : []
   }
 }

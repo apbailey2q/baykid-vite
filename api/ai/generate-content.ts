@@ -39,10 +39,12 @@ const ALLOWED_ORIGINS: ReadonlySet<string> = new Set(
   [
     'http://localhost:5173',
     'http://localhost:4173',
+    // Set VITE_APP_URL or APP_URL in Vercel environment variables to your real domain.
+    // Never hardcode production URLs here — use env vars so staging and prod differ.
     process.env.VITE_APP_URL,
     process.env.APP_URL,
-    'https://baykid.vercel.app',
-  ].filter((o): o is string => Boolean(o)),
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter((o): o is string => typeof o === 'string' && o.startsWith('http')),
 )
 
 function getAllowedOrigin(origin: string | undefined): string {
@@ -118,6 +120,7 @@ _cleanupInterval.unref()
 function escapeForPrompt(text: string): string {
   return text
     .replace(/\r?\n/g, ' ')      // no newlines inside label:value pairs
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1F]/g, '')  // strip control chars
     .trim()
 }
@@ -192,7 +195,9 @@ export default async function handler(req: any, res: any): Promise<void> {
 
   // ── API key guard ────────────────────────────────────────────────────────
   const apiKey = process.env.ANTHROPIC_API_KEY ?? ''
-  const model  = (process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5').trim()
+  // claude-sonnet-4-5 is retired. Always set ANTHROPIC_MODEL in Vercel env vars.
+  // Default here is a safe fallback but the env var should be explicit.
+  const model  = (process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6').trim()
 
   if (!apiKey || apiKey.trim() === 'your_key_here' || apiKey.startsWith('sk-ant-your')) {
     slog('WARN', 'ANTHROPIC_API_KEY not configured — returning demo signal')

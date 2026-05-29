@@ -809,6 +809,31 @@ export function AutomationRules() {
         </button>
       </div>
 
+      {/* ── Beta notice banner ── */}
+      <div style={{
+        background:   'rgba(251,191,36,0.06)',
+        border:       '1px solid rgba(251,191,36,0.2)',
+        borderRadius: 12,
+        padding:      '12px 16px',
+        marginBottom: 20,
+        display:      'flex',
+        alignItems:   'flex-start',
+        gap:          12,
+      }}>
+        <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🧪</span>
+        <div>
+          <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 13, margin: 0, marginBottom: 3 }}>
+            Beta Preview — Test Mode Only
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+            Automation rules currently run in <strong style={{ color: 'rgba(255,255,255,0.7)' }}>test mode only</strong>.
+            Rules can be evaluated using the "Test Rule" button below, but they do not yet
+            automatically process live comments, emails, or social triggers.
+            Real-time automation is coming in a future release.
+          </p>
+        </div>
+      </div>
+
       {/* ── Stats ── */}
       <StatsCards rules={rules} />
 

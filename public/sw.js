@@ -13,7 +13,7 @@ self.addEventListener('push', event => {
     self.registration.showNotification(title, {
       body,
       icon:               '/icon-192.png',
-      badge:              '/icon-72.png',
+      badge:              '/icon-192.png',
       data,
       // One active notification per event type — replaces any prior one
       tag:                String(data.event_type ?? 'cbrecycling'),

@@ -6,6 +6,7 @@ import { AppShell } from '../../components/ui/AppShell'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
+import { isPushConfigured } from '../../lib/vapid'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,25 @@ export default function NotificationPreferences() {
             Choose which alerts you receive
           </p>
         </div>
+
+        {/* ── Push not configured banner ── */}
+        {!isPushConfigured() && (
+          <GlassCard padding="md" className="mb-5">
+            <div className="flex items-start gap-3">
+              <span style={{ fontSize: 18, flexShrink: 0 }}>🔔</span>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>
+                  Push notifications are being prepared
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  Push notifications may not send live alerts yet during the beta period.
+                  In-app notification preferences below are active and will be used
+                  once push delivery is enabled.
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        )}
 
         {/* ── Emergency lock banner ── */}
         {emergencyLocked && (

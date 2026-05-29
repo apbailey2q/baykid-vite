@@ -157,16 +157,18 @@ export function loadUserProfile(): UserProfile {
     const raw = localStorage.getItem(PROFILE_KEY)
     if (raw) return JSON.parse(raw) as UserProfile
   } catch { /* */ }
-  // Default: admin so existing users lose no access
+  // Default to viewer (lowest privilege) — never default to admin.
+  // The actual profile is written to localStorage by saveUserProfile() when the
+  // user's Supabase org membership is resolved. Until then they get read-only access.
   return {
-    id:         'local-user',
-    email:      'admin@cbrecycling.org',
-    name:       'Cyan\'s Brooklynn Admin',
-    role:       'admin',
-    orgId:      '00000000-0000-0000-0000-00000000ba47',
+    id:         '',
+    email:      '',
+    name:       '',
+    role:       'viewer',
+    orgId:      '',
     createdAt:  new Date().toISOString(),
     lastSeenAt: new Date().toISOString(),
-    avatarInitials: 'BA',
+    avatarInitials: '',
   }
 }
 

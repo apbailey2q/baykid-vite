@@ -165,19 +165,30 @@ interface PublishModalProps {
 function PublishModal({ post, onClose, onQueued }: PublishModalProps) {
   const accounts = loadAccounts().filter((a) => a.isActive)
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
-  const [publishNow] = useState(true)
+  const [publishNow, setPublishNow] = useState(true)
+  const [scheduledFor, setScheduledFor] = useState<string>(() => {
+    // Default to 2 days from now at 9 AM
+    const d = new Date()
+    d.setDate(d.getDate() + 2)
+    d.setHours(9, 0, 0, 0)
+    return toLocalInput(d.toISOString())
+  })
   const [error, setError] = useState('')
 
   function handleConfirm() {
     if (!selectedAccountId) { setError('Please select a connected account.'); return }
+    if (!publishNow && !scheduledFor) { setError('Please select a date and time to schedule.'); return }
     try {
       createPublishJob({
-        postId:    post.id,
-        accountId: selectedAccountId,
-        scheduledFor: publishNow ? undefined : undefined, // always "now" from this modal
+        postId:      post.id,
+        accountId:   selectedAccountId,
+        scheduledFor: publishNow ? undefined : new Date(scheduledFor).toISOString(),
       })
       const acct = accounts.find((a) => a.id === selectedAccountId)
-      onQueued(`🚀 Queued for ${acct?.accountHandle ?? 'publishing'} — go to Publishing → Queue to process`)
+      const msg = publishNow
+        ? `🚀 Queued for ${acct?.accountHandle ?? 'publishing'} — go to Publishing → Queue to process`
+        : `📅 Scheduled for ${new Date(scheduledFor).toLocaleString()} — go to Publishing → Queue to process`
+      onQueued(msg)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create publish job')
@@ -205,10 +216,51 @@ function PublishModal({ post, onClose, onQueued }: PublishModalProps) {
         background: '#0f1628', border: '1px solid rgba(0,190,255,0.25)', borderRadius: 16,
         padding: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
       }}>
-        <div style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🚀 Publish Now</div>
-        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 20 }}>
-          Select a connected account to queue <strong style={{ color: 'rgba(255,255,255,0.7)' }}>"{post.title}"</strong> for publishing.
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🚀 Publish Post</div>
+        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 16 }}>
+          Queue <strong style={{ color: 'rgba(255,255,255,0.7)' }}>"{post.title}"</strong> for publishing.
         </div>
+
+        {/* Publish Now / Schedule toggle */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          {[
+            { label: '🚀 Publish Now', value: true  },
+            { label: '📅 Schedule',    value: false },
+          ].map(({ label, value }) => (
+            <button
+              key={String(value)}
+              onClick={() => setPublishNow(value)}
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', border: '1px solid',
+                background:   publishNow === value ? 'rgba(0,200,255,0.15)' : 'rgba(255,255,255,0.05)',
+                borderColor:  publishNow === value ? 'rgba(0,200,255,0.5)' : 'rgba(255,255,255,0.12)',
+                color:        publishNow === value ? '#00c8ff' : 'rgba(255,255,255,0.55)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Schedule date/time input */}
+        {!publishNow && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700, display: 'block', marginBottom: 6 }}>
+              Schedule Date & Time
+            </label>
+            <input
+              type="datetime-local"
+              value={scheduledFor}
+              onChange={(e) => setScheduledFor(e.target.value)}
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,200,255,0.25)',
+                borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 13,
+                colorScheme: 'dark', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        )}
 
         {accounts.length === 0 ? (
           <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 10, padding: 14, color: '#fbbf24', fontSize: 12, marginBottom: 16 }}>
@@ -271,7 +323,7 @@ function PublishModal({ post, onClose, onQueued }: PublishModalProps) {
             disabled={accounts.length === 0}
             style={{ background: 'linear-gradient(135deg, #7c3aed, #00c8ff)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 20px', fontWeight: 700, fontSize: 12, cursor: accounts.length === 0 ? 'not-allowed' : 'pointer', opacity: accounts.length === 0 ? 0.5 : 1 }}
           >
-            🚀 Queue for Publishing
+            {publishNow ? '🚀 Queue for Publishing' : '📅 Schedule for Publishing'}
           </button>
         </div>
       </div>
@@ -640,6 +692,8 @@ export function ApprovalQueue() {
   const [scheduleTz, setScheduleTz]     = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [publishingPost, setPublishingPost] = useState<AIContentResult | null>(null)
   const [toasts, setToasts]             = useState<Toast[]>([])
+  // ── Bulk selection ─────────────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
 
   // ── Toast helper ─────────────────────────────────────────────────────────────
 
@@ -803,7 +857,70 @@ export function ApprovalQueue() {
     setPosts(initializePosts())
     setEditingId(null)
     setSchedulingId(null)
+    setSelectedIds(new Set())
     showToast('🔄 Refreshed', 'info')
+  }
+
+  // ── Bulk selection helpers ────────────────────────────────────────────────────
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(filtered.map((p) => p.id)))
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  function bulkApprove() {
+    if (!window.confirm(`Approve ${selectedIds.size} post(s)?`)) return
+    let updated = [...posts]
+    for (const id of selectedIds) {
+      const idx = updated.findIndex((p) => p.id === id)
+      if (idx < 0) continue
+      const ev: ActivityEvent = {
+        id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'approved', label: 'Bulk approved', ts: new Date().toISOString(), actor: 'Admin',
+      }
+      updated[idx] = { ...updated[idx], status: 'approved', activity: [ev, ...(updated[idx].activity ?? [])] }
+      upsertPost(updated[idx])
+    }
+    setPosts(updated)
+    clearSelection()
+    showToast(`✅ ${selectedIds.size} post(s) approved`)
+  }
+
+  function bulkReject() {
+    if (!window.confirm(`Reject ${selectedIds.size} post(s)?`)) return
+    let updated = [...posts]
+    for (const id of selectedIds) {
+      const idx = updated.findIndex((p) => p.id === id)
+      if (idx < 0) continue
+      const ev: ActivityEvent = {
+        id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'rejected', label: 'Bulk rejected', ts: new Date().toISOString(), actor: 'Admin',
+      }
+      updated[idx] = { ...updated[idx], status: 'rejected', activity: [ev, ...(updated[idx].activity ?? [])] }
+      upsertPost(updated[idx])
+    }
+    setPosts(updated)
+    clearSelection()
+    showToast(`✗ ${selectedIds.size} post(s) rejected`, 'error')
+  }
+
+  function bulkDelete() {
+    if (!window.confirm(`Delete ${selectedIds.size} post(s)? This cannot be undone.`)) return
+    for (const id of selectedIds) removePost(id)
+    setPosts((prev) => prev.filter((p) => !selectedIds.has(p.id)))
+    showToast(`🗑️ ${selectedIds.size} post(s) deleted`, 'info')
+    clearSelection()
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -887,6 +1004,37 @@ export function ApprovalQueue() {
         </select>
       </div>
 
+      {/* ── Bulk action bar ── */}
+      {filtered.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+            <input
+              type="checkbox"
+              checked={selectedIds.size === filtered.length && filtered.length > 0}
+              onChange={() => selectedIds.size === filtered.length ? clearSelection() : selectAll()}
+              style={{ accentColor: '#00c8ff', width: 14, height: 14 }}
+            />
+            {selectedIds.size === 0 ? 'Select all' : `${selectedIds.size} selected`}
+          </label>
+          {selectedIds.size > 0 && (
+            <>
+              <ActionButton onClick={bulkApprove} color="#22c55e" bg="rgba(34,197,94,0.1)" border="rgba(34,197,94,0.25)">
+                ✅ Approve {selectedIds.size}
+              </ActionButton>
+              <ActionButton onClick={bulkReject} color="#f87171" bg="rgba(248,113,113,0.08)" border="rgba(248,113,113,0.2)">
+                ✗ Reject {selectedIds.size}
+              </ActionButton>
+              <ActionButton onClick={bulkDelete} color="#fb923c" bg="rgba(251,146,60,0.06)" border="rgba(251,146,60,0.15)">
+                🗑️ Delete {selectedIds.size}
+              </ActionButton>
+              <button onClick={clearSelection} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', padding: 0 }}>
+                ✕ Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Post groups ── */}
       {grouped.length > 0 ? (
         grouped.map(({ status, posts: gPosts }) => {
@@ -902,27 +1050,39 @@ export function ApprovalQueue() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {gPosts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    isEditing={editingId === post.id}
-                    editBuf={editBuf}
-                    isScheduling={schedulingId === post.id}
-                    scheduleValue={scheduleValue}
-                    scheduleTz={scheduleTz}
-                    onEditBufChange={(delta) => setEditBuf((prev) => ({ ...prev, ...delta }))}
-                    onScheduleChange={setScheduleValue}
-                    onScheduleTzChange={setScheduleTz}
-                    onStatusChange={(s, extra) => handleStatusChange(post.id, s, extra)}
-                    onEditStart={() => handleEditStart(post)}
-                    onEditSave={() => handleEditSave(post.id)}
-                    onEditCancel={handleEditCancel}
-                    onScheduleStart={() => handleScheduleStart(post)}
-                    onScheduleConfirm={() => handleScheduleConfirm(post.id)}
-                    onScheduleCancel={handleScheduleCancel}
-                    onPublishStart={() => { setEditingId(null); setSchedulingId(null); setPublishingPost(post) }}
-                    onDelete={() => handleDelete(post.id)}
-                  />
+                  <div key={post.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    {/* Checkbox */}
+                    <div style={{ paddingTop: 20, flexShrink: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(post.id)}
+                        onChange={() => toggleSelect(post.id)}
+                        style={{ accentColor: '#00c8ff', width: 14, height: 14, cursor: 'pointer' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <PostCard
+                        post={post}
+                        isEditing={editingId === post.id}
+                        editBuf={editBuf}
+                        isScheduling={schedulingId === post.id}
+                        scheduleValue={scheduleValue}
+                        scheduleTz={scheduleTz}
+                        onEditBufChange={(delta) => setEditBuf((prev) => ({ ...prev, ...delta }))}
+                        onScheduleChange={setScheduleValue}
+                        onScheduleTzChange={setScheduleTz}
+                        onStatusChange={(s, extra) => handleStatusChange(post.id, s, extra)}
+                        onEditStart={() => handleEditStart(post)}
+                        onEditSave={() => handleEditSave(post.id)}
+                        onEditCancel={handleEditCancel}
+                        onScheduleStart={() => handleScheduleStart(post)}
+                        onScheduleConfirm={() => handleScheduleConfirm(post.id)}
+                        onScheduleCancel={handleScheduleCancel}
+                        onPublishStart={() => { setEditingId(null); setSchedulingId(null); setPublishingPost(post) }}
+                        onDelete={() => handleDelete(post.id)}
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

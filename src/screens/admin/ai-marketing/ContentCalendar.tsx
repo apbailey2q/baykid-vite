@@ -149,10 +149,13 @@ function calItemToPost(item: ContentCalendarItem): AIContentResult {
 function loadCalendarData(): AIContentResult[] {
   const stored = loadPosts()
   const storedIds = new Set(stored.map((p) => p.id))
-  // Convert mock calendar items not overridden in localStorage
-  const mockItems = MOCK_CALENDAR.filter((m) => !storedIds.has(m.id)).map(calItemToPost)
   // From localStorage: only posts with scheduledFor
   const withSchedule = stored.filter((p) => !!p.scheduledFor)
+  // Only include mock calendar items when VITE_SEED_MOCK_DATA=true
+  const seedEnabled = import.meta.env.VITE_SEED_MOCK_DATA === 'true'
+  const mockItems   = seedEnabled
+    ? MOCK_CALENDAR.filter((m) => !storedIds.has(m.id)).map(calItemToPost)
+    : []
   return [...withSchedule, ...mockItems]
     .sort((a, b) => new Date(a.scheduledFor!).getTime() - new Date(b.scheduledFor!).getTime())
 }

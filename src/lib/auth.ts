@@ -88,16 +88,12 @@ export async function signUp(
   // Normalize email — Supabase Auth is case-insensitive but profile lookups
   // downstream rely on a single canonical lowercase form.
   const cleanEmail = email.trim().toLowerCase()
-  console.log('[signUp] starting', { email: cleanEmail, role })
 
   const { data, error } = await supabase.auth.signUp({
     email: cleanEmail,
     password,
   })
-  if (error) {
-    console.error('[signUp] auth error:', error.message)
-    throw error
-  }
+  if (error) throw error
 
   if (data.user) {
     const approvalStatus = AUTO_APPROVED_ROLES.includes(role) ? 'approved' : 'pending'
@@ -116,13 +112,7 @@ export async function signUp(
         },
         { onConflict: 'id' },
       )
-    if (profileError) {
-      console.error('[signUp] profile upsert error:', profileError.message)
-      throw profileError
-    }
-    console.log('[signUp] profile upserted', { id: data.user.id, role, approvalStatus })
-  } else {
-    console.warn('[signUp] no user in response (email confirmation may be required)')
+    if (profileError) throw profileError
   }
 
   return data

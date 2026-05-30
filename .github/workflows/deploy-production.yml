@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   VITE_ENVIRONMENT: production
   VITE_APP_VERSION: ${{ github.sha }}
   VITE_SUPABASE_URL: 'https://ci-placeholder.supabase.co'

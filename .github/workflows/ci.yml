@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   # Placeholder env vars so the build doesn't fail without real secrets.
   # Real secrets are injected via Vercel's dashboard, not here.
   ANTHROPIC_API_KEY: 'ci-placeholder-key'

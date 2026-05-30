@@ -7,9 +7,16 @@
 // Response:  { result: 'green'|'yellow'|'red', confidence: number, reason: string }
 //
 // Environment variable required:
-//   GOOGLE_VISION_API_KEY — same key used by analyze-image (Google Cloud API key
-//   with Generative Language API enabled, or a Google AI Studio API key)
-//   Set via: supabase secrets set GOOGLE_VISION_API_KEY=<your-key>
+//   GEMINI_API_KEY — dedicated key for the Generative Language API (Gemini).
+//   Get one from Google AI Studio: https://aistudio.google.com/apikey
+//   Set via: supabase secrets set GEMINI_API_KEY=<your-key>
+//
+// IMPORTANT — do NOT reuse GOOGLE_VISION_API_KEY here.
+//   GOOGLE_VISION_API_KEY is the Maps/Vision platform key used by
+//   analyze-image and is restricted to Cloud Vision endpoints. Pointing
+//   it at Gemini returns 403 API_KEY_SERVICE_BLOCKED.
+//   analyze-image  → GOOGLE_VISION_API_KEY (Cloud Vision REST)
+//   analyze-bag-image → GEMINI_API_KEY      (Generative Language / Gemini)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -21,7 +28,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const GEMINI_MODEL = 'gemini-1.5-flash'
+const GEMINI_MODEL = 'gemini-2.5-flash'
 
 const INSPECTION_PROMPT = `You are a curbside recycling bag safety inspector AI.
 A driver has photographed a residential recycling bag and needs an instant safety classification.
@@ -86,9 +93,11 @@ serve(async (req: Request) => {
   }
 
   // ── API key ────────────────────────────────────────────────────────────────
-  const apiKey = Deno.env.get('GOOGLE_VISION_API_KEY')
+  // Gemini-only key. Do NOT fall back to GOOGLE_VISION_API_KEY — that key is
+  // restricted to Cloud Vision and silently returns 403 against Gemini.
+  const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) {
-    console.error('GOOGLE_VISION_API_KEY not set')
+    console.error('GEMINI_API_KEY not set — set with: supabase secrets set GEMINI_API_KEY=<your-key>')
     return fallbackYellow('AI service unavailable — manual review required.')
   }
 
@@ -114,7 +123,10 @@ serve(async (req: Request) => {
         }],
         generationConfig: {
           temperature:     0.1,
-          maxOutputTokens: 200,
+          maxOutputTokens: 512,
+          // gemini-2.5-flash: disable thinking to prevent token budget being
+          // consumed by the reasoning trace, which truncates the JSON output.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     })
@@ -124,18 +136,24 @@ serve(async (req: Request) => {
       console.error(`Gemini API error ${geminiRes.status}:`, errText)
 
       // 400 = bad request (e.g. image too large / unsupported format) — return yellow
-      // 403 = API key not enabled for Generative Language API
+      // 403 = GEMINI_API_KEY missing the Generative Language API in its allowlist,
+      //       OR is from a different GCP project than the one with Gemini enabled.
+      //       Fastest fix: generate a fresh key at https://aistudio.google.com/apikey
+      //       and set with: supabase secrets set GEMINI_API_KEY=<new-key>
       if (geminiRes.status === 403) {
-        console.error('Hint: Enable the "Generative Language API" for this API key in Google Cloud Console, or use a Google AI Studio key.')
+        console.error('Hint: GEMINI_API_KEY blocked. Get a key from https://aistudio.google.com/apikey and run: supabase secrets set GEMINI_API_KEY=<key>')
       }
       return fallbackYellow('AI analysis failed — please review the bag manually.')
     }
 
     const geminiData = await geminiRes.json()
 
-    // Extract text from first candidate
-    const raw: string =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? ''
+    // Extract text — gemini-2.5-flash may include thought parts; find the first
+    // non-thought text part (thought: true parts are internal reasoning tokens).
+    const parts: Array<{ text?: string; thought?: boolean }> =
+      geminiData?.candidates?.[0]?.content?.parts ?? []
+    const responsePart = parts.find((p) => !p.thought && p.text) ?? parts[0]
+    const raw: string  = responsePart?.text?.trim() ?? ''
 
     console.log('Gemini raw response:', raw)
 

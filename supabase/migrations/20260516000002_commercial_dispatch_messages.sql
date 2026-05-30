@@ -2,6 +2,12 @@
 -- Driver ↔ Admin messaging for commercial dispatch changes
 -- ============================================================
 
+-- Ensure commercial_routes exists (may be a stub if not yet created by another migration)
+create table if not exists public.commercial_routes (
+  id         uuid        primary key default gen_random_uuid(),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.commercial_dispatch_messages (
   id           uuid        primary key default gen_random_uuid(),
   created_at   timestamptz not null default now(),

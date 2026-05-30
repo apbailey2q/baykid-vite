@@ -96,12 +96,15 @@ async function probeEndpoint(url: string, timeoutMs = 5000): Promise<{ ok: boole
 
 async function clientSideProbes(_priorMs: number): Promise<SystemHealth> {
   const supaUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+  const supaKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
   const now = new Date().toISOString()
 
-  // Probe Supabase (safe — just hits the REST root with anon key)
-  const supaProbe = supaUrl
-    ? await probeEndpoint(`${supaUrl}/rest/v1/`)
+  // Probe Supabase. The REST gateway requires an apikey on every request
+  // (even the root) — without it Kong returns 401 UNAUTHORIZED_MISSING_API_KEY,
+  // which would make the fallback always look like Supabase is down.
+  const supaProbe = (supaUrl && supaKey)
+    ? await probeEndpoint(`${supaUrl}/rest/v1/?apikey=${encodeURIComponent(supaKey)}`)
     : { ok: false, latencyMs: 0 }
 
   // Probe the AI endpoint (dev Vite plugin handles this)

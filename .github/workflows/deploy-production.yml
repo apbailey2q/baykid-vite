@@ -51,7 +51,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - run: npm ci
+      # `npm install` not `npm ci` — see ci.yml comment for rationale.
+      - run: npm install --prefer-offline --no-audit --no-fund
       - run: npx tsc --noEmit
       - run: npm run build
       - name: Verify dist

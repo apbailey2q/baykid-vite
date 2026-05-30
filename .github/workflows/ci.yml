@@ -45,8 +45,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      # Using `npm install` over `npm ci` because the lockfile was generated
+      # with a different npm version than the runner's, and npm ci's strict
+      # comparison rejects it. `npm install` honors the lockfile for versions
+      # but is forgiving on metadata drift. CI doesn't commit any changes.
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline --no-audit --no-fund
 
       - name: ESLint (informational — does not block CI)
         id: eslint
@@ -85,7 +89,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline --no-audit --no-fund
 
       - name: Build
         run: npm run build

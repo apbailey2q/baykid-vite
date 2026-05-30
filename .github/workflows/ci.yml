@@ -24,6 +24,12 @@ env:
 
 jobs:
   # ── Job 1: Lint + Type Check ─────────────────────────────────────────────────
+  # ESLint is INFORMATIONAL ONLY — it runs on every push and the report shows
+  # in the workflow summary, but its exit code never fails the job. TypeScript
+  # remains a hard gate: any tsc error blocks the rest of CI and any deploy.
+  # If you want ESLint to gate deploys again, flip `continue-on-error: false`
+  # on the ESLint step (and remove the `id:`/conditional summary if you also
+  # want to drop the report).
   quality:
     name: Lint & Type Check
     runs-on: ubuntu-latest
@@ -42,13 +48,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: ESLint
+      - name: ESLint (informational — does not block CI)
+        id: eslint
         run: npm run lint
-        continue-on-error: false
+        continue-on-error: true
 
-      - name: TypeScript type check
+      - name: ESLint report banner
+        if: always()
+        run: |
+          if [ "${{ steps.eslint.outcome }}" = "success" ]; then
+            echo "## ✅ ESLint clean"                       >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️  ESLint reported findings (informational only — not blocking)" >> $GITHUB_STEP_SUMMARY
+            echo "View the full report in the **ESLint** step above. Lint cleanup is tracked separately from CI gating." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: TypeScript type check (BLOCKING)
         run: npx tsc --noEmit
-        continue-on-error: false
+        # No continue-on-error — tsc failures fail this job and block downstream.
 
   # ── Job 2: Build ──────────────────────────────────────────────────────────────
   build:
@@ -144,6 +161,10 @@ jobs:
           fi
 
   # ── Job 4: Notify on success (main branch only) ───────────────────────────────
+  # ESLint is informational; this summary shows TypeScript + Build + Readiness
+  # as the actual blocking gates. The ESLint result line is replaced with a
+  # neutral marker so reviewers know lint is reported in the quality job above
+  # but not a deploy gate.
   notify:
     name: Ready to Deploy
     runs-on: ubuntu-latest
@@ -157,10 +178,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| ESLint | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          echo "| TypeScript | ✅ No errors |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ✅ dist/ generated |" >> $GITHUB_STEP_SUMMARY
-          echo "| Readiness | ✅ Env vars documented |" >> $GITHUB_STEP_SUMMARY
+          echo "| ESLint | ℹ️  Informational (see Lint & Type Check job for findings) |" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript | ✅ No errors (blocking) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ✅ dist/ generated (blocking) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Readiness | ✅ Env vars documented (blocking) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY

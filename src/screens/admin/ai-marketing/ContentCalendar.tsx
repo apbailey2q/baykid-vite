@@ -2,8 +2,11 @@
 import { useState, useMemo } from 'react'
 import type { AIContentResult, PostStatus, Platform, ContentType } from '../../../lib/aiMarketing'
 import { MOCK_CALENDAR, type ContentCalendarItem } from '../../../lib/aiMarketing'
+import { WORKFLOW_V2, STATUS_META as CANONICAL_STATUS_META } from '../../../lib/aiMarketing'
 import { loadPosts, upsertPost, removePost, duplicatePost } from '../../../lib/postStorage'
 import { SchedulePicker, TIMEZONES } from '../../../components/ai-marketing/SchedulePicker'
+import { usePosts, useMarketing } from '../../../lib/marketingStore'
+import { StatusBadge } from '../../../components/ui/StatusBadge'
 
 // Re-export for back-compat with any consumers still importing from this file.
 // New code should import from '../../../components/ai-marketing/SchedulePicker'.
@@ -250,9 +253,31 @@ interface PostActionRowProps {
   onDuplicate:       () => void
   onDelete:          () => void
   onEdit:            () => void
+  v2?:               boolean
 }
 
-function PostActionRow({ post, onReschedule, onMarkPosted, onMarkFailed, onDuplicate, onDelete, onEdit }: PostActionRowProps) {
+function PostActionRow({ post, onReschedule, onMarkPosted, onMarkFailed, onDuplicate, onDelete, onEdit, v2 = false }: PostActionRowProps) {
+  if (v2) {
+    return (
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+        <button onClick={onEdit} style={ghostBtn()}>✏️ Edit</button>
+        {(post.status === 'scheduled' || post.status === 'queued' || post.status === 'approved' || post.status === 'pending_approval' || post.status === 'draft') && (
+          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)', background: 'rgba(0,200,255,0.08)' })}>📅 Reschedule</button>
+        )}
+        {(post.status === 'scheduled' || post.status === 'queued') && (
+          <button onClick={onMarkPosted} style={ghostBtn({ color: '#a855f7', borderColor: 'rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)' })}>📢 Mark as Posted</button>
+        )}
+        {post.status === 'posted' && (
+          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Reshare</button>
+        )}
+        {post.status === 'failed' && (
+          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Retry Schedule</button>
+        )}
+        <button onClick={onDuplicate} style={ghostBtn()}>⧉ Duplicate</button>
+        <button onClick={onDelete} style={ghostBtn({ color: 'rgba(248,113,113,0.7)', borderColor: 'rgba(248,113,113,0.2)' })}>🗑️</button>
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
       {post.status === 'scheduled' && (
@@ -304,6 +329,7 @@ interface PostCardProps {
   onDuplicate:    () => void
   onDelete:       () => void
   compact?:       boolean
+  v2?:            boolean
 }
 
 function PostCard({
@@ -312,9 +338,10 @@ function PostCard({
   onEditStart, onEditSave, onEditCancel,
   onReschedule, onScheduleConfirm, onScheduleCancel,
   onMarkPosted, onMarkFailed, onDuplicate, onDelete,
-  compact = false,
+  compact = false, v2 = false,
 }: PostCardProps) {
   const meta = STATUS_META[post.status] ?? STATUS_META.draft
+  const canonicalMeta = CANONICAL_STATUS_META[post.status] ?? CANONICAL_STATUS_META.draft
   const tz   = post.timezone ?? getBrowserTz()
   const tzLabel = TIMEZONES.find((t) => t.value === tz)?.label ?? tz
 
@@ -327,9 +354,13 @@ function PostCard({
             {post.title}
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, borderRadius: 20, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
-              {meta.label}
-            </span>
+            {v2 ? (
+              <StatusBadge variant={canonicalMeta.badgeVariant} label={canonicalMeta.label} size="sm" />
+            ) : (
+              <span style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, borderRadius: 20, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+                {meta.label}
+              </span>
+            )}
             {post.platform && (
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
                 {PLATFORM_ICONS[post.platform]} {post.platform}
@@ -410,6 +441,7 @@ function PostCard({
           onDuplicate={onDuplicate}
           onDelete={onDelete}
           onEdit={onEditStart}
+          v2={v2}
         />
       )}
     </div>
@@ -498,9 +530,10 @@ interface WeekViewProps {
   weekDates:    Date[]
   selectedId:   string | null
   onSelectPost: (id: string | null) => void
+  v2?:          boolean
 }
 
-function WeekView({ posts, weekDates, selectedId, onSelectPost }: WeekViewProps) {
+function WeekView({ posts, weekDates, selectedId, onSelectPost, v2 = false }: WeekViewProps) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
       {weekDates.map((date) => {
@@ -521,6 +554,7 @@ function WeekView({ posts, weekDates, selectedId, onSelectPost }: WeekViewProps)
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {dayPosts.map((p) => {
                 const meta = STATUS_META[p.status] ?? STATUS_META.draft
+                const canonicalMeta = CANONICAL_STATUS_META[p.status] ?? CANONICAL_STATUS_META.draft
                 return (
                   <div key={p.id} onClick={() => onSelectPost(selectedId === p.id ? null : p.id)}
                     style={{ background: selectedId === p.id ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selectedId === p.id ? 'rgba(0,200,255,0.35)' : meta.border}`, borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>
@@ -528,9 +562,16 @@ function WeekView({ posts, weekDates, selectedId, onSelectPost }: WeekViewProps)
                     <div style={{ color: '#fff', fontSize: 10, fontWeight: 600, lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {p.title}
                     </div>
-                    <div style={{ color: meta.color, fontSize: 9, fontWeight: 700 }}>
-                      {fmtTime(p.scheduledFor!)}
-                    </div>
+                    {v2 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        <StatusBadge variant={canonicalMeta.badgeVariant} label={canonicalMeta.label} size="sm" />
+                        {p.scheduledFor && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600 }}>{fmtTime(p.scheduledFor)}</span>}
+                      </div>
+                    ) : (
+                      <div style={{ color: meta.color, fontSize: 9, fontWeight: 700 }}>
+                        {fmtTime(p.scheduledFor!)}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -567,6 +608,7 @@ interface ListViewProps {
   onMarkFailed:       (id: string) => void
   onDuplicate:        (p: AIContentResult) => void
   onDelete:           (id: string) => void
+  v2?:                boolean
 }
 
 function ListView({
@@ -575,13 +617,18 @@ function ListView({
   onEditStart, onEditSave, onEditCancel,
   onRescheduleStart, onScheduleConfirm, onScheduleCancel,
   onMarkPosted, onMarkFailed, onDuplicate, onDelete,
+  v2 = false,
 }: ListViewProps) {
   // Group by day
   const grouped: { dateKey: string; dateLabel: string; posts: AIContentResult[] }[] = []
   const seen = new Set<string>()
+  const unscheduled: AIContentResult[] = []
 
   for (const p of posts) {
-    if (!p.scheduledFor) continue
+    if (!p.scheduledFor) {
+      if (v2) unscheduled.push(p)
+      continue
+    }
     const d    = new Date(p.scheduledFor)
     const key  = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
     if (!seen.has(key)) {
@@ -589,6 +636,10 @@ function ListView({
       grouped.push({ dateKey: key, dateLabel: fmtDayLabel(d), posts: [] })
     }
     grouped[grouped.length - 1].posts.push(p)
+  }
+
+  if (v2 && unscheduled.length > 0) {
+    grouped.unshift({ dateKey: 'no-date', dateLabel: 'No scheduled date', posts: unscheduled })
   }
 
   if (grouped.length === 0) return null
@@ -624,6 +675,7 @@ function ListView({
                 onMarkFailed={() => onMarkFailed(p.id)}
                 onDuplicate={() => onDuplicate(p)}
                 onDelete={() => onDelete(p.id)}
+                v2={v2}
               />
             ))}
           </div>
@@ -648,7 +700,17 @@ export function ContentCalendar() {
   const [dateRange,    setDateRange]    = useState<DateRange>('all')
 
   // ── Data state ──────────────────────────────────────────────────────────────
-  const [posts, setPosts] = useState<AIContentResult[]>(() => loadCalendarData())
+  const storePosts = usePosts()
+  const marketing = useMarketing()
+  const [v1Posts, setV1Posts] = useState<AIContentResult[]>(() => loadCalendarData())
+  const posts = WORKFLOW_V2
+    ? [...storePosts].sort((a, b) => {
+        const ta = a.scheduledFor ? new Date(a.scheduledFor).getTime() : Number.POSITIVE_INFINITY
+        const tb = b.scheduledFor ? new Date(b.scheduledFor).getTime() : Number.POSITIVE_INFINITY
+        return ta - tb
+      })
+    : v1Posts
+  const setPosts = setV1Posts
 
   // ── Edit state ──────────────────────────────────────────────────────────────
   const [editingId,  setEditingId]  = useState<string | null>(null)
@@ -695,12 +757,22 @@ export function ContentCalendar() {
 
   // ── State updater helpers ───────────────────────────────────────────────────
   function applyUpdate(updated: AIContentResult, msg: string) {
+    if (WORKFLOW_V2) {
+      marketing.actions.upsertPost(updated)
+      showToast(msg)
+      return
+    }
     upsertPost(updated)
     setPosts((prev) => prev.map((p) => p.id === updated.id ? updated : p))
     showToast(msg)
   }
 
   function applyDelete(id: string) {
+    if (WORKFLOW_V2) {
+      marketing.actions.deletePost(id)
+      showToast('🗑️ Deleted', 'info')
+      return
+    }
     // For mock calendar items that aren't in localStorage yet, just hide from local state
     removePost(id)
     setPosts((prev) => prev.filter((p) => p.id !== id))
@@ -735,6 +807,14 @@ export function ContentCalendar() {
   }
   function handleScheduleConfirm(id: string) {
     const post = posts.find((p) => p.id === id); if (!post || !scheduleValue) return
+    if (WORKFLOW_V2) {
+      const iso = new Date(scheduleValue).toISOString()
+      void marketing.schedulePost(id, iso, scheduleTz).then((r) => {
+        if (r.ok) showToast(`📅 Scheduled for ${fmtDateTime(iso, scheduleTz)}`)
+      })
+      setReschedulingId(null)
+      return
+    }
     const updated: AIContentResult = { ...post, status: 'scheduled', scheduledFor: new Date(scheduleValue).toISOString(), timezone: scheduleTz }
     applyUpdate(updated, `📅 Scheduled for ${fmtDateTime(updated.scheduledFor!, scheduleTz)}`)
     setReschedulingId(null)
@@ -743,6 +823,12 @@ export function ContentCalendar() {
 
   // ── Status actions ──────────────────────────────────────────────────────────
   function handleMarkPosted(id: string) {
+    if (WORKFLOW_V2) {
+      void marketing.markPostedPost(id).then((r) => {
+        if (r.ok) showToast('📢 Marked as posted')
+      })
+      return
+    }
     const post = posts.find((p) => p.id === id); if (!post) return
     applyUpdate({ ...post, status: 'posted' }, '📢 Marked as posted')
   }
@@ -754,12 +840,22 @@ export function ContentCalendar() {
   // ── Duplicate ───────────────────────────────────────────────────────────────
   function handleDuplicate(post: AIContentResult) {
     const { copy } = duplicatePost(post)
+    if (WORKFLOW_V2) {
+      marketing.actions.upsertPost(copy)
+      showToast('⧉ Duplicated as draft', 'info')
+      return
+    }
     setPosts((prev) => [copy, ...prev])
     showToast('⧉ Duplicated as draft', 'info')
   }
 
   // ── Refresh ─────────────────────────────────────────────────────────────────
   function handleRefresh() {
+    if (WORKFLOW_V2) {
+      marketing.actions.reloadPosts(); setEditingId(null); setReschedulingId(null); setSelectedId(null)
+      showToast('🔄 Refreshed', 'info')
+      return
+    }
     setPosts(loadCalendarData()); setEditingId(null); setReschedulingId(null); setSelectedId(null)
     showToast('🔄 Refreshed', 'info')
   }
@@ -878,6 +974,7 @@ export function ContentCalendar() {
                 onMarkFailed={() => handleMarkFailed(selectedPost.id)}
                 onDuplicate={() => handleDuplicate(selectedPost)}
                 onDelete={() => { applyDelete(selectedPost.id); setSelectedId(null) }}
+                v2={WORKFLOW_V2}
               />
             </div>
           )}
@@ -892,6 +989,7 @@ export function ContentCalendar() {
               weekDates={getWeekDates(navDate)}
               selectedId={selectedId}
               onSelectPost={setSelectedId}
+              v2={WORKFLOW_V2}
             />
           </div>
           {selectedPost && (
@@ -917,6 +1015,7 @@ export function ContentCalendar() {
                 onMarkFailed={() => handleMarkFailed(selectedPost.id)}
                 onDuplicate={() => handleDuplicate(selectedPost)}
                 onDelete={() => { applyDelete(selectedPost.id); setSelectedId(null) }}
+                v2={WORKFLOW_V2}
               />
             </div>
           )}
@@ -945,6 +1044,7 @@ export function ContentCalendar() {
               onMarkFailed={handleMarkFailed}
               onDuplicate={handleDuplicate}
               onDelete={applyDelete}
+              v2={WORKFLOW_V2}
             />
           : <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 60, fontSize: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16 }}>
               No scheduled content matches the current filters.

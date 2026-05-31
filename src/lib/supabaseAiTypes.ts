@@ -10,8 +10,11 @@ export const BAYKID_ORG_ID = '00000000-0000-0000-0000-00000000ba47' as const
 // ── ai_posts / baykid_ai_posts ────────────────────────────────────────────────
 
 export type DbPostStatus =
+  // v1 statuses
   | 'draft' | 'pending_approval' | 'approved'
   | 'scheduled' | 'posted' | 'rejected' | 'failed'
+  // workflow v2 additions (gated by VITE_WORKFLOW_V2)
+  | 'queued' | 'publishing' | 'cancelled'
 
 export type DbPostContentType =
   | 'social_post' | 'reel_script' | 'carousel' | 'comment_reply'
@@ -274,13 +277,20 @@ export interface DbActivityEvent {
 // ── Dashboard stats (returned by ai_dashboard_stats RPC) ─────────────────────
 
 export interface DbDashboardStats {
+  // ── post status counts (mirrors ai_dashboard_stats RPC) ──────────────────
   drafts:               number
-  pending:              number
+  pending:              number   // pending_approval
+  approved:             number
+  // workflow v2 additions — always present in RPC response; 0 while flag is off
+  queued:               number
   scheduled:            number
+  publishing:           number
   posted:               number
   rejected:             number
   failed:               number
+  cancelled:            number
   scheduledToday:       number
+  // ── CRM / automation ─────────────────────────────────────────────────────
   newLeads:             number
   totalLeads:           number
   followUpsDue:         number

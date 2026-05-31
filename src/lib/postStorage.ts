@@ -4,7 +4,7 @@
 // Migrates from legacy baykid_ai_queue / baykid_ai_drafts on first run.
 // Mock posts are seeded once on first ApprovalQueue load (baykid_ai_seeded flag).
 
-import type { AIContentResult } from './aiMarketing'
+import type { AIContentResult, PostStatus, ActivityEvent } from './aiMarketing'
 import { MOCK_POSTS } from './aiMarketing'
 import { sbUpsertPost, sbDeletePost } from './aiMarketingDb'
 
@@ -12,6 +12,28 @@ export const POSTS_KEY       = 'baykid_ai_posts'
 const SEEDED_FLAG            = 'baykid_ai_seeded'
 const LEGACY_QUEUE_KEY       = 'baykid_ai_queue'
 const LEGACY_DRAFTS_KEY      = 'baykid_ai_drafts'
+
+// ── Pub/sub ───────────────────────────────────────────────────────────────────
+
+type PostsListener = (posts: AIContentResult[]) => void
+const listeners = new Set<PostsListener>()
+
+export function subscribePosts(fn: PostsListener): () => void {
+  listeners.add(fn)
+  try { fn(loadPosts()) } catch { /* */ }
+  return () => { listeners.delete(fn) }
+}
+
+function emitPosts(): void {
+  const p = loadPosts()
+  listeners.forEach((fn) => { try { fn(p) } catch { /* */ } })
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e: StorageEvent) => {
+    if (e.key === POSTS_KEY) emitPosts()
+  })
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +83,7 @@ export function upsertPost(post: AIContentResult): AIContentResult[] {
   if (idx >= 0) all[idx] = post
   else all.unshift(post)
   savePosts(all)
+  emitPosts()
   // Background sync to Supabase (fire-and-forget, no await)
   sbUpsertPost(post).catch(() => {})
   return all
@@ -70,6 +93,7 @@ export function upsertPost(post: AIContentResult): AIContentResult[] {
 export function removePost(id: string): AIContentResult[] {
   const all = loadPosts().filter((p) => p.id !== id)
   savePosts(all)
+  emitPosts()
   sbDeletePost(id).catch(() => {})
   return all
 }
@@ -93,7 +117,8 @@ export function duplicatePost(post: AIContentResult): { copy: AIContentResult; a
     _source: undefined,
     _error: undefined,
   }
-  return { copy, all: upsertPost(copy) }
+  const all = upsertPost(copy)
+  return { copy, all }
 }
 
 /**
@@ -116,6 +141,7 @@ export function initializePosts(): AIContentResult[] {
       const merged   = mergeById([...existing, ...newMocks]).sort(byDateDesc)
       savePosts(merged)
       localStorage.setItem(SEEDED_FLAG, 'true')
+      emitPosts()
       return merged
     }
 
@@ -126,4 +152,59 @@ export function initializePosts(): AIContentResult[] {
   } catch {
     return seedEnabled ? [...MOCK_POSTS].sort(byDateDesc) : []
   }
+}
+
+// ── v2 canonical status transition ────────────────────────────────────────────
+
+/**
+ * Canonical status transition used by workflow-v2 screens. Writes locally,
+ * emits to subscribers, then AWAITS the Supabase sync — on remote failure
+ * the local write is reverted so the UI never drifts from the server.
+ * Legacy callers continue to use upsertPost (fire-and-forget).
+ */
+export async function transitionPostStatus(
+  id: string,
+  nextStatus: PostStatus,
+  activity?: ActivityEvent,
+): Promise<{ ok: boolean; error?: string }> {
+  const all = loadPosts()
+  const original = all.find((p) => p.id === id)
+  if (!original) return { ok: false, error: `Post ${id} not found` }
+
+  const updated: AIContentResult = {
+    ...original,
+    status: nextStatus,
+    activity: activity ? [activity, ...(original.activity ?? [])] : original.activity,
+  }
+
+  upsertPost(updated)
+
+  try {
+    await sbUpsertPost(updated)
+    return { ok: true }
+  } catch (err) {
+    upsertPost(original)
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: message }
+  }
+}
+
+// ── Mock cleanup (workflow-v2 reconcile) ──────────────────────────────────────
+
+/**
+ * Removes seed/mock posts from local storage. Invoked by MarketingProvider
+ * during the workflow-v2 reconcile so demo data does not leak into the v2
+ * state machine.
+ */
+export function purgeMockPosts(): AIContentResult[] {
+  const mockIds = new Set(MOCK_POSTS.map((m) => m.id))
+  const all = loadPosts()
+  const kept = all.filter((p) => !p.id.startsWith('mock-') && !mockIds.has(p.id))
+  if (kept.length === all.length) return all
+  savePosts(kept)
+  emitPosts()
+  for (const p of all) {
+    if (!kept.includes(p)) sbDeletePost(p.id).catch(() => {})
+  }
+  return kept
 }

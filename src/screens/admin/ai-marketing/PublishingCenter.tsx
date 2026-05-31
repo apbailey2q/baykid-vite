@@ -6,7 +6,7 @@
 //   2. Publishing Queue    — active jobs (queued / publishing / retrying) + process controls
 //   3. Publish History     — completed / failed / cancelled jobs
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { ConnectedAccount, PlatformId, PublishJob, PublishHistoryEntry } from '../../../lib/publishTypes'
 import { PLATFORM_CONFIGS } from '../../../lib/publishTypes'
 import {
@@ -16,9 +16,15 @@ import {
 } from '../../../lib/platformConnections'
 import {
   loadJobs, loadHistory, subscribeJobs,
-  processQueue, retryJob, cancelJob, deleteJob,
+  processQueue, processJob, retryJob, cancelJob, deleteJob,
+  createPublishJob,
   getQueueStats, PUBLISH_STATUS_META,
 } from '../../../lib/publishingEngine'
+import type { AIContentResult, PostStatus } from '../../../lib/aiMarketing'
+import { WORKFLOW_V2, STATUS_META } from '../../../lib/aiMarketing'
+import { useMarketing, usePosts } from '../../../lib/marketingStore'
+import { StatusBadge } from '../../../components/ui/StatusBadge'
+import { SchedulePicker } from '../../../components/ai-marketing/SchedulePicker'
 
 // ── Style helpers ──────────────────────────────────────────────────────────────
 
@@ -319,10 +325,265 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Publishing Queue Tab — V2 (post-centric, behind WORKFLOW_V2)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// v2 only — Approval Queue owns drafts/pending/rejected; Calendar/History own 'posted'.
+const QUEUE_V2_VISIBLE_STATUSES: PostStatus[] = [
+  'approved', 'queued', 'scheduled', 'publishing', 'failed',
+]
+
+function defaultScheduleLocal(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(9, 0, 0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function QueueTabV2({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
+  const posts = usePosts()
+  const { schedulePost, cancelPost, retryPost } = useMarketing()
+  const [jobs, setJobs] = useState<PublishJob[]>(() => loadJobs())
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null)
+  const [scheduleValue, setScheduleValue] = useState('')
+  const [scheduleTz, setScheduleTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+
+  useEffect(() => subscribeJobs(setJobs), [])
+
+  const visible = useMemo(
+    () =>
+      posts
+        .filter((p) => QUEUE_V2_VISIBLE_STATUSES.includes(p.status))
+        .sort((a, b) => {
+          const aTime = a.scheduledFor ? new Date(a.scheduledFor).getTime() : new Date(a.createdAt).getTime()
+          const bTime = b.scheduledFor ? new Date(b.scheduledFor).getTime() : new Date(b.createdAt).getTime()
+          return aTime - bTime
+        }),
+    [posts],
+  )
+
+  const stats = useMemo(() => {
+    const s: Record<PostStatus, number> = {
+      draft: 0, pending_approval: 0, approved: 0, queued: 0, scheduled: 0,
+      publishing: 0, posted: 0, rejected: 0, failed: 0, cancelled: 0,
+    }
+    for (const p of visible) s[p.status]++
+    return s
+  }, [visible])
+
+  function jobForPost(postId: string): PublishJob | undefined {
+    return jobs.find(
+      (j) =>
+        j.postId === postId &&
+        (j.status === 'queued' || j.status === 'publishing' || j.status === 'retrying' || j.status === 'failed'),
+    )
+  }
+
+  async function handlePublishNow(post: AIContentResult) {
+    if (busyId) return
+    setBusyId(post.id)
+    try {
+      let job = jobForPost(post.id)
+      if (!job) {
+        const account = loadAccounts().find((a) => a.isActive && (!post.platform || a.platform === post.platform))
+          ?? loadAccounts().find((a) => a.isActive)
+        if (!account) {
+          onToast('Connect a social account first', 'warn')
+          return
+        }
+        try {
+          job = createPublishJob({ postId: post.id, accountId: account.id, autoPublishAllowed: true })
+        } catch (err) {
+          onToast(err instanceof Error ? err.message : 'Failed to queue post', 'error')
+          return
+        }
+      }
+      await processJob(job.id)
+      setJobs(loadJobs())
+      onToast(`Publishing "${post.title}"…`, 'info')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function handleRescheduleStart(post: AIContentResult) {
+    setReschedulingId(post.id)
+    setScheduleValue(defaultScheduleLocal())
+  }
+
+  async function handleRescheduleConfirm(post: AIContentResult) {
+    if (!scheduleValue) return
+    const iso = new Date(scheduleValue).toISOString()
+    const r = await schedulePost(post.id, iso, scheduleTz)
+    if (r.ok) onToast(`Rescheduled "${post.title}" for ${new Date(iso).toLocaleString()}`, 'success')
+    setReschedulingId(null)
+  }
+
+  async function handleCancel(post: AIContentResult) {
+    if (busyId) return
+    setBusyId(post.id)
+    try {
+      const r = await cancelPost(post.id)
+      if (r.ok) onToast(`Cancelled "${post.title}"`, 'info')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleRetry(post: AIContentResult) {
+    if (busyId) return
+    setBusyId(post.id)
+    try {
+      const r = await retryPost(post.id)
+      if (r.ok) onToast(`Requeued "${post.title}" for retry`, 'info')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 16, margin: '0 0 4px' }}>📡 Publishing Queue</h3>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>
+          Approved, queued, scheduled, publishing and failed posts. Use Publish Now to send immediately or Reschedule to adjust timing.
+        </p>
+      </div>
+
+      {/* Stats row — counts by post.status */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {QUEUE_V2_VISIBLE_STATUSES.map((status) => {
+          const count = stats[status]
+          if (count === 0) return null
+          const meta = STATUS_META[status]
+          return (
+            <div key={status} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '5px 12px', display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>{count}</span>
+              <StatusBadge variant={meta.badgeVariant} label={`${meta.icon} ${meta.label}`} size="sm" />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Post list */}
+      {visible.length === 0 ? (
+        <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 60, fontSize: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16 }}>
+          Nothing in the publishing pipeline.<br />
+          Approve a post in the Approval Queue to send it here.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {visible.map((post) => {
+            const meta = STATUS_META[post.status]
+            const job = jobForPost(post.id)
+            const cfg = post.platform ? PLATFORM_CONFIGS[post.platform as PlatformId] : null
+            const isBusy = busyId === post.id
+            const isRescheduling = reschedulingId === post.id
+            const canPublishNow = post.status === 'approved' || post.status === 'queued' || post.status === 'scheduled' || post.status === 'failed'
+            const canReschedule = post.status === 'queued' || post.status === 'scheduled' || post.status === 'approved'
+            const canCancel = post.status === 'queued' || post.status === 'scheduled' || post.status === 'publishing'
+            const canRetry = post.status === 'failed'
+
+            return (
+              <div key={post.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  {cfg && (
+                    <div style={{ width: 34, height: 34, borderRadius: 8, background: cfg.colorBg, border: `1px solid ${cfg.colorBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                      {cfg.icon}
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {post.title}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {cfg && <span>{cfg.name}{job?.accountHandle ? ` · ${job.accountHandle}` : ''}</span>}
+                      {post.scheduledFor && <span>📅 {fmtDateTime(post.scheduledFor)}</span>}
+                      <span>{timeAgo(post.createdAt)}</span>
+                    </div>
+                    {job?.lastError && post.status === 'failed' && (
+                      <div style={{ color: '#f87171', fontSize: 11, marginTop: 5, background: 'rgba(248,113,113,0.08)', borderRadius: 6, padding: '4px 8px' }}>
+                        ⚠️ {job.lastError}
+                        {job.retryCount > 0 && <span style={{ opacity: 0.7 }}> (attempt {job.retryCount}/{job.maxRetries})</span>}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ flexShrink: 0 }}>
+                    <StatusBadge variant={meta.badgeVariant} label={`${meta.icon} ${meta.label}`} />
+                  </div>
+                </div>
+
+                {isRescheduling && (
+                  <div style={{ marginTop: 12 }}>
+                    <SchedulePicker
+                      value={scheduleValue}
+                      timezone={scheduleTz}
+                      onValueChange={setScheduleValue}
+                      onTimezoneChange={setScheduleTz}
+                      onConfirm={() => handleRescheduleConfirm(post)}
+                      onCancel={() => setReschedulingId(null)}
+                    />
+                  </div>
+                )}
+
+                {!isRescheduling && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                    {canPublishNow && (
+                      <button
+                        onClick={() => handlePublishNow(post)}
+                        disabled={isBusy}
+                        style={ghostBtn({ color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', fontSize: 10, padding: '4px 10px', opacity: isBusy ? 0.5 : 1, cursor: isBusy ? 'wait' : 'pointer' })}
+                      >
+                        🚀 Publish Now
+                      </button>
+                    )}
+                    {canReschedule && (
+                      <button
+                        onClick={() => handleRescheduleStart(post)}
+                        disabled={isBusy}
+                        style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.3)', background: 'rgba(0,200,255,0.08)', fontSize: 10, padding: '4px 10px', opacity: isBusy ? 0.5 : 1 })}
+                      >
+                        📅 Reschedule
+                      </button>
+                    )}
+                    {canCancel && (
+                      <button
+                        onClick={() => handleCancel(post)}
+                        disabled={isBusy}
+                        style={ghostBtn({ color: '#f87171', borderColor: 'rgba(248,113,113,0.25)', fontSize: 10, padding: '4px 10px', opacity: isBusy ? 0.5 : 1 })}
+                      >
+                        ✕ Cancel
+                      </button>
+                    )}
+                    {canRetry && (
+                      <button
+                        onClick={() => handleRetry(post)}
+                        disabled={isBusy}
+                        style={ghostBtn({ color: '#fbbf24', borderColor: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.08)', fontSize: 10, padding: '4px 10px', opacity: isBusy ? 0.5 : 1 })}
+                      >
+                        🔄 Retry
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Publishing Queue Tab
 // ══════════════════════════════════════════════════════════════════════════════
 
 function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
+  if (WORKFLOW_V2) return <QueueTabV2 onToast={onToast} />
   const [jobs,       setJobs]       = useState<PublishJob[]>(() => loadJobs())
   const [processing, setProcessing] = useState(false)
   const [autoRun,    setAutoRun]    = useState(false)

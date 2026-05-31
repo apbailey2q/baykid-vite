@@ -7,9 +7,26 @@
 
 import type { PublishJob, PublishHistoryEntry, PlatformId, PublishStatus } from './publishTypes'
 import { loadAccounts } from './platformConnections'
-import { loadPosts, upsertPost } from './postStorage'
+import { loadPosts, upsertPost, transitionPostStatus } from './postStorage'
 import { addNotification } from './notifications'
 import { logEvent } from './activityLog'
+import { WORKFLOW_V2 } from './aiMarketing'
+import type { ActivityEvent } from './aiMarketing'
+
+function newActivity(
+  type: ActivityEvent['type'],
+  label: string,
+  meta?: Record<string, string>,
+): ActivityEvent {
+  return {
+    id:    `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    type,
+    label,
+    ts:    new Date().toISOString(),
+    actor: 'System',
+    meta,
+  }
+}
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
 
@@ -129,6 +146,18 @@ export function createPublishJob(params: CreateJobParams): PublishJob {
     meta: { postId, accountId: account.id },
   })
 
+  if (WORKFLOW_V2) {
+    const nextStatus = scheduledFor ? 'scheduled' : 'queued'
+    const activity = newActivity(
+      scheduledFor ? 'scheduled' : 'sent_to_queue',
+      scheduledFor
+        ? `Scheduled for ${account.platform} at ${new Date(scheduledFor).toLocaleString()}`
+        : `Queued for ${account.platform}`,
+      { jobId: job.id, accountId: account.id, platform: account.platform },
+    )
+    transitionPostStatus(postId, nextStatus, activity).catch(() => {})
+  }
+
   return job
 }
 
@@ -223,6 +252,10 @@ export async function processJob(jobId: string): Promise<void> {
   // Mark as publishing
   updateJob(jobId, { status: 'publishing', startedAt: now })
 
+  if (WORKFLOW_V2) {
+    await transitionPostStatus(job.postId, 'publishing').catch(() => {})
+  }
+
   try {
     const result = await serverPublish(job)
 
@@ -235,13 +268,25 @@ export async function processJob(jobId: string): Promise<void> {
       isMock:         job.isMock,
     })
 
-    // Update the source post to 'posted'
-    const post = loadPosts().find((p) => p.id === job.postId)
-    if (post) {
-      upsertPost({ ...post, status: 'posted' })
+    if (WORKFLOW_V2) {
+      const activity = newActivity(
+        'posted',
+        `Published to ${job.platform} (${job.accountHandle})`,
+        { jobId, platform: job.platform, url: result.url },
+      )
+      await transitionPostStatus(job.postId, 'posted', activity).catch(() => {})
       logEvent('posted', `Published to ${job.platform}: ${job.postTitle}`, {
         meta: { postId: job.postId },
       })
+    } else {
+      // Update the source post to 'posted'
+      const post = loadPosts().find((p) => p.id === job.postId)
+      if (post) {
+        upsertPost({ ...post, status: 'posted' })
+        logEvent('posted', `Published to ${job.platform}: ${job.postTitle}`, {
+          meta: { postId: job.postId },
+        })
+      }
     }
 
     appendHistory({
@@ -290,9 +335,18 @@ export async function processJob(jobId: string): Promise<void> {
     })
 
     if (finalFailure) {
-      // Update the source post to 'failed'
-      const post = loadPosts().find((p) => p.id === job.postId)
-      if (post) upsertPost({ ...post, status: 'failed' })
+      if (WORKFLOW_V2) {
+        const activity = newActivity(
+          'note',
+          `Publish to ${job.platform} failed after ${retryCount} attempts: ${errMsg}`,
+          { jobId, platform: job.platform, error: errMsg },
+        )
+        await transitionPostStatus(job.postId, 'failed', activity).catch(() => {})
+      } else {
+        // Update the source post to 'failed'
+        const post = loadPosts().find((p) => p.id === job.postId)
+        if (post) upsertPost({ ...post, status: 'failed' })
+      }
 
       addNotification(
         'post_failed',
@@ -333,11 +387,21 @@ export async function processQueue(): Promise<number> {
 // ── Manual actions ────────────────────────────────────────────────────────────
 
 export function retryJob(jobId: string): void {
+  const job = loadJobs().find((j) => j.id === jobId)
   updateJob(jobId, {
     status:    'retrying',
     failedAt:  new Date(0).toISOString(), // make it due immediately
     lastError: undefined,
   })
+
+  if (WORKFLOW_V2 && job) {
+    const activity = newActivity(
+      'note',
+      `Requeued for ${job.platform} retry`,
+      { jobId, platform: job.platform },
+    )
+    transitionPostStatus(job.postId, 'queued', activity).catch(() => {})
+  }
 }
 
 export function cancelJob(jobId: string): void {
@@ -355,6 +419,15 @@ export function cancelJob(jobId: string): void {
     timestamp:     new Date().toISOString(),
     isMock:        job.isMock,
   })
+
+  if (WORKFLOW_V2) {
+    const activity = newActivity(
+      'note',
+      'Publish job cancelled',
+      { jobId, platform: job.platform },
+    )
+    transitionPostStatus(job.postId, 'approved', activity).catch(() => {})
+  }
 }
 
 export function deleteJob(jobId: string): void {

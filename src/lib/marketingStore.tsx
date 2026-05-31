@@ -12,17 +12,27 @@
 
 import {
   createContext, useContext, useReducer, useEffect, useCallback,
-  useMemo, type ReactNode,
+  useMemo, useRef, type ReactNode,
 } from 'react'
-import type { AIContentResult, Lead } from './aiMarketing'
+import type { AIContentResult, Lead, ActivityEvent } from './aiMarketing'
 import type { AutomationRule } from './automationRules'
 import type { AppNotification } from './notifications'
-import { loadPosts, upsertPost, removePost }   from './postStorage'
+import { WORKFLOW_V2 } from './aiMarketing'
+import {
+  loadPosts, upsertPost, removePost,
+  subscribePosts, transitionPostStatus, purgeMockPosts,
+} from './postStorage'
 import { loadLeads, upsertLead }               from './leadStorage'
 import { loadRules }                           from './automationRules'
 import { activeNotifications, markRead, dismissNotification } from './notifications'
 import { loadUserProfile, type UserProfile }   from './permissions'
 import { loadOrgSettings, type OrgSettings }   from './orgSettings'
+import { supabase } from './supabase'
+import { getActiveOrgId } from './organizations'
+import {
+  createPublishJob, cancelJob, retryJob, loadJobs,
+} from './publishingEngine'
+import { loadAccounts } from './platformConnections'
 
 // ── State shape ───────────────────────────────────────────────────────────────
 
@@ -202,6 +212,8 @@ const INITIAL_STATE: MarketingState = {
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
+export interface DomainActionResult { ok: boolean; error?: string }
+
 interface MarketingContextValue {
   state:    MarketingState
   dispatch: React.Dispatch<MarketingAction>
@@ -218,6 +230,13 @@ interface MarketingContextValue {
     markNotifRead: (id: string) => void
     dismissNotif:  (id: string) => void
   }
+  // v2 domain actions — see CRITICAL RULES in marketingStore docs
+  approvePost:    (id: string) => Promise<DomainActionResult>
+  rejectPost:     (id: string, reason?: string) => Promise<DomainActionResult>
+  schedulePost:   (id: string, scheduledFor: string, timezone?: string) => Promise<DomainActionResult>
+  cancelPost:     (id: string) => Promise<DomainActionResult>
+  retryPost:      (id: string) => Promise<DomainActionResult>
+  markPostedPost: (id: string) => Promise<DomainActionResult>
 }
 
 const MarketingContext = createContext<MarketingContextValue | null>(null)
@@ -226,6 +245,7 @@ const MarketingContext = createContext<MarketingContextValue | null>(null)
 
 export function MarketingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE)
+  const toastRef = useRef<(msg: string, type?: ToastMessage['type'], ttl?: number) => void>(() => {})
 
   // ── Hydrate from localStorage on mount ──────────────────────────────────────
   useEffect(() => {
@@ -246,6 +266,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // ── Live in-tab sync: any postStorage write fans out here ───────────────────
+  useEffect(() => {
+    const unsub = subscribePosts(() => dispatch({ type: 'RELOAD_POSTS' }))
+    return () => { unsub() }
+  }, [])
+
   // ── Cross-tab sync via StorageEvent ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e: StorageEvent) => {
@@ -256,6 +282,66 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('storage', handler)
     return () => window.removeEventListener('storage', handler)
+  }, [])
+
+  // ── v2 only: Supabase realtime channel for ai_posts ─────────────────────────
+  useEffect(() => {
+    if (!WORKFLOW_V2) return
+    let cleanedUp = false
+    const orgId = getActiveOrgId()
+    const channel = supabase
+      .channel('ai-posts:org=' + orgId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ai_posts', filter: 'organization_id=eq.' + orgId },
+        () => { if (!cleanedUp) dispatch({ type: 'RELOAD_POSTS' }) },
+      )
+      .subscribe()
+    return () => {
+      cleanedUp = true
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  // ── v2 only: one-shot reconcile + mock purge ────────────────────────────────
+  useEffect(() => {
+    if (!WORKFLOW_V2) return
+    try {
+      purgeMockPosts()
+      const legacyFlag = localStorage.getItem('baykid_ai_seeded')
+      if (legacyFlag && legacyFlag !== 'v2') {
+        localStorage.removeItem('baykid_ai_seeded')
+        localStorage.setItem('baykid_ai_seeded_v2', 'true')
+      } else if (!localStorage.getItem('baykid_ai_seeded_v2')) {
+        localStorage.setItem('baykid_ai_seeded_v2', 'true')
+      }
+
+      const jobs = loadJobs()
+      const postIdsWithJob = new Set(jobs.map((j) => j.postId))
+      const orphaned = loadPosts().filter(
+        (p) => (p.status === 'approved' || p.status === 'scheduled') && !postIdsWithJob.has(p.id),
+      )
+      let created = 0
+      const accounts = loadAccounts()
+      for (const p of orphaned) {
+        const account = accounts.find(
+          (a) => a.isActive && (!p.platform || a.platform === p.platform),
+        )
+        if (!account) continue
+        try {
+          createPublishJob({
+            postId:             p.id,
+            accountId:          account.id,
+            scheduledFor:       p.scheduledFor,
+            autoPublishAllowed: true,
+          })
+          created++
+        } catch { /* skip orphan we can't reconcile */ }
+      }
+      console.info('v2 reconcile: created ' + created + ' publish jobs for orphaned posts')
+    } catch (err) {
+      console.warn('v2 reconcile failed', err)
+    }
   }, [])
 
   // ── Toast auto-dismiss ───────────────────────────────────────────────────────
@@ -295,8 +381,134 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     dismissNotif:  (id: string) => { dismissNotification(id); dispatch({ type: 'DISMISS_NOTIFICATION', id }) },
   }), [])
 
+  // Keep a stable ref so domain actions can surface toasts without depending on actions identity
+  useEffect(() => { toastRef.current = actions.toast }, [actions])
+
+  // ── v2 domain actions ───────────────────────────────────────────────────────
+  const makeActivity = useCallback(
+    (type: ActivityEvent['type'], label: string, actor = 'Admin'): ActivityEvent => ({
+      id:    `act-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      type,
+      label,
+      ts:    new Date().toISOString(),
+      actor,
+    }),
+    [],
+  )
+
+  const pickAccountForPost = useCallback((post: AIContentResult) => {
+    const accounts = loadAccounts()
+    return (
+      accounts.find((a) => a.isActive && (!post.platform || a.platform === post.platform)) ??
+      accounts.find((a) => a.isActive) ??
+      null
+    )
+  }, [])
+
+  const approvePost = useCallback(async (id: string): Promise<DomainActionResult> => {
+    const post = loadPosts().find((p) => p.id === id)
+    if (!post) return { ok: false, error: 'Post not found' }
+    const account = pickAccountForPost(post)
+    if (!account) {
+      toastRef.current('Connect a social account before approving', 'warn')
+      return { ok: false, error: 'No connected account available' }
+    }
+    const prevStatus = post.status
+    const r = await transitionPostStatus(id, 'queued', makeActivity('approved', 'Approved and queued for publishing'))
+    if (!r.ok) {
+      toastRef.current(r.error ?? 'Approve failed', 'error')
+      return r
+    }
+    try {
+      createPublishJob({ postId: id, accountId: account.id, autoPublishAllowed: true })
+      return { ok: true }
+    } catch (err) {
+      await transitionPostStatus(id, prevStatus)
+      const message = err instanceof Error ? err.message : String(err)
+      toastRef.current(message, 'error')
+      return { ok: false, error: message }
+    }
+  }, [makeActivity, pickAccountForPost])
+
+  const rejectPost = useCallback(async (id: string, reason?: string): Promise<DomainActionResult> => {
+    const r = await transitionPostStatus(
+      id,
+      'rejected',
+      makeActivity('rejected', reason ? `Rejected: ${reason}` : 'Rejected'),
+    )
+    if (!r.ok) toastRef.current(r.error ?? 'Reject failed', 'error')
+    return r
+  }, [makeActivity])
+
+  const schedulePost = useCallback(async (id: string, scheduledFor: string, timezone?: string): Promise<DomainActionResult> => {
+    const post = loadPosts().find((p) => p.id === id)
+    if (!post) return { ok: false, error: 'Post not found' }
+    const account = pickAccountForPost(post)
+    if (!account) {
+      toastRef.current('Connect a social account before scheduling', 'warn')
+      return { ok: false, error: 'No connected account available' }
+    }
+    const prevStatus = post.status
+    const prevScheduledFor = post.scheduledFor
+    const prevTimezone = post.timezone
+    upsertPost({ ...post, scheduledFor, timezone: timezone ?? post.timezone })
+    const r = await transitionPostStatus(
+      id,
+      'scheduled',
+      makeActivity('scheduled', `Scheduled for ${new Date(scheduledFor).toLocaleString()}`),
+    )
+    if (!r.ok) {
+      upsertPost({ ...post, scheduledFor: prevScheduledFor, timezone: prevTimezone })
+      toastRef.current(r.error ?? 'Schedule failed', 'error')
+      return r
+    }
+    try {
+      createPublishJob({ postId: id, accountId: account.id, scheduledFor, autoPublishAllowed: true })
+      return { ok: true }
+    } catch (err) {
+      await transitionPostStatus(id, prevStatus)
+      upsertPost({ ...post, scheduledFor: prevScheduledFor, timezone: prevTimezone })
+      const message = err instanceof Error ? err.message : String(err)
+      toastRef.current(message, 'error')
+      return { ok: false, error: message }
+    }
+  }, [makeActivity, pickAccountForPost])
+
+  const cancelPost = useCallback(async (id: string): Promise<DomainActionResult> => {
+    const active = loadJobs().find(
+      (j) => j.postId === id && (j.status === 'queued' || j.status === 'publishing' || j.status === 'retrying'),
+    )
+    if (active) cancelJob(active.id)
+    const r = await transitionPostStatus(
+      id,
+      'approved',
+      makeActivity('note', 'Cancelled — returned to Approved'),
+    )
+    if (!r.ok) toastRef.current(r.error ?? 'Cancel failed', 'error')
+    return r
+  }, [makeActivity])
+
+  const retryPost = useCallback(async (id: string): Promise<DomainActionResult> => {
+    const failed = loadJobs().find((j) => j.postId === id && j.status === 'failed')
+    if (failed) retryJob(failed.id)
+    const r = await transitionPostStatus(id, 'queued', makeActivity('note', 'Retry requested'))
+    if (!r.ok) toastRef.current(r.error ?? 'Retry failed', 'error')
+    return r
+  }, [makeActivity])
+
+  const markPostedPost = useCallback(async (id: string): Promise<DomainActionResult> => {
+    const r = await transitionPostStatus(id, 'posted', makeActivity('posted', 'Marked as posted'))
+    if (!r.ok) toastRef.current(r.error ?? 'Mark posted failed', 'error')
+    return r
+  }, [makeActivity])
+
+  const value = useMemo<MarketingContextValue>(() => ({
+    state, dispatch, actions,
+    approvePost, rejectPost, schedulePost, cancelPost, retryPost, markPostedPost,
+  }), [state, actions, approvePost, rejectPost, schedulePost, cancelPost, retryPost, markPostedPost])
+
   return (
-    <MarketingContext.Provider value={{ state, dispatch, actions }}>
+    <MarketingContext.Provider value={value}>
       {children}
     </MarketingContext.Provider>
   )

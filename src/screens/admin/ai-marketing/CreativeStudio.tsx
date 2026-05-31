@@ -3,14 +3,17 @@
 import { useState, useEffect } from 'react'
 import {
   generateAIContent,
+  WORKFLOW_V2,
   type AIContentResult,
+  type ActivityEvent,
   type Platform,
   type Tone,
   type ContentType,
 } from '../../../lib/aiMarketing'
-import { upsertPost } from '../../../lib/postStorage'
+import { upsertPost, transitionPostStatus } from '../../../lib/postStorage'
 import { logEvent } from '../../../lib/activityLog'
 import { addNotification } from '../../../lib/notifications'
+import { useMarketing } from '../../../lib/marketingStore'
 import { TIMEZONES } from '../../../components/ai-marketing/SchedulePicker'
 import type { DbBrandVoice } from '../../../lib/supabaseAiTypes'
 
@@ -240,14 +243,44 @@ function ExportBar({ result, copyText }: ExportBarProps) {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // toast pipeline lives on MarketingProvider; only consumed by v2 path
+  const marketing = useMarketing()
+
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3000) }
 
-  function saveDraft() {
+  async function saveDraft() {
+    if (!WORKFLOW_V2) {
+      setBusy('draft')
+      upsertPost({ ...result, status: 'draft' })
+      logEvent('generated', `Draft saved: ${result.title}`, { meta: { postId: result.id } })
+      setBusy(null)
+      flash('Draft saved!')
+      return
+    }
+
     setBusy('draft')
-    upsertPost({ ...result, status: 'draft' })
-    logEvent('generated', `Draft saved: ${result.title}`, { meta: { postId: result.id } })
-    setBusy(null)
-    flash('Draft saved!')
+    try {
+      upsertPost({ ...result, status: 'draft' })
+      const activity: ActivityEvent = {
+        id:    `act-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        type:  'generated',
+        label: 'Saved as draft from Creative Studio',
+        ts:    new Date().toISOString(),
+        actor: 'Admin',
+      }
+      const r = await transitionPostStatus(result.id, 'draft', activity)
+      if (!r.ok) {
+        marketing.actions.toast(r.error ?? 'Failed to save draft', 'error')
+        return
+      }
+      logEvent('generated', `Draft saved: ${result.title}`, { meta: { postId: result.id } })
+      marketing.actions.toast('Saved to Approval Queue', 'success')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      marketing.actions.toast(message, 'error')
+    } finally {
+      setBusy(null)
+    }
   }
 
   function sendToQueue() {
@@ -298,16 +331,18 @@ function ExportBar({ result, copyText }: ExportBarProps) {
         >
           {busy === 'queue' ? '…' : '📤 Send to Queue'}
         </button>
-        <button
-          onClick={() => setShowSched(true)}
-          style={{
-            background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.3)',
-            color: '#00c8ff', borderRadius: 8, padding: '6px 14px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-          }}
-        >
-          📅 Schedule
-        </button>
+        {!WORKFLOW_V2 && (
+          <button
+            onClick={() => setShowSched(true)}
+            style={{
+              background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.3)',
+              color: '#00c8ff', borderRadius: 8, padding: '6px 14px',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            📅 Schedule
+          </button>
+        )}
         {msg && (
           <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>✓ {msg}</span>
         )}

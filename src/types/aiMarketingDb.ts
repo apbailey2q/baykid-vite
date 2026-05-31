@@ -34,6 +34,9 @@ export type AiTemplatePlatform = AiPlatform | 'email'
 export type AiPostStatus =
   | 'draft' | 'pending_approval' | 'approved'
   | 'scheduled' | 'posted' | 'rejected' | 'failed'
+  | 'queued'
+  | 'publishing'
+  | 'cancelled'
 
 export type AiScheduleStatus =
   | 'pending' | 'queued' | 'publishing' | 'published' | 'failed' | 'canceled'

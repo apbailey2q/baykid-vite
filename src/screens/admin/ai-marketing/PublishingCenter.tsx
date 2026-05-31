@@ -350,19 +350,27 @@ function QueueTabV2({ onToast }: { onToast: (msg: string, type?: Toast['type']) 
   const [scheduleValue, setScheduleValue] = useState('')
   const [scheduleTz, setScheduleTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
 
-  useEffect(() => subscribeJobs(setJobs), [])
+  useEffect(() => {
+    console.info('[v2] QueueTabV2 mounted', { visibleStatuses: QUEUE_V2_VISIBLE_STATUSES, totalPosts: posts.length })
+    return subscribeJobs(setJobs)
+  }, [])
 
-  const visible = useMemo(
-    () =>
-      posts
-        .filter((p) => QUEUE_V2_VISIBLE_STATUSES.includes(p.status))
-        .sort((a, b) => {
-          const aTime = a.scheduledFor ? new Date(a.scheduledFor).getTime() : new Date(a.createdAt).getTime()
-          const bTime = b.scheduledFor ? new Date(b.scheduledFor).getTime() : new Date(b.createdAt).getTime()
-          return aTime - bTime
-        }),
-    [posts],
-  )
+  const visible = useMemo(() => {
+    const matched = posts
+      .filter((p) => QUEUE_V2_VISIBLE_STATUSES.includes(p.status))
+      .sort((a, b) => {
+        const aTime = a.scheduledFor ? new Date(a.scheduledFor).getTime() : new Date(a.createdAt).getTime()
+        const bTime = b.scheduledFor ? new Date(b.scheduledFor).getTime() : new Date(b.createdAt).getTime()
+        return aTime - bTime
+      })
+    console.info('[v2] QueueTabV2 filter', {
+      allowed: QUEUE_V2_VISIBLE_STATUSES,
+      matched: matched.length,
+      total: posts.length,
+      byStatus: posts.reduce<Record<string, number>>((acc, p) => { acc[p.status] = (acc[p.status] ?? 0) + 1; return acc }, {}),
+    })
+    return matched
+  }, [posts])
 
   const stats = useMemo(() => {
     const s: Record<PostStatus, number> = {

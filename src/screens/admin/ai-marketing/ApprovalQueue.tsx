@@ -1,5 +1,5 @@
 // ApprovalQueue.tsx — BayKid AI Marketing Center
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { AIContentResult, PostStatus, Platform, ActivityEvent } from '../../../lib/aiMarketing'
 import { WORKFLOW_V2, STATUS_META as STATUS_META_V2 } from '../../../lib/aiMarketing'
 import { initializePosts, upsertPost, removePost } from '../../../lib/postStorage'
@@ -25,8 +25,12 @@ const STATUS_META: Record<PostStatus, {
   approved:         { label: 'Approved', icon: '✅', color: '#22c55e',              bg: 'rgba(34,197,94,0.1)',    border: 'rgba(34,197,94,0.25)'   },
   scheduled:        { label: 'Scheduled',icon: '📅', color: '#00c8ff',              bg: 'rgba(0,200,255,0.1)',    border: 'rgba(0,200,255,0.25)'   },
   posted:           { label: 'Posted',   icon: '📢', color: '#a855f7',              bg: 'rgba(168,85,247,0.1)',   border: 'rgba(168,85,247,0.25)'  },
-  rejected:         { label: 'Rejected', icon: '✗',  color: '#f87171',              bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)' },
-  failed:           { label: 'Failed',   icon: '⚠️', color: '#fb923c',              bg: 'rgba(251,146,60,0.1)',  border: 'rgba(251,146,60,0.25)'  },
+  rejected:         { label: 'Rejected',   icon: '✗',  color: '#f87171',              bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)' },
+  failed:           { label: 'Failed',     icon: '⚠️', color: '#fb923c',              bg: 'rgba(251,146,60,0.1)',  border: 'rgba(251,146,60,0.25)'  },
+  // v2 workflow states (visible when VITE_WORKFLOW_V2=true)
+  queued:           { label: 'Queued',     icon: '🔁', color: '#60a5fa',              bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.25)'  },
+  publishing:       { label: 'Publishing', icon: '⚡', color: '#34d399',              bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.25)'  },
+  cancelled:        { label: 'Cancelled',  icon: '⊘',  color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)' },
 }
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -1181,6 +1185,13 @@ function ConfirmModal({ title, message, confirmLabel, confirmColor, onConfirm, o
 function ApprovalQueueV2() {
   const { approvePost, rejectPost, schedulePost, actions } = useMarketing()
   const allPosts = usePosts()
+
+  useEffect(() => {
+    console.info('[v2] ApprovalQueueV2 mounted', {
+      visibleStatuses: V2_VISIBLE_STATUSES,
+      totalPosts: allPosts.length,
+    })
+  }, [])
 
   const [statusFilter, setStatusFilter] = useState<PostStatus | 'all'>('all')
   const [platFilter, setPlatFilter]     = useState<Platform | 'all'>('all')

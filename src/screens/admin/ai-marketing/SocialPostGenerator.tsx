@@ -5,7 +5,7 @@ import {
   type AIContentResult,
 } from '../../../lib/aiMarketing'
 import { upsertPost, loadPosts } from '../../../lib/postStorage'
-import { SchedulePicker } from './ContentCalendar'
+import { SchedulePicker } from '../../../components/ai-marketing/SchedulePicker'
 
 // ── Style constants ────────────────────────────────────────────────────────────
 

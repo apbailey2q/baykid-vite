@@ -2,6 +2,16 @@
 // BayKid AI Marketing Center — aiMarketing.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { BadgeVariant } from '../components/ui/StatusBadge'
+
+// ── Workflow v2 feature flag ──────────────────────────────────────────────────
+// Gates the new state machine ('queued' | 'publishing' | 'cancelled' +
+// Approval Queue scoped to drafts/pending/rejected + cross-screen sync via
+// MarketingProvider). Default OFF until the DB CHECK migration has been
+// applied — without the migration any Supabase write of a v2-only status
+// silently fails the constraint.
+export const WORKFLOW_V2 = import.meta.env.VITE_WORKFLOW_V2 === 'true'
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ContentType =
@@ -34,10 +44,39 @@ export type PostStatus =
   | 'draft'
   | 'pending_approval'
   | 'approved'
+  | 'queued'          // approved + has a PublishJob, no scheduledFor yet
   | 'scheduled'
+  | 'publishing'      // transient — mirrors PublishJob.publishing during processJob
   | 'posted'
   | 'rejected'
   | 'failed'
+  | 'cancelled'       // manual cancel from Publishing Queue — post reverts to 'approved' but the cancellation is logged
+
+/** Which workflow stage a status belongs to. A post lives in exactly one
+ *  stage at a time — this is the rule that fixes the duplicate-display bug. */
+export type WorkflowStage = 'approval' | 'publishing' | 'calendar' | 'analytics' | 'terminal'
+
+/** Canonical metadata for every PostStatus. Single source of truth for
+ *  label / icon / badge variant / workflow stage. Per-screen STATUS_META
+ *  copies in ApprovalQueue/ContentCalendar/PublishingCenter will migrate to
+ *  this in later refactor steps. */
+export const STATUS_META: Record<PostStatus, {
+  label:        string
+  badgeVariant: BadgeVariant
+  icon:         string
+  stage:        WorkflowStage
+}> = {
+  draft:            { label: 'Draft',            badgeVariant: 'draft',      icon: '📝', stage: 'approval'   },
+  pending_approval: { label: 'Pending Approval', badgeVariant: 'pending',    icon: '⏳', stage: 'approval'   },
+  approved:         { label: 'Approved',         badgeVariant: 'approved',   icon: '✅', stage: 'publishing' },
+  queued:           { label: 'Queued',           badgeVariant: 'queued',     icon: '📋', stage: 'publishing' },
+  scheduled:        { label: 'Scheduled',        badgeVariant: 'scheduled',  icon: '📅', stage: 'publishing' },
+  publishing:       { label: 'Publishing',       badgeVariant: 'publishing', icon: '🚀', stage: 'publishing' },
+  posted:           { label: 'Posted',           badgeVariant: 'posted',     icon: '📢', stage: 'analytics'  },
+  rejected:         { label: 'Rejected',         badgeVariant: 'rejected',   icon: '✗',  stage: 'terminal'   },
+  failed:           { label: 'Failed',           badgeVariant: 'failed',     icon: '⚠️', stage: 'publishing' },
+  cancelled:        { label: 'Cancelled',        badgeVariant: 'cancelled',  icon: '🚫', stage: 'terminal'   },
+}
 
 export interface AIContentParams {
   contentType: ContentType

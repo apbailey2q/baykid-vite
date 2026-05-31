@@ -11,7 +11,7 @@ import {
 import { upsertPost } from '../../../lib/postStorage'
 import { logEvent } from '../../../lib/activityLog'
 import { addNotification } from '../../../lib/notifications'
-import { TIMEZONES } from './ContentCalendar'
+import { TIMEZONES } from '../../../components/ai-marketing/SchedulePicker'
 import type { DbBrandVoice } from '../../../lib/supabaseAiTypes'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────

@@ -3,19 +3,13 @@ import { useState, useMemo } from 'react'
 import type { AIContentResult, PostStatus, Platform, ContentType } from '../../../lib/aiMarketing'
 import { MOCK_CALENDAR, type ContentCalendarItem } from '../../../lib/aiMarketing'
 import { loadPosts, upsertPost, removePost, duplicatePost } from '../../../lib/postStorage'
+import { SchedulePicker, TIMEZONES } from '../../../components/ai-marketing/SchedulePicker'
+
+// Re-export for back-compat with any consumers still importing from this file.
+// New code should import from '../../../components/ai-marketing/SchedulePicker'.
+export { SchedulePicker, TIMEZONES }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-
-export const TIMEZONES = [
-  { value: 'America/New_York',   label: 'ET — Eastern Time'       },
-  { value: 'America/Chicago',    label: 'CT — Central Time'       },
-  { value: 'America/Denver',     label: 'MT — Mountain Time'      },
-  { value: 'America/Phoenix',    label: 'MT — Mountain (AZ)'      },
-  { value: 'America/Los_Angeles',label: 'PT — Pacific Time'       },
-  { value: 'America/Anchorage',  label: 'AKT — Alaska Time'       },
-  { value: 'Pacific/Honolulu',   label: 'HT — Hawaii Time'        },
-  { value: 'UTC',                label: 'UTC'                     },
-]
 
 export const PLATFORM_ICONS: Record<string, string> = {
   instagram: '📷', tiktok: '🎵', facebook: '👥',
@@ -243,43 +237,8 @@ function StatsCards({ posts }: { posts: AIContentResult[] }) {
   )
 }
 
-// ── SchedulePicker (reusable) ──────────────────────────────────────────────────
-
-interface SchedulePickerProps {
-  value: string; timezone: string
-  onValueChange: (v: string) => void
-  onTimezoneChange: (tz: string) => void
-  onConfirm: () => void; onCancel: () => void
-}
-
-export function SchedulePicker({ value, timezone, onValueChange, onTimezoneChange, onConfirm, onCancel }: SchedulePickerProps) {
-  return (
-    <div style={{ background: 'rgba(0,200,255,0.05)', border: '1px solid rgba(0,200,255,0.18)', borderRadius: 12, padding: 16 }}>
-      <div style={{ color: '#00c8ff', fontSize: 11, fontWeight: 700, marginBottom: 12 }}>📅 Set Publish Date &amp; Time</div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 700, display: 'block', marginBottom: 4 }}>Date &amp; Time</label>
-          <input type="datetime-local" style={{ ...inputStyle, colorScheme: 'dark' }}
-            value={value} onChange={(e) => onValueChange(e.target.value)} />
-        </div>
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 700, display: 'block', marginBottom: 4 }}>Timezone</label>
-          <select style={inputStyle} value={timezone} onChange={(e) => onTimezoneChange(e.target.value)}>
-            {TIMEZONES.map((tz) => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
-          </select>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={onConfirm} disabled={!value}
-          style={{ background: 'rgba(0,200,255,0.15)', border: '1px solid rgba(0,200,255,0.35)', color: '#00c8ff',
-            borderRadius: 8, padding: '7px 18px', fontWeight: 700, fontSize: 12, cursor: value ? 'pointer' : 'not-allowed', opacity: value ? 1 : 0.5 }}>
-          Confirm Schedule
-        </button>
-        <button onClick={onCancel} style={ghostBtn()}>Cancel</button>
-      </div>
-    </div>
-  )
-}
+// SchedulePicker + TIMEZONES are imported from components/ai-marketing/SchedulePicker
+// (extracted so non-calendar screens don't depend on this file).
 
 // ── PostActionRow ──────────────────────────────────────────────────────────────
 

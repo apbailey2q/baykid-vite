@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react'
 import type { AIContentResult, PostStatus, Platform, ActivityEvent } from '../../../lib/aiMarketing'
 import { initializePosts, upsertPost, removePost } from '../../../lib/postStorage'
-import { SchedulePicker } from './ContentCalendar'
+import { SchedulePicker } from '../../../components/ai-marketing/SchedulePicker'
 import type { ConnectedAccount } from '../../../lib/publishTypes'
 import { PLATFORM_CONFIGS } from '../../../lib/publishTypes'
 import { loadAccounts } from '../../../lib/platformConnections'

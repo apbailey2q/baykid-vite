@@ -92,6 +92,10 @@ function StatusBadge({ status }: { status: AIContentResult['status'] }) {
     posted:           { label: 'POSTED',            color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
     rejected:         { label: 'REJECTED',          color: '#f87171', bg: 'rgba(248,113,113,0.1)'},
     failed:           { label: 'FAILED',            color: '#fb923c', bg: 'rgba(251,146,60,0.1)' },
+    // v2 workflow states (visible when VITE_WORKFLOW_V2=true)
+    queued:           { label: 'QUEUED',            color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
+    publishing:       { label: 'PUBLISHING',        color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
+    cancelled:        { label: 'CANCELLED',         color: 'rgba(255,255,255,0.3)', bg: 'rgba(255,255,255,0.05)' },
   }
   const s = map[status]
   return (

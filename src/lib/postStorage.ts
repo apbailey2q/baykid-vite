@@ -83,9 +83,12 @@ export function upsertPost(post: AIContentResult): AIContentResult[] {
   if (idx >= 0) all[idx] = post
   else all.unshift(post)
   savePosts(all)
+  console.info('[draft] upsertPost wrote localStorage', { id: post.id, status: post.status, total: all.length })
   emitPosts()
   // Background sync to Supabase (fire-and-forget, no await)
-  sbUpsertPost(post).catch(() => {})
+  sbUpsertPost(post)
+    .then(() => console.info('[draft] sbUpsertPost ok', { id: post.id }))
+    .catch((err) => console.warn('[draft] sbUpsertPost failed (kept locally)', { id: post.id, error: err instanceof Error ? err.message : String(err) }))
   return all
 }
 
@@ -194,14 +197,16 @@ export async function transitionPostStatus(
 // ── Mock cleanup (workflow-v2 reconcile) ──────────────────────────────────────
 
 /**
- * Removes seed/mock posts from local storage. Invoked by MarketingProvider
- * during the workflow-v2 reconcile so demo data does not leak into the v2
- * state machine.
+ * Removes the MOCK_POSTS seed rows from local storage on first v2 mount.
+ * Matches by exact id only — the 'mock-' prefix used by generateAIContent's
+ * demo fallback (lib/aiMarketing.ts MOCK_RESPONSES) is intentionally NOT
+ * matched, otherwise legitimate demo-generated drafts would be wiped on
+ * every MarketingProvider mount.
  */
 export function purgeMockPosts(): AIContentResult[] {
   const mockIds = new Set(MOCK_POSTS.map((m) => m.id))
   const all = loadPosts()
-  const kept = all.filter((p) => !p.id.startsWith('mock-') && !mockIds.has(p.id))
+  const kept = all.filter((p) => !mockIds.has(p.id))
   if (kept.length === all.length) return all
   savePosts(kept)
   emitPosts()

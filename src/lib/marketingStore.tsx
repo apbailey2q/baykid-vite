@@ -266,7 +266,12 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   // ── Live in-tab sync: any postStorage write fans out here ───────────────────
   useEffect(() => {
-    const unsub = subscribePosts(() => dispatch({ type: 'RELOAD_POSTS' }))
+    const unsub = subscribePosts((posts) => {
+      const byStatus: Record<string, number> = {}
+      for (const p of posts) byStatus[p.status] = (byStatus[p.status] ?? 0) + 1
+      console.info('[draft] marketingStore RELOAD_POSTS', { total: posts.length, byStatus })
+      dispatch({ type: 'RELOAD_POSTS' })
+    })
     return () => { unsub() }
   }, [])
 

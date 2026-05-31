@@ -1,5 +1,5 @@
 // ApprovalQueue.tsx — BayKid AI Marketing Center
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { AIContentResult, PostStatus, Platform, ActivityEvent } from '../../../lib/aiMarketing'
 import { STATUS_META } from '../../../lib/aiMarketing'
 import { SchedulePicker } from '../../../components/ai-marketing/SchedulePicker'
@@ -199,6 +199,12 @@ export function ApprovalQueue() {
     () => allPosts.filter((p) => V2_VISIBLE_STATUSES.includes(p.status)),
     [allPosts],
   )
+
+  useEffect(() => {
+    const byStatus: Record<string, number> = {}
+    for (const p of allPosts) byStatus[p.status] = (byStatus[p.status] ?? 0) + 1
+    console.info('[draft] ApprovalQueue posts', { total: allPosts.length, visible: visiblePosts.length, allowed: V2_VISIBLE_STATUSES, byStatus })
+  }, [allPosts, visiblePosts])
 
   const statusCounts = useMemo(() => {
     const c: Record<string, number> = { all: visiblePosts.length }

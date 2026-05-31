@@ -179,6 +179,7 @@ function ExportBar({ result, copyText }: ExportBarProps) {
 
   async function saveDraft() {
     setBusy('draft')
+    console.info('[draft] saveDraft begin', { id: result.id, status: 'draft', platform: result.platform, title: result.title })
     try {
       upsertPost({ ...result, status: 'draft' })
       const activity: ActivityEvent = {
@@ -189,6 +190,7 @@ function ExportBar({ result, copyText }: ExportBarProps) {
         actor: 'Admin',
       }
       const r = await transitionPostStatus(result.id, 'draft', activity)
+      console.info('[draft] saveDraft transition result', { id: result.id, ok: r.ok, error: r.error })
       if (!r.ok) {
         marketing.actions.toast(r.error ?? 'Failed to save draft', 'error')
         return
@@ -197,6 +199,7 @@ function ExportBar({ result, copyText }: ExportBarProps) {
       marketing.actions.toast('Saved to Approval Queue', 'success')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      console.error('[draft] saveDraft threw', { id: result.id, message })
       marketing.actions.toast(message, 'error')
     } finally {
       setBusy(null)

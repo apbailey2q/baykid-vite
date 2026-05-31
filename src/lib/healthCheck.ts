@@ -100,12 +100,22 @@ async function clientSideProbes(_priorMs: number): Promise<SystemHealth> {
 
   const now = new Date().toISOString()
 
-  // Probe Supabase. The REST gateway requires an apikey on every request
-  // (even the root) — without it Kong returns 401 UNAUTHORIZED_MISSING_API_KEY,
-  // which would make the fallback always look like Supabase is down.
-  const supaProbe = (supaUrl && supaKey)
-    ? await probeEndpoint(`${supaUrl}/rest/v1/?apikey=${encodeURIComponent(supaKey)}`)
-    : { ok: false, latencyMs: 0 }
+  // Probe Supabase via /auth/v1/settings — the canonical anon-permitted
+  // endpoint. /rest/v1/ root is service_role-only on current Supabase, so
+  // anon requests there return 401 UNAUTHORIZED_INVALID_API_KEY_TYPE.
+  const supaProbe = await (async () => {
+    if (!supaUrl || !supaKey) return { ok: false, latencyMs: 0 }
+    const t0 = Date.now()
+    try {
+      const res = await fetch(`${supaUrl}/auth/v1/settings`, {
+        headers: { apikey: supaKey },
+        signal: AbortSignal.timeout(5000),
+      })
+      return { ok: res.ok, latencyMs: Date.now() - t0, status: res.status }
+    } catch {
+      return { ok: false, latencyMs: Date.now() - t0 }
+    }
+  })()
 
   // Probe the AI endpoint (dev Vite plugin handles this)
   const aiProbe = await probeEndpoint('/api/ai/generate-content', 3000)

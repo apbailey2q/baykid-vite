@@ -71,16 +71,25 @@ async function checkSupabase(url: string, key: string): Promise<ServiceCheck> {
   }
   const t0 = Date.now()
   try {
-    // Ping the Supabase REST API — a lightweight read with anon key
-    const res = await fetch(`${url}/rest/v1/?apikey=${key}`, {
-      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+    // /auth/v1/settings is the canonical anon-accessible health endpoint.
+    // /rest/v1/ root is service_role-only on current Supabase (returns 401
+    // UNAUTHORIZED_INVALID_API_KEY_TYPE for anon), so we can't use it here.
+    const res = await fetch(`${url}/auth/v1/settings`, {
+      headers: { 'apikey': key },
       signal: AbortSignal.timeout(6000),
     })
     const latencyMs = Date.now() - t0
-    if (res.ok || res.status === 200) {
+    if (res.ok) {
       return { name: 'Supabase', status: latencyMs > 2000 ? 'degraded' : 'ok', latencyMs }
     }
-    return { name: 'Supabase', status: 'degraded', latencyMs, message: `HTTP ${res.status}` }
+    // Surface Supabase's actual error code/message so future regressions are
+    // diagnosable from the /api/health response alone.
+    const body = await res.text().catch(() => '')
+    const detail = body.slice(0, 200).replace(/\s+/g, ' ').trim()
+    return {
+      name: 'Supabase', status: 'degraded', latencyMs,
+      message: detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}`,
+    }
   } catch (err) {
     return {
       name: 'Supabase', status: 'down',

@@ -1,9 +1,8 @@
 // ContentCalendar.tsx — BayKid AI Marketing Center
 import { useState, useMemo } from 'react'
 import type { AIContentResult, PostStatus, Platform, ContentType } from '../../../lib/aiMarketing'
-import { MOCK_CALENDAR, type ContentCalendarItem } from '../../../lib/aiMarketing'
-import { WORKFLOW_V2, STATUS_META as CANONICAL_STATUS_META } from '../../../lib/aiMarketing'
-import { loadPosts, upsertPost, removePost, duplicatePost } from '../../../lib/postStorage'
+import { STATUS_META } from '../../../lib/aiMarketing'
+import { duplicatePost } from '../../../lib/postStorage'
 import { SchedulePicker, TIMEZONES } from '../../../components/ai-marketing/SchedulePicker'
 import { usePosts, useMarketing } from '../../../lib/marketingStore'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
@@ -22,16 +21,6 @@ export const PLATFORM_ICONS: Record<string, string> = {
 const PLATFORM_COLORS: Record<string, string> = {
   instagram: '#c13584', tiktok: '#ff3b5c', facebook: '#1877f2',
   twitter: '#1da1f2', linkedin: '#0077b5', youtube: '#ff0000',
-}
-
-const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  draft:            { label: 'Draft',    color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.07)', border: 'rgba(255,255,255,0.12)' },
-  pending_approval: { label: 'Pending',  color: '#fbbf24',              bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)'   },
-  approved:         { label: 'Approved', color: '#22c55e',              bg: 'rgba(34,197,94,0.1)',    border: 'rgba(34,197,94,0.2)'    },
-  scheduled:        { label: 'Scheduled',color: '#00c8ff',              bg: 'rgba(0,200,255,0.1)',    border: 'rgba(0,200,255,0.2)'    },
-  posted:           { label: 'Posted',   color: '#a855f7',              bg: 'rgba(168,85,247,0.1)',   border: 'rgba(168,85,247,0.2)'   },
-  rejected:         { label: 'Rejected', color: '#f87171',              bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.2)'  },
-  failed:           { label: 'Failed',   color: '#fb923c',              bg: 'rgba(251,146,60,0.1)',  border: 'rgba(251,146,60,0.2)'   },
 }
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -120,42 +109,6 @@ function sameDay(a: Date, b: Date): boolean {
 }
 
 function isToday(d: Date): boolean { return sameDay(d, new Date()) }
-
-// ── Data loading ───────────────────────────────────────────────────────────────
-
-/** Convert MOCK_CALENDAR items (different type) to AIContentResult for display */
-function calItemToPost(item: ContentCalendarItem): AIContentResult {
-  return {
-    id: item.id,
-    contentType: item.contentType,
-    title: item.title,
-    hook: item.title,
-    caption: `CTA: ${item.callToAction}`,
-    hashtags: ['#CyansBrooklynn', '#Nashville'],
-    script: '', storyboard: '', emailDraft: '', commentReply: '',
-    status: item.status,
-    platform: item.platform,
-    tone: 'friendly',
-    goal: '',
-    callToAction: item.callToAction,
-    createdAt: new Date(new Date(item.scheduledFor).getTime() - 86400000).toISOString(),
-    scheduledFor: item.scheduledFor,
-  }
-}
-
-function loadCalendarData(): AIContentResult[] {
-  const stored = loadPosts()
-  const storedIds = new Set(stored.map((p) => p.id))
-  // From localStorage: only posts with scheduledFor
-  const withSchedule = stored.filter((p) => !!p.scheduledFor)
-  // Only include mock calendar items when VITE_SEED_MOCK_DATA=true
-  const seedEnabled = import.meta.env.VITE_SEED_MOCK_DATA === 'true'
-  const mockItems   = seedEnabled
-    ? MOCK_CALENDAR.filter((m) => !storedIds.has(m.id)).map(calItemToPost)
-    : []
-  return [...withSchedule, ...mockItems]
-    .sort((a, b) => new Date(a.scheduledFor!).getTime() - new Date(b.scheduledFor!).getTime())
-}
 
 function applyDateRange(posts: AIContentResult[], range: DateRange): AIContentResult[] {
   if (range === 'all') return posts
@@ -249,59 +202,29 @@ interface PostActionRowProps {
   post:              AIContentResult
   onReschedule:      () => void
   onMarkPosted:      () => void
-  onMarkFailed:      () => void
   onDuplicate:       () => void
   onDelete:          () => void
   onEdit:            () => void
-  v2?:               boolean
 }
 
-function PostActionRow({ post, onReschedule, onMarkPosted, onMarkFailed, onDuplicate, onDelete, onEdit, v2 = false }: PostActionRowProps) {
-  if (v2) {
-    return (
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-        <button onClick={onEdit} style={ghostBtn()}>✏️ Edit</button>
-        {(post.status === 'scheduled' || post.status === 'queued' || post.status === 'approved' || post.status === 'pending_approval' || post.status === 'draft') && (
-          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)', background: 'rgba(0,200,255,0.08)' })}>📅 Reschedule</button>
-        )}
-        {(post.status === 'scheduled' || post.status === 'queued') && (
-          <button onClick={onMarkPosted} style={ghostBtn({ color: '#a855f7', borderColor: 'rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)' })}>📢 Mark as Posted</button>
-        )}
-        {post.status === 'posted' && (
-          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Reshare</button>
-        )}
-        {post.status === 'failed' && (
-          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Retry Schedule</button>
-        )}
-        <button onClick={onDuplicate} style={ghostBtn()}>⧉ Duplicate</button>
-        <button onClick={onDelete} style={ghostBtn({ color: 'rgba(248,113,113,0.7)', borderColor: 'rgba(248,113,113,0.2)' })}>🗑️</button>
-      </div>
-    )
-  }
+function PostActionRow({ post, onReschedule, onMarkPosted, onDuplicate, onDelete, onEdit }: PostActionRowProps) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-      {post.status === 'scheduled' && (
-        <>
-          <button onClick={onMarkPosted}  style={ghostBtn({ color: '#a855f7', borderColor: 'rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)' })}>📢 Mark as Posted</button>
-          <button onClick={onReschedule}  style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)', background: 'rgba(0,200,255,0.08)' })}>📅 Reschedule</button>
-          <button onClick={onMarkFailed}  style={ghostBtn({ color: '#fb923c', borderColor: 'rgba(251,146,60,0.25)', background: 'rgba(251,146,60,0.06)' })}>⚠️ Mark as Failed</button>
-        </>
+      <button onClick={onEdit} style={ghostBtn()}>✏️ Edit</button>
+      {(post.status === 'scheduled' || post.status === 'queued' || post.status === 'approved' || post.status === 'pending_approval' || post.status === 'draft') && (
+        <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)', background: 'rgba(0,200,255,0.08)' })}>📅 Reschedule</button>
+      )}
+      {(post.status === 'scheduled' || post.status === 'queued') && (
+        <button onClick={onMarkPosted} style={ghostBtn({ color: '#a855f7', borderColor: 'rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)' })}>📢 Mark as Posted</button>
       )}
       {post.status === 'posted' && (
         <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Reshare</button>
       )}
       {post.status === 'failed' && (
-        <>
-          <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Retry Schedule</button>
-          <button onClick={onMarkPosted} style={ghostBtn({ color: '#a855f7', borderColor: 'rgba(168,85,247,0.3)' })}>📢 Mark as Posted</button>
-        </>
+        <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)' })}>📅 Retry Schedule</button>
       )}
-      {(post.status === 'approved' || post.status === 'pending_approval' || post.status === 'draft') && (
-        <button onClick={onReschedule} style={ghostBtn({ color: '#00c8ff', borderColor: 'rgba(0,200,255,0.25)', background: 'rgba(0,200,255,0.08)' })}>📅 Schedule</button>
-      )}
-      <button onClick={onEdit}      style={ghostBtn()}>✏️ Edit</button>
       <button onClick={onDuplicate} style={ghostBtn()}>⧉ Duplicate</button>
-      <button onClick={onDelete}    style={ghostBtn({ color: 'rgba(248,113,113,0.7)', borderColor: 'rgba(248,113,113,0.2)' })}>🗑️</button>
+      <button onClick={onDelete} style={ghostBtn({ color: 'rgba(248,113,113,0.7)', borderColor: 'rgba(248,113,113,0.2)' })}>🗑️</button>
     </div>
   )
 }
@@ -325,11 +248,9 @@ interface PostCardProps {
   onScheduleConfirm: () => void
   onScheduleCancel:  () => void
   onMarkPosted:   () => void
-  onMarkFailed:   () => void
   onDuplicate:    () => void
   onDelete:       () => void
   compact?:       boolean
-  v2?:            boolean
 }
 
 function PostCard({
@@ -337,16 +258,15 @@ function PostCard({
   onEditBufChange, onScheduleChange, onTimezoneChange,
   onEditStart, onEditSave, onEditCancel,
   onReschedule, onScheduleConfirm, onScheduleCancel,
-  onMarkPosted, onMarkFailed, onDuplicate, onDelete,
-  compact = false, v2 = false,
+  onMarkPosted, onDuplicate, onDelete,
+  compact = false,
 }: PostCardProps) {
-  const meta = STATUS_META[post.status] ?? STATUS_META.draft
-  const canonicalMeta = CANONICAL_STATUS_META[post.status] ?? CANONICAL_STATUS_META.draft
+  const canonicalMeta = STATUS_META[post.status] ?? STATUS_META.draft
   const tz   = post.timezone ?? getBrowserTz()
   const tzLabel = TIMEZONES.find((t) => t.value === tz)?.label ?? tz
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${isEditing || isRescheduling ? meta.border : 'rgba(255,255,255,0.08)'}`, borderRadius: 12, padding: compact ? 12 : 16, transition: 'border-color 0.2s' }}>
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: compact ? 12 : 16, transition: 'border-color 0.2s' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -354,13 +274,7 @@ function PostCard({
             {post.title}
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-            {v2 ? (
-              <StatusBadge variant={canonicalMeta.badgeVariant} label={canonicalMeta.label} size="sm" />
-            ) : (
-              <span style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, borderRadius: 20, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
-                {meta.label}
-              </span>
-            )}
+            <StatusBadge variant={canonicalMeta.badgeVariant} label={canonicalMeta.label} size="sm" />
             {post.platform && (
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
                 {PLATFORM_ICONS[post.platform]} {post.platform}
@@ -437,11 +351,9 @@ function PostCard({
           post={post}
           onReschedule={onReschedule}
           onMarkPosted={onMarkPosted}
-          onMarkFailed={onMarkFailed}
           onDuplicate={onDuplicate}
           onDelete={onDelete}
           onEdit={onEditStart}
-          v2={v2}
         />
       )}
     </div>
@@ -530,10 +442,9 @@ interface WeekViewProps {
   weekDates:    Date[]
   selectedId:   string | null
   onSelectPost: (id: string | null) => void
-  v2?:          boolean
 }
 
-function WeekView({ posts, weekDates, selectedId, onSelectPost, v2 = false }: WeekViewProps) {
+function WeekView({ posts, weekDates, selectedId, onSelectPost }: WeekViewProps) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
       {weekDates.map((date) => {
@@ -553,25 +464,18 @@ function WeekView({ posts, weekDates, selectedId, onSelectPost, v2 = false }: We
             {/* Posts */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {dayPosts.map((p) => {
-                const meta = STATUS_META[p.status] ?? STATUS_META.draft
-                const canonicalMeta = CANONICAL_STATUS_META[p.status] ?? CANONICAL_STATUS_META.draft
+                const canonicalMeta = STATUS_META[p.status] ?? STATUS_META.draft
                 return (
                   <div key={p.id} onClick={() => onSelectPost(selectedId === p.id ? null : p.id)}
-                    style={{ background: selectedId === p.id ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selectedId === p.id ? 'rgba(0,200,255,0.35)' : meta.border}`, borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>
+                    style={{ background: selectedId === p.id ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selectedId === p.id ? 'rgba(0,200,255,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>
                     <div style={{ fontSize: 14, marginBottom: 2 }}>{PLATFORM_ICONS[p.platform ?? ''] ?? '📱'}</div>
                     <div style={{ color: '#fff', fontSize: 10, fontWeight: 600, lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {p.title}
                     </div>
-                    {v2 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                        <StatusBadge variant={canonicalMeta.badgeVariant} label={canonicalMeta.label} size="sm" />
-                        {p.scheduledFor && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600 }}>{fmtTime(p.scheduledFor)}</span>}
-                      </div>
-                    ) : (
-                      <div style={{ color: meta.color, fontSize: 9, fontWeight: 700 }}>
-                        {fmtTime(p.scheduledFor!)}
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                      <StatusBadge variant={canonicalMeta.badgeVariant} label={canonicalMeta.label} size="sm" />
+                      {p.scheduledFor && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600 }}>{fmtTime(p.scheduledFor)}</span>}
+                    </div>
                   </div>
                 )
               })}
@@ -605,10 +509,8 @@ interface ListViewProps {
   onScheduleConfirm:  (id: string) => void
   onScheduleCancel:   () => void
   onMarkPosted:       (id: string) => void
-  onMarkFailed:       (id: string) => void
   onDuplicate:        (p: AIContentResult) => void
   onDelete:           (id: string) => void
-  v2?:                boolean
 }
 
 function ListView({
@@ -616,8 +518,7 @@ function ListView({
   onEditBufChange, onScheduleChange, onTimezoneChange,
   onEditStart, onEditSave, onEditCancel,
   onRescheduleStart, onScheduleConfirm, onScheduleCancel,
-  onMarkPosted, onMarkFailed, onDuplicate, onDelete,
-  v2 = false,
+  onMarkPosted, onDuplicate, onDelete,
 }: ListViewProps) {
   // Group by day
   const grouped: { dateKey: string; dateLabel: string; posts: AIContentResult[] }[] = []
@@ -626,7 +527,7 @@ function ListView({
 
   for (const p of posts) {
     if (!p.scheduledFor) {
-      if (v2) unscheduled.push(p)
+      unscheduled.push(p)
       continue
     }
     const d    = new Date(p.scheduledFor)
@@ -638,7 +539,7 @@ function ListView({
     grouped[grouped.length - 1].posts.push(p)
   }
 
-  if (v2 && unscheduled.length > 0) {
+  if (unscheduled.length > 0) {
     grouped.unshift({ dateKey: 'no-date', dateLabel: 'No scheduled date', posts: unscheduled })
   }
 
@@ -672,10 +573,8 @@ function ListView({
                 onScheduleConfirm={() => onScheduleConfirm(p.id)}
                 onScheduleCancel={onScheduleCancel}
                 onMarkPosted={() => onMarkPosted(p.id)}
-                onMarkFailed={() => onMarkFailed(p.id)}
                 onDuplicate={() => onDuplicate(p)}
                 onDelete={() => onDelete(p.id)}
-                v2={v2}
               />
             ))}
           </div>
@@ -702,15 +601,11 @@ export function ContentCalendar() {
   // ── Data state ──────────────────────────────────────────────────────────────
   const storePosts = usePosts()
   const marketing = useMarketing()
-  const [v1Posts, setV1Posts] = useState<AIContentResult[]>(() => loadCalendarData())
-  const posts = WORKFLOW_V2
-    ? [...storePosts].sort((a, b) => {
-        const ta = a.scheduledFor ? new Date(a.scheduledFor).getTime() : Number.POSITIVE_INFINITY
-        const tb = b.scheduledFor ? new Date(b.scheduledFor).getTime() : Number.POSITIVE_INFINITY
-        return ta - tb
-      })
-    : v1Posts
-  const setPosts = setV1Posts
+  const posts = [...storePosts].sort((a, b) => {
+    const ta = a.scheduledFor ? new Date(a.scheduledFor).getTime() : Number.POSITIVE_INFINITY
+    const tb = b.scheduledFor ? new Date(b.scheduledFor).getTime() : Number.POSITIVE_INFINITY
+    return ta - tb
+  })
 
   // ── Edit state ──────────────────────────────────────────────────────────────
   const [editingId,  setEditingId]  = useState<string | null>(null)
@@ -757,25 +652,12 @@ export function ContentCalendar() {
 
   // ── State updater helpers ───────────────────────────────────────────────────
   function applyUpdate(updated: AIContentResult, msg: string) {
-    if (WORKFLOW_V2) {
-      marketing.actions.upsertPost(updated)
-      showToast(msg)
-      return
-    }
-    upsertPost(updated)
-    setPosts((prev) => prev.map((p) => p.id === updated.id ? updated : p))
+    marketing.actions.upsertPost(updated)
     showToast(msg)
   }
 
   function applyDelete(id: string) {
-    if (WORKFLOW_V2) {
-      marketing.actions.deletePost(id)
-      showToast('🗑️ Deleted', 'info')
-      return
-    }
-    // For mock calendar items that aren't in localStorage yet, just hide from local state
-    removePost(id)
-    setPosts((prev) => prev.filter((p) => p.id !== id))
+    marketing.actions.deletePost(id)
     showToast('🗑️ Deleted', 'info')
   }
 
@@ -806,57 +688,32 @@ export function ContentCalendar() {
     setScheduleTz(post.timezone ?? getBrowserTz())
   }
   function handleScheduleConfirm(id: string) {
-    const post = posts.find((p) => p.id === id); if (!post || !scheduleValue) return
-    if (WORKFLOW_V2) {
-      const iso = new Date(scheduleValue).toISOString()
-      void marketing.schedulePost(id, iso, scheduleTz).then((r) => {
-        if (r.ok) showToast(`📅 Scheduled for ${fmtDateTime(iso, scheduleTz)}`)
-      })
-      setReschedulingId(null)
-      return
-    }
-    const updated: AIContentResult = { ...post, status: 'scheduled', scheduledFor: new Date(scheduleValue).toISOString(), timezone: scheduleTz }
-    applyUpdate(updated, `📅 Scheduled for ${fmtDateTime(updated.scheduledFor!, scheduleTz)}`)
+    if (!scheduleValue) return
+    const iso = new Date(scheduleValue).toISOString()
+    void marketing.schedulePost(id, iso, scheduleTz).then((r) => {
+      if (r.ok) showToast(`📅 Scheduled for ${fmtDateTime(iso, scheduleTz)}`)
+    })
     setReschedulingId(null)
   }
   function handleScheduleCancel() { setReschedulingId(null) }
 
   // ── Status actions ──────────────────────────────────────────────────────────
   function handleMarkPosted(id: string) {
-    if (WORKFLOW_V2) {
-      void marketing.markPostedPost(id).then((r) => {
-        if (r.ok) showToast('📢 Marked as posted')
-      })
-      return
-    }
-    const post = posts.find((p) => p.id === id); if (!post) return
-    applyUpdate({ ...post, status: 'posted' }, '📢 Marked as posted')
-  }
-  function handleMarkFailed(id: string) {
-    const post = posts.find((p) => p.id === id); if (!post) return
-    applyUpdate({ ...post, status: 'failed' }, '⚠️ Marked as failed', )
+    void marketing.markPostedPost(id).then((r) => {
+      if (r.ok) showToast('📢 Marked as posted')
+    })
   }
 
   // ── Duplicate ───────────────────────────────────────────────────────────────
   function handleDuplicate(post: AIContentResult) {
     const { copy } = duplicatePost(post)
-    if (WORKFLOW_V2) {
-      marketing.actions.upsertPost(copy)
-      showToast('⧉ Duplicated as draft', 'info')
-      return
-    }
-    setPosts((prev) => [copy, ...prev])
+    marketing.actions.upsertPost(copy)
     showToast('⧉ Duplicated as draft', 'info')
   }
 
   // ── Refresh ─────────────────────────────────────────────────────────────────
   function handleRefresh() {
-    if (WORKFLOW_V2) {
-      marketing.actions.reloadPosts(); setEditingId(null); setReschedulingId(null); setSelectedId(null)
-      showToast('🔄 Refreshed', 'info')
-      return
-    }
-    setPosts(loadCalendarData()); setEditingId(null); setReschedulingId(null); setSelectedId(null)
+    marketing.actions.reloadPosts(); setEditingId(null); setReschedulingId(null); setSelectedId(null)
     showToast('🔄 Refreshed', 'info')
   }
 
@@ -971,10 +828,8 @@ export function ContentCalendar() {
                 onScheduleConfirm={() => handleScheduleConfirm(selectedPost.id)}
                 onScheduleCancel={handleScheduleCancel}
                 onMarkPosted={() => handleMarkPosted(selectedPost.id)}
-                onMarkFailed={() => handleMarkFailed(selectedPost.id)}
                 onDuplicate={() => handleDuplicate(selectedPost)}
                 onDelete={() => { applyDelete(selectedPost.id); setSelectedId(null) }}
-                v2={WORKFLOW_V2}
               />
             </div>
           )}
@@ -989,7 +844,6 @@ export function ContentCalendar() {
               weekDates={getWeekDates(navDate)}
               selectedId={selectedId}
               onSelectPost={setSelectedId}
-              v2={WORKFLOW_V2}
             />
           </div>
           {selectedPost && (
@@ -1012,10 +866,8 @@ export function ContentCalendar() {
                 onScheduleConfirm={() => handleScheduleConfirm(selectedPost.id)}
                 onScheduleCancel={handleScheduleCancel}
                 onMarkPosted={() => handleMarkPosted(selectedPost.id)}
-                onMarkFailed={() => handleMarkFailed(selectedPost.id)}
                 onDuplicate={() => handleDuplicate(selectedPost)}
                 onDelete={() => { applyDelete(selectedPost.id); setSelectedId(null) }}
-                v2={WORKFLOW_V2}
               />
             </div>
           )}
@@ -1041,10 +893,8 @@ export function ContentCalendar() {
               onScheduleConfirm={handleScheduleConfirm}
               onScheduleCancel={handleScheduleCancel}
               onMarkPosted={handleMarkPosted}
-              onMarkFailed={handleMarkFailed}
               onDuplicate={handleDuplicate}
               onDelete={applyDelete}
-              v2={WORKFLOW_V2}
             />
           : <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 60, fontSize: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16 }}>
               No scheduled content matches the current filters.

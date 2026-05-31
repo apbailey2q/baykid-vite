@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { autoGenerateNotifications, unreadCount } from '../../lib/notifications'
 import { syncFromSupabase } from '../../lib/aiMarketingDb'
 import { MarketingProvider, GlobalToastStack } from '../../lib/marketingStore'
-import { WORKFLOW_V2 } from '../../lib/aiMarketing'
 import { OrgProvider } from '../../lib/orgStore'
 import { OrgSwitcher } from '../../components/OrgSwitcher'
 import { OnboardingFlow, isOnboardingComplete } from './ai-marketing/OnboardingFlow'
@@ -176,23 +175,6 @@ function AIMarketingCenterInner() {
               ⚡ LIVE
             </span>
           )}
-          <span
-            style={{
-              background: WORKFLOW_V2 ? 'rgba(34,197,94,0.12)' : 'rgba(251,146,60,0.12)',
-              border: WORKFLOW_V2 ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(251,146,60,0.35)',
-              color: WORKFLOW_V2 ? '#22c55e' : '#fb923c',
-              borderRadius: 20,
-              padding: '3px 10px',
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-            }}
-            title={WORKFLOW_V2
-              ? 'VITE_WORKFLOW_V2=true at build time. v2 paths active.'
-              : 'VITE_WORKFLOW_V2 not set at build time. v1 paths rendering. Set the env var in Vercel and trigger a NEW deploy.'}
-          >
-            {WORKFLOW_V2 ? 'WF v2: ON' : 'WF v2: OFF'}
-          </span>
         </div>
 
         {/* Org switcher */}

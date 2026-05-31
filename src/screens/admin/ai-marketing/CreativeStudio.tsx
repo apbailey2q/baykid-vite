@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import {
   generateAIContent,
-  WORKFLOW_V2,
   type AIContentResult,
   type ActivityEvent,
   type Platform,
@@ -12,9 +11,7 @@ import {
 } from '../../../lib/aiMarketing'
 import { upsertPost, transitionPostStatus } from '../../../lib/postStorage'
 import { logEvent } from '../../../lib/activityLog'
-import { addNotification } from '../../../lib/notifications'
 import { useMarketing } from '../../../lib/marketingStore'
-import { TIMEZONES } from '../../../components/ai-marketing/SchedulePicker'
 import type { DbBrandVoice } from '../../../lib/supabaseAiTypes'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -168,69 +165,6 @@ function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   )
 }
 
-// ── Schedule mini-modal ───────────────────────────────────────────────────────
-
-interface SchedModalProps {
-  onConfirm: (iso: string, tz: string) => void
-  onCancel: () => void
-}
-
-function SchedModal({ onConfirm, onCancel }: SchedModalProps) {
-  const [dt, setDt] = useState(() => {
-    const d = new Date(Date.now() + 24 * 3600000)
-    d.setMinutes(0, 0, 0)
-    return d.toISOString().slice(0, 16)
-  })
-  const [tz, setTz] = useState('America/Chicago')
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 300,
-      background: 'rgba(0,0,0,0.72)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div style={{
-        background: '#0e1528', border: '1px solid rgba(0,190,255,0.25)',
-        borderRadius: 16, padding: 28, width: 360,
-      }}>
-        <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: '0 0 20px' }}>
-          📅 Schedule Post
-        </h3>
-        <div style={{ marginBottom: 14 }}>
-          <label style={labelStyle}>Date &amp; Time</label>
-          <input type="datetime-local" value={dt} onChange={(e) => setDt(e.target.value)} style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: 22 }}>
-          <label style={labelStyle}>Timezone</label>
-          <select value={tz} onChange={(e) => setTz(e.target.value)} style={inputStyle}>
-            {TIMEZONES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => dt && onConfirm(new Date(dt).toISOString(), tz)}
-            disabled={!dt}
-            style={{
-              flex: 1, background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
-              color: '#fff', border: 'none', borderRadius: 10, padding: '10px 0',
-              fontWeight: 700, fontSize: 13, cursor: dt ? 'pointer' : 'not-allowed', opacity: dt ? 1 : 0.6,
-            }}
-          >
-            Schedule
-          </button>
-          <button onClick={onCancel} style={{
-            flex: 1, background: 'rgba(255,255,255,0.07)',
-            color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 10, padding: '10px 0', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-          }}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Export action bar ─────────────────────────────────────────────────────────
 
 interface ExportBarProps {
@@ -239,25 +173,11 @@ interface ExportBarProps {
 }
 
 function ExportBar({ result, copyText }: ExportBarProps) {
-  const [showSched, setShowSched] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
 
-  // toast pipeline lives on MarketingProvider; only consumed by v2 path
   const marketing = useMarketing()
 
-  function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3000) }
-
   async function saveDraft() {
-    if (!WORKFLOW_V2) {
-      setBusy('draft')
-      upsertPost({ ...result, status: 'draft' })
-      logEvent('generated', `Draft saved: ${result.title}`, { meta: { postId: result.id } })
-      setBusy(null)
-      flash('Draft saved!')
-      return
-    }
-
     setBusy('draft')
     try {
       upsertPost({ ...result, status: 'draft' })
@@ -283,71 +203,21 @@ function ExportBar({ result, copyText }: ExportBarProps) {
     }
   }
 
-  function sendToQueue() {
-    setBusy('queue')
-    upsertPost({ ...result, status: 'pending_approval' })
-    logEvent('sent_to_queue', `Sent to Approval Queue: ${result.title}`, { meta: { postId: result.id } })
-    addNotification(
-      'pending_approval',
-      'Post Awaiting Approval',
-      `"${result.title}" is waiting in the Approval Queue.`,
-      { linkSection: 'queue', linkId: `post-${result.id}` },
-    )
-    setBusy(null)
-    flash('Sent to Approval Queue!')
-  }
-
-  function handleSchedConfirm(iso: string, tz: string) {
-    setShowSched(false)
-    upsertPost({ ...result, status: 'scheduled', scheduledFor: iso, timezone: tz })
-    logEvent('scheduled', `Scheduled: ${result.title}`, { meta: { postId: result.id } })
-    flash('Scheduled! Check Content Calendar.')
-  }
-
   return (
-    <>
-      {showSched && <SchedModal onConfirm={handleSchedConfirm} onCancel={() => setShowSched(false)} />}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <CopyBtn text={copyText} />
-        <button
-          onClick={saveDraft}
-          disabled={busy === 'draft'}
-          style={{
-            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
-            color: '#818cf8', borderRadius: 8, padding: '6px 14px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-          }}
-        >
-          {busy === 'draft' ? '…' : '💾 Save Draft'}
-        </button>
-        <button
-          onClick={sendToQueue}
-          disabled={busy === 'queue'}
-          style={{
-            background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)',
-            color: '#fbbf24', borderRadius: 8, padding: '6px 14px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-          }}
-        >
-          {busy === 'queue' ? '…' : '📤 Send to Queue'}
-        </button>
-        {!WORKFLOW_V2 && (
-          <button
-            onClick={() => setShowSched(true)}
-            style={{
-              background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.3)',
-              color: '#00c8ff', borderRadius: 8, padding: '6px 14px',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-            }}
-          >
-            📅 Schedule
-          </button>
-        )}
-        {msg && (
-          <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>✓ {msg}</span>
-        )}
-      </div>
-    </>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <CopyBtn text={copyText} />
+      <button
+        onClick={saveDraft}
+        disabled={busy === 'draft'}
+        style={{
+          background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
+          color: '#818cf8', borderRadius: 8, padding: '6px 14px',
+          fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        {busy === 'draft' ? '…' : '💾 Save Draft'}
+      </button>
+    </div>
   )
 }
 

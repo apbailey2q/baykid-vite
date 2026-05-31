@@ -170,11 +170,8 @@ export async function transitionPostStatus(
   const all = loadPosts()
   const original = all.find((p) => p.id === id)
   if (!original) {
-    console.warn('[v2] transitionPostStatus: post not found', { id, nextStatus })
     return { ok: false, error: `Post ${id} not found` }
   }
-
-  console.info('[v2] transitionPostStatus', { id, from: original.status, to: nextStatus })
 
   const updated: AIContentResult = {
     ...original,
@@ -186,12 +183,10 @@ export async function transitionPostStatus(
 
   try {
     await sbUpsertPost(updated)
-    console.info('[v2] transitionPostStatus ok', { id, status: nextStatus })
     return { ok: true }
   } catch (err) {
     upsertPost(original)
     const message = err instanceof Error ? err.message : String(err)
-    console.error('[v2] transitionPostStatus failed, reverted', { id, nextStatus, error: message })
     return { ok: false, error: message }
   }
 }

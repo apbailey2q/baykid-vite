@@ -4,14 +4,6 @@
 
 import type { BadgeVariant } from '../components/ui/StatusBadge'
 
-// ── Workflow v2 feature flag ──────────────────────────────────────────────────
-// Gates the new state machine ('queued' | 'publishing' | 'cancelled' +
-// Approval Queue scoped to drafts/pending/rejected + cross-screen sync via
-// MarketingProvider). Default OFF until the DB CHECK migration has been
-// applied — without the migration any Supabase write of a v2-only status
-// silently fails the constraint.
-export const WORKFLOW_V2 = import.meta.env.VITE_WORKFLOW_V2 === 'true'
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ContentType =

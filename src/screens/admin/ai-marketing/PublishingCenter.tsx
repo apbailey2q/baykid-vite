@@ -16,12 +16,12 @@ import {
 } from '../../../lib/platformConnections'
 import {
   loadJobs, loadHistory, subscribeJobs,
-  processQueue, processJob, retryJob, cancelJob, deleteJob,
+  processJob,
   createPublishJob,
-  getQueueStats, PUBLISH_STATUS_META,
+  getQueueStats,
 } from '../../../lib/publishingEngine'
 import type { AIContentResult, PostStatus } from '../../../lib/aiMarketing'
-import { WORKFLOW_V2, STATUS_META } from '../../../lib/aiMarketing'
+import { STATUS_META } from '../../../lib/aiMarketing'
 import { useMarketing, usePosts } from '../../../lib/marketingStore'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { SchedulePicker } from '../../../components/ai-marketing/SchedulePicker'
@@ -325,10 +325,9 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Publishing Queue Tab — V2 (post-centric, behind WORKFLOW_V2)
+// Publishing Queue Tab
 // ══════════════════════════════════════════════════════════════════════════════
 
-// v2 only — Approval Queue owns drafts/pending/rejected; Calendar/History own 'posted'.
 const QUEUE_V2_VISIBLE_STATUSES: PostStatus[] = [
   'approved', 'queued', 'scheduled', 'publishing', 'failed',
 ]
@@ -341,7 +340,7 @@ function defaultScheduleLocal(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function QueueTabV2({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
+function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
   const posts = usePosts()
   const { schedulePost, cancelPost, retryPost } = useMarketing()
   const [jobs, setJobs] = useState<PublishJob[]>(() => loadJobs())
@@ -350,26 +349,16 @@ function QueueTabV2({ onToast }: { onToast: (msg: string, type?: Toast['type']) 
   const [scheduleValue, setScheduleValue] = useState('')
   const [scheduleTz, setScheduleTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
 
-  useEffect(() => {
-    console.info('[v2] QueueTabV2 mounted', { visibleStatuses: QUEUE_V2_VISIBLE_STATUSES, totalPosts: posts.length })
-    return subscribeJobs(setJobs)
-  }, [])
+  useEffect(() => subscribeJobs(setJobs), [])
 
   const visible = useMemo(() => {
-    const matched = posts
+    return posts
       .filter((p) => QUEUE_V2_VISIBLE_STATUSES.includes(p.status))
       .sort((a, b) => {
         const aTime = a.scheduledFor ? new Date(a.scheduledFor).getTime() : new Date(a.createdAt).getTime()
         const bTime = b.scheduledFor ? new Date(b.scheduledFor).getTime() : new Date(b.createdAt).getTime()
         return aTime - bTime
       })
-    console.info('[v2] QueueTabV2 filter', {
-      allowed: QUEUE_V2_VISIBLE_STATUSES,
-      matched: matched.length,
-      total: posts.length,
-      byStatus: posts.reduce<Record<string, number>>((acc, p) => { acc[p.status] = (acc[p.status] ?? 0) + 1; return acc }, {}),
-    })
-    return matched
   }, [posts])
 
   const stats = useMemo(() => {
@@ -582,230 +571,6 @@ function QueueTabV2({ onToast }: { onToast: (msg: string, type?: Toast['type']) 
           })}
         </div>
       )}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Publishing Queue Tab
-// ══════════════════════════════════════════════════════════════════════════════
-
-function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
-  if (WORKFLOW_V2) return <QueueTabV2 onToast={onToast} />
-  const [jobs,       setJobs]       = useState<PublishJob[]>(() => loadJobs())
-  const [processing, setProcessing] = useState(false)
-  const [autoRun,    setAutoRun]    = useState(false)
-
-  // Live updates
-  useEffect(() => subscribeJobs(setJobs), [])
-
-  // Auto-process interval (when enabled)
-  useEffect(() => {
-    if (!autoRun) return
-    const id = setInterval(() => {
-      processQueue().then((count) => {
-        if (count > 0) setJobs(loadJobs())
-      })
-    }, 8000)
-    return () => clearInterval(id)
-  }, [autoRun])
-
-  async function handleProcessNow() {
-    setProcessing(true)
-    try {
-      const count = await processQueue()
-      setJobs(loadJobs())
-      onToast(count > 0 ? `⚡ Processed ${count} job${count !== 1 ? 's' : ''}` : 'No due jobs', 'info')
-    } finally {
-      setProcessing(false)
-    }
-  }
-
-  function handleRetry(jobId: string) {
-    retryJob(jobId)
-    setJobs(loadJobs())
-    onToast('🔄 Job queued for retry', 'info')
-  }
-
-  function handleCancel(jobId: string) {
-    cancelJob(jobId)
-    setJobs(loadJobs())
-    onToast('✕ Job cancelled', 'info')
-  }
-
-  function handleDelete(jobId: string) {
-    deleteJob(jobId)
-    setJobs(loadJobs())
-    onToast('🗑️ Job removed', 'info')
-  }
-
-  const stats = (() => {
-    const s = { queued: 0, publishing: 0, retrying: 0, posted: 0, failed: 0, cancelled: 0 }
-    for (const j of jobs) if (j.status in s) (s as Record<string, number>)[j.status]++
-    return s
-  })()
-
-  const active    = jobs.filter((j) => j.status === 'queued' || j.status === 'publishing' || j.status === 'retrying')
-  const completed = jobs.filter((j) => j.status === 'posted' || j.status === 'failed' || j.status === 'cancelled')
-
-  return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 16, margin: '0 0 4px' }}>📡 Publishing Queue</h3>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>
-            Jobs are processed sequentially to avoid rate limits. Mock mode active (85% success rate).
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Auto-run toggle */}
-          <button
-            onClick={() => setAutoRun((v) => !v)}
-            style={ghostBtn({ color: autoRun ? '#22c55e' : 'rgba(255,255,255,0.5)', borderColor: autoRun ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.15)', background: autoRun ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.07)' })}
-          >
-            {autoRun ? '⏸ Auto-run ON' : '▶ Auto-run OFF'}
-          </button>
-          <button
-            onClick={handleProcessNow}
-            disabled={processing || active.length === 0}
-            style={{
-              background: 'rgba(0,200,255,0.15)', border: '1px solid rgba(0,200,255,0.35)',
-              color: '#00c8ff', borderRadius: 8, padding: '7px 16px',
-              fontWeight: 700, fontSize: 12,
-              cursor: processing || active.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: active.length === 0 ? 0.5 : 1,
-            }}
-          >
-            {processing ? '⏳ Processing…' : '⚡ Process Now'}
-          </button>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {(Object.entries(PUBLISH_STATUS_META) as [string, typeof PUBLISH_STATUS_META[keyof typeof PUBLISH_STATUS_META]][]).map(([status, meta]) => {
-          const count = (stats as Record<string, number>)[status] ?? 0
-          if (count === 0) return null
-          return (
-            <div key={status} style={{ background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 10, padding: '5px 12px', display: 'flex', gap: 5, alignItems: 'center' }}>
-              <span style={{ color: meta.color, fontWeight: 700, fontSize: 14 }}>{count}</span>
-              <span style={{ color: meta.color, fontSize: 11 }}>{meta.icon} {meta.label}</span>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Active jobs */}
-      {active.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-            Active ({active.length})
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {active.map((job) => <JobCard key={job.id} job={job} onRetry={handleRetry} onCancel={handleCancel} onDelete={handleDelete} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Recent completed (last 10) */}
-      {completed.length > 0 && (
-        <div>
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-            Recent Completed
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {completed.slice(0, 10).map((job) => <JobCard key={job.id} job={job} onRetry={handleRetry} onCancel={handleCancel} onDelete={handleDelete} />)}
-          </div>
-        </div>
-      )}
-
-      {jobs.length === 0 && (
-        <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 60, fontSize: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16 }}>
-          No publish jobs yet.<br />
-          Approve a post → click <strong style={{ color: 'rgba(255,255,255,0.5)' }}>🚀 Publish Now</strong> in the Approval Queue.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── JobCard ────────────────────────────────────────────────────────────────────
-
-function JobCard({ job, onRetry, onCancel, onDelete }: {
-  job: PublishJob
-  onRetry:  (id: string) => void
-  onCancel: (id: string) => void
-  onDelete: (id: string) => void
-}) {
-  const meta    = PUBLISH_STATUS_META[job.status]
-  const cfg     = PLATFORM_CONFIGS[job.platform]
-  const active  = job.status === 'queued' || job.status === 'publishing' || job.status === 'retrying'
-
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${meta.border}`, borderRadius: 12, padding: '12px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        {/* Platform icon */}
-        <div style={{ width: 34, height: 34, borderRadius: 8, background: cfg.colorBg, border: `1px solid ${cfg.colorBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
-          {cfg.icon}
-        </div>
-
-        {/* Info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {job.postTitle}
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <span>{cfg.name} · {job.accountHandle}</span>
-            {job.scheduledFor && <span>📅 {fmtDateTime(job.scheduledFor)}</span>}
-            <span>{timeAgo(job.createdAt)}</span>
-            {job.isMock && <span style={{ color: 'rgba(0,200,255,0.5)', fontSize: 10 }}>MOCK</span>}
-          </div>
-          {job.lastError && (
-            <div style={{ color: '#f87171', fontSize: 11, marginTop: 5, background: 'rgba(248,113,113,0.08)', borderRadius: 6, padding: '4px 8px' }}>
-              ⚠️ {job.lastError}
-              {job.retryCount > 0 && <span style={{ opacity: 0.7 }}> (attempt {job.retryCount}/{job.maxRetries})</span>}
-            </div>
-          )}
-          {job.publishedUrl && (
-            <div style={{ marginTop: 6 }}>
-              <a href={job.publishedUrl} target="_blank" rel="noopener noreferrer"
-                style={{ color: '#00c8ff', fontSize: 11, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                🔗 {job.publishedUrl.slice(0, 55)}{job.publishedUrl.length > 55 ? '…' : ''}
-              </a>
-            </div>
-          )}
-        </div>
-
-        {/* Status badge */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-          <span style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>
-            {meta.icon} {meta.label}
-          </span>
-          {job.status === 'publishing' && (
-            <div style={{ width: 20, height: 20, border: '2px solid rgba(0,200,255,0.3)', borderTopColor: '#00c8ff', borderRadius: '50%', animation: 'ai-spin 0.8s linear infinite' }} />
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-        {job.status === 'failed' && (
-          <button onClick={() => onRetry(job.id)} style={ghostBtn({ color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', fontSize: 10, padding: '4px 10px' })}>
-            🔄 Retry
-          </button>
-        )}
-        {active && (
-          <button onClick={() => onCancel(job.id)} style={ghostBtn({ color: '#f87171', borderColor: 'rgba(248,113,113,0.25)', fontSize: 10, padding: '4px 10px' })}>
-            ✕ Cancel
-          </button>
-        )}
-        {!active && (
-          <button onClick={() => onDelete(job.id)} style={ghostBtn({ color: 'rgba(248,113,113,0.6)', borderColor: 'rgba(248,113,113,0.2)', fontSize: 10, padding: '4px 10px' })}>
-            🗑️ Remove
-          </button>
-        )}
-      </div>
     </div>
   )
 }

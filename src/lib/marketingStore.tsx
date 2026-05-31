@@ -17,7 +17,6 @@ import {
 import type { AIContentResult, Lead, ActivityEvent } from './aiMarketing'
 import type { AutomationRule } from './automationRules'
 import type { AppNotification } from './notifications'
-import { WORKFLOW_V2 } from './aiMarketing'
 import {
   loadPosts, upsertPost, removePost,
   subscribePosts, transitionPostStatus, purgeMockPosts,
@@ -230,7 +229,6 @@ interface MarketingContextValue {
     markNotifRead: (id: string) => void
     dismissNotif:  (id: string) => void
   }
-  // v2 domain actions — see CRITICAL RULES in marketingStore docs
   approvePost:    (id: string) => Promise<DomainActionResult>
   rejectPost:     (id: string, reason?: string) => Promise<DomainActionResult>
   schedulePost:   (id: string, scheduledFor: string, timezone?: string) => Promise<DomainActionResult>
@@ -284,9 +282,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', handler)
   }, [])
 
-  // ── v2 only: Supabase realtime channel for ai_posts ─────────────────────────
+  // ── Supabase realtime channel for ai_posts ──────────────────────────────────
   useEffect(() => {
-    if (!WORKFLOW_V2) return
     let cleanedUp = false
     const orgId = getActiveOrgId()
     const channel = supabase
@@ -303,9 +300,8 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // ── v2 only: one-shot reconcile + mock purge ────────────────────────────────
+  // ── One-shot reconcile + mock purge ─────────────────────────────────────────
   useEffect(() => {
-    if (!WORKFLOW_V2) return
     try {
       purgeMockPosts()
       const legacyFlag = localStorage.getItem('baykid_ai_seeded')
@@ -384,7 +380,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   // Keep a stable ref so domain actions can surface toasts without depending on actions identity
   useEffect(() => { toastRef.current = actions.toast }, [actions])
 
-  // ── v2 domain actions ───────────────────────────────────────────────────────
+  // ── Domain actions ──────────────────────────────────────────────────────────
   const makeActivity = useCallback(
     (type: ActivityEvent['type'], label: string, actor = 'Admin'): ActivityEvent => ({
       id:    `act-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
@@ -406,12 +402,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const approvePost = useCallback(async (id: string): Promise<DomainActionResult> => {
-    console.info('[v2] approvePost', { id })
     const post = loadPosts().find((p) => p.id === id)
     if (!post) return { ok: false, error: 'Post not found' }
     const account = pickAccountForPost(post)
     if (!account) {
-      console.warn('[v2] approvePost: no connected account', { id, platform: post.platform })
       toastRef.current('Connect a social account before approving', 'warn')
       return { ok: false, error: 'No connected account available' }
     }
@@ -422,20 +416,17 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       return r
     }
     try {
-      const job = createPublishJob({ postId: id, accountId: account.id, autoPublishAllowed: true })
-      console.info('[v2] approvePost: PublishJob created', { id, jobId: job.id, accountId: account.id })
+      createPublishJob({ postId: id, accountId: account.id, autoPublishAllowed: true })
       return { ok: true }
     } catch (err) {
       await transitionPostStatus(id, prevStatus)
       const message = err instanceof Error ? err.message : String(err)
-      console.error('[v2] approvePost: createPublishJob failed, reverted', { id, error: message })
       toastRef.current(message, 'error')
       return { ok: false, error: message }
     }
   }, [makeActivity, pickAccountForPost])
 
   const rejectPost = useCallback(async (id: string, reason?: string): Promise<DomainActionResult> => {
-    console.info('[v2] rejectPost', { id, reason })
     const r = await transitionPostStatus(
       id,
       'rejected',
@@ -446,12 +437,10 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   }, [makeActivity])
 
   const schedulePost = useCallback(async (id: string, scheduledFor: string, timezone?: string): Promise<DomainActionResult> => {
-    console.info('[v2] schedulePost', { id, scheduledFor, timezone })
     const post = loadPosts().find((p) => p.id === id)
     if (!post) return { ok: false, error: 'Post not found' }
     const account = pickAccountForPost(post)
     if (!account) {
-      console.warn('[v2] schedulePost: no connected account', { id, platform: post.platform })
       toastRef.current('Connect a social account before scheduling', 'warn')
       return { ok: false, error: 'No connected account available' }
     }
@@ -470,21 +459,18 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       return r
     }
     try {
-      const job = createPublishJob({ postId: id, accountId: account.id, scheduledFor, autoPublishAllowed: true })
-      console.info('[v2] schedulePost: PublishJob created', { id, jobId: job.id, scheduledFor })
+      createPublishJob({ postId: id, accountId: account.id, scheduledFor, autoPublishAllowed: true })
       return { ok: true }
     } catch (err) {
       await transitionPostStatus(id, prevStatus)
       upsertPost({ ...post, scheduledFor: prevScheduledFor, timezone: prevTimezone })
       const message = err instanceof Error ? err.message : String(err)
-      console.error('[v2] schedulePost: createPublishJob failed, reverted', { id, error: message })
       toastRef.current(message, 'error')
       return { ok: false, error: message }
     }
   }, [makeActivity, pickAccountForPost])
 
   const cancelPost = useCallback(async (id: string): Promise<DomainActionResult> => {
-    console.info('[v2] cancelPost', { id })
     const active = loadJobs().find(
       (j) => j.postId === id && (j.status === 'queued' || j.status === 'publishing' || j.status === 'retrying'),
     )
@@ -499,7 +485,6 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   }, [makeActivity])
 
   const retryPost = useCallback(async (id: string): Promise<DomainActionResult> => {
-    console.info('[v2] retryPost', { id })
     const failed = loadJobs().find((j) => j.postId === id && j.status === 'failed')
     if (failed) retryJob(failed.id)
     const r = await transitionPostStatus(id, 'queued', makeActivity('note', 'Retry requested'))
@@ -508,7 +493,6 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
   }, [makeActivity])
 
   const markPostedPost = useCallback(async (id: string): Promise<DomainActionResult> => {
-    console.info('[v2] markPostedPost', { id })
     const r = await transitionPostStatus(id, 'posted', makeActivity('posted', 'Marked as posted'))
     if (!r.ok) toastRef.current(r.error ?? 'Mark posted failed', 'error')
     return r

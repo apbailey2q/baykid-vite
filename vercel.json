@@ -16,6 +16,10 @@
       "maxDuration": 30
     }
   },
+  "crons": [
+    { "path": "/api/cron/process-queue",       "schedule": "* * * * *" },
+    { "path": "/api/cron/cleanup-oauth-state", "schedule": "0 * * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

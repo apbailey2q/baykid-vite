@@ -13,6 +13,15 @@ interface ServiceCheck {
   message?:  string
 }
 
+interface CronRunSummary {
+  jobName:           string
+  lastRunAt:         string | null
+  lastRunOutcome:    'ok' | 'error' | 'noop' | null
+  secondsSinceLastRun: number | null
+  isStale:           boolean
+  lastRunDetails:    Record<string, unknown> | null
+}
+
 interface HealthResponse {
   status:      'ok' | 'degraded' | 'down'
   timestamp:   string
@@ -20,6 +29,7 @@ interface HealthResponse {
   environment: string
   uptime:      number
   services:    Record<string, ServiceCheck>
+  crons?:      CronRunSummary[]
 }
 
 const startTime = Date.now()
@@ -128,6 +138,65 @@ function overallStatus(services: Record<string, ServiceCheck>): 'ok' | 'degraded
   return 'ok'
 }
 
+// ── Cron observability ───────────────────────────────────────────────────────
+// Reads public.cron_runs (granted SELECT to anon). Reports each registered
+// cron's last run age. A cron is 'stale' if it hasn't reported within 5× its
+// expected interval — process-queue should tick every minute, cleanup hourly.
+
+const CRON_EXPECTED_INTERVAL_SEC: Record<string, number> = {
+  'process-queue':       60,
+  'cleanup-oauth-state': 3600,
+}
+
+async function fetchCronStatus(supaUrl: string, supaKey: string): Promise<CronRunSummary[]> {
+  if (!supaUrl || !supaKey) return []
+  try {
+    const res = await fetch(`${supaUrl}/rest/v1/cron_runs?select=job_name,last_run_at,last_run_outcome,last_run_details`, {
+      headers: { 'apikey': supaKey, 'Authorization': `Bearer ${supaKey}` },
+      signal:  AbortSignal.timeout(4000),
+    })
+    if (!res.ok) return []
+    const rows = await res.json() as Array<{
+      job_name:          string
+      last_run_at:       string
+      last_run_outcome:  'ok' | 'error' | 'noop'
+      last_run_details:  Record<string, unknown> | null
+    }>
+    const seen = new Set<string>()
+    const out: CronRunSummary[] = []
+    const now = Date.now()
+    for (const row of rows) {
+      seen.add(row.job_name)
+      const ts = new Date(row.last_run_at).getTime()
+      const ageSec = Math.round((now - ts) / 1000)
+      const expected = CRON_EXPECTED_INTERVAL_SEC[row.job_name] ?? 3600
+      out.push({
+        jobName:             row.job_name,
+        lastRunAt:           row.last_run_at,
+        lastRunOutcome:      row.last_run_outcome,
+        secondsSinceLastRun: ageSec,
+        isStale:             ageSec > expected * 5,
+        lastRunDetails:      row.last_run_details ?? null,
+      })
+    }
+    // Always list every registered cron so the UI sees jobs that have never run yet
+    for (const jobName of Object.keys(CRON_EXPECTED_INTERVAL_SEC)) {
+      if (seen.has(jobName)) continue
+      out.push({
+        jobName,
+        lastRunAt:           null,
+        lastRunOutcome:      null,
+        secondsSinceLastRun: null,
+        isStale:             true,
+        lastRunDetails:      null,
+      })
+    }
+    return out.sort((a, b) => a.jobName.localeCompare(b.jobName))
+  } catch {
+    return []
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function handler(req: any, res: any): Promise<void> {
   res.setHeader('Cache-Control', 'no-cache, no-store')
@@ -146,13 +215,24 @@ export default async function handler(req: any, res: any): Promise<void> {
   const version    = process.env.VITE_APP_VERSION ?? process.env.VERCEL_GIT_COMMIT_SHA ?? 'unknown'
 
   // Run all checks concurrently
-  const [claude, supabase, publishingAPIs] = await Promise.all([
+  const [claude, supabase, publishingAPIs, crons] = await Promise.all([
     checkClaude(apiKey, model),
     checkSupabase(supaUrl, supaKey),
     checkPublishingAPIs(),
+    fetchCronStatus(supaUrl, supaKey),
   ])
 
+  // A stale cron downgrades overall to 'degraded' (not 'down' — the app still
+  // serves; only scheduled publishes are affected).
   const services: Record<string, ServiceCheck> = { claude, supabase, publishingAPIs }
+  if (crons.some((c) => c.isStale)) {
+    services.crons = {
+      name:      'Scheduled jobs',
+      status:    'degraded',
+      latencyMs: null,
+      message:   `Stale: ${crons.filter((c) => c.isStale).map((c) => c.jobName).join(', ')}`,
+    }
+  }
   const overall = overallStatus(services)
 
   const body: HealthResponse = {
@@ -162,6 +242,7 @@ export default async function handler(req: any, res: any): Promise<void> {
     environment: env,
     uptime:      Math.round((Date.now() - startTime) / 1000),
     services,
+    crons,
   }
 
   const httpStatus = overall === 'down' ? 503 : overall === 'degraded' ? 207 : 200

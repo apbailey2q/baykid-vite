@@ -11,7 +11,7 @@ import type { ConnectedAccount, PlatformId, PublishJob, PublishHistoryEntry } fr
 import { PLATFORM_CONFIGS } from '../../../lib/publishTypes'
 import {
   loadAccounts, subscribeAccounts,
-  completeMockOAuth, disconnectAccount, reconnectAccount, deleteAccount,
+  startMetaOAuth, disconnectAccount,
   isExpiringSoon, isExpired, accountStatusLabel,
 } from '../../../lib/platformConnections'
 import {
@@ -107,48 +107,50 @@ const PLATFORM_ORDER: PlatformId[] = ['instagram', 'tiktok', 'facebook', 'linked
 
 function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
   const [accounts,      setAccounts]      = useState<ConnectedAccount[]>(() => loadAccounts())
-  const [connecting,    setConnecting]    = useState<PlatformId | null>(null)
-  const [showHandleFor, setShowHandleFor] = useState<PlatformId | null>(null)
-  const [customHandle,  setCustomHandle]  = useState('')
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
 
-  // Live updates when another component changes accounts
+  // Live updates from Supabase realtime + initial fetch
   useEffect(() => subscribeAccounts(setAccounts), [])
 
-  async function handleConnect(platform: PlatformId) {
-    setConnecting(platform)
-    setShowHandleFor(null)
-    try {
-      const result = await completeMockOAuth(platform, customHandle.trim() || undefined)
-      if (result.success && result.account) {
-        setAccounts(loadAccounts())
-        onToast(`✅ Connected to ${PLATFORM_CONFIGS[platform].name}`, 'success')
-      } else {
-        onToast(`❌ ${result.error ?? 'Connection failed'}`, 'error')
-      }
-    } catch {
-      onToast('❌ OAuth error — try again', 'error')
-    } finally {
-      setConnecting(null)
-      setCustomHandle('')
+  // OAuth callback handling: /admin/ai-marketing?connected=meta&fb=N&ig=M[&error=...]
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('connected') !== 'meta') return
+    const err = params.get('error')
+    if (err) {
+      onToast(`Meta connect failed: ${err}`, 'error')
+    } else {
+      const fb = Number(params.get('fb') ?? 0)
+      const ig = Number(params.get('ig') ?? 0)
+      const bits: string[] = []
+      if (fb > 0) bits.push(`${fb} Facebook Page${fb !== 1 ? 's' : ''}`)
+      if (ig > 0) bits.push(`${ig} Instagram account${ig !== 1 ? 's' : ''}`)
+      onToast(`Connected ${bits.join(' + ') || 'Meta'}`, 'success')
     }
+    // Clean the URL so a refresh doesn't re-toast
+    const cleaned = new URL(window.location.href)
+    cleaned.search = ''
+    window.history.replaceState(null, '', cleaned.toString())
+  }, [onToast])
+
+  function handleConnect(platform: PlatformId) {
+    // Meta OAuth covers Facebook + Instagram. Other platforms aren't wired yet.
+    if (platform === 'facebook' || platform === 'instagram') {
+      startMetaOAuth()
+      return
+    }
+    onToast(`${PLATFORM_CONFIGS[platform].name} connect is not enabled yet`, 'warn')
   }
 
-  function handleDisconnect(id: string, name: string) {
-    disconnectAccount(id)
-    setAccounts(loadAccounts())
-    onToast(`Disconnected ${name}`, 'info')
-  }
-
-  function handleReconnect(id: string, name: string) {
-    reconnectAccount(id)
-    setAccounts(loadAccounts())
-    onToast(`Reconnected ${name}`, 'success')
-  }
-
-  function handleDelete(id: string) {
-    deleteAccount(id)
-    setAccounts(loadAccounts())
-    onToast('Account removed', 'info')
+  async function handleDisconnect(id: string, name: string) {
+    setDisconnectingId(id)
+    try {
+      const r = await disconnectAccount(id)
+      if (r.ok) onToast(`Disconnected ${name}`, 'info')
+      else      onToast(`Disconnect failed: ${r.error ?? 'unknown'}`, 'error')
+    } finally {
+      setDisconnectingId(null)
+    }
   }
 
   const activeByPlatform = (platform: PlatformId) =>
@@ -160,7 +162,7 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 16, margin: '0 0 4px' }}>🔌 Platform Connections</h3>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>
-          Connect your social accounts to enable publishing. Tokens are stored as metadata only — actual OAuth flow is mocked for demo.
+          Connect your social accounts to enable publishing. Connecting Facebook also connects any linked Instagram Business accounts — they share one Meta authorization.
         </p>
       </div>
 
@@ -170,8 +172,10 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
           const cfg = PLATFORM_CONFIGS[platformId]
           const platformAccounts = activeByPlatform(platformId)
           const hasActive = platformAccounts.some((a) => a.isActive)
-          const isLoading = connecting === platformId
-          const showingHandle = showHandleFor === platformId
+          const isMeta    = platformId === 'facebook' || platformId === 'instagram'
+          const connectLabel = isMeta
+            ? (platformId === 'instagram' ? '+ Connect via Facebook' : '+ Connect')
+            : '+ Coming soon'
 
           return (
             <div
@@ -198,52 +202,23 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
                 </div>
 
                 {/* Connect button */}
-                {!hasActive && !showingHandle && (
+                {!hasActive && (
                   <button
-                    onClick={() => { setShowHandleFor(platformId); setCustomHandle('') }}
-                    disabled={isLoading}
+                    onClick={() => handleConnect(platformId)}
+                    disabled={!isMeta}
                     style={{
-                      background: cfg.colorBg, border: `1px solid ${cfg.colorBorder}`,
-                      color: cfg.color, borderRadius: 8, padding: '8px 16px',
-                      fontWeight: 700, fontSize: 12, cursor: isLoading ? 'wait' : 'pointer',
-                      opacity: isLoading ? 0.6 : 1,
+                      background: isMeta ? cfg.colorBg : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isMeta ? cfg.colorBorder : 'rgba(255,255,255,0.1)'}`,
+                      color: isMeta ? cfg.color : 'rgba(255,255,255,0.3)',
+                      borderRadius: 8, padding: '8px 16px',
+                      fontWeight: 700, fontSize: 12,
+                      cursor: isMeta ? 'pointer' : 'not-allowed',
                     }}
                   >
-                    {isLoading ? '⏳ Connecting…' : '+ Connect'}
+                    {connectLabel}
                   </button>
                 )}
               </div>
-
-              {/* Connect form (handle input) */}
-              {showingHandle && !hasActive && (
-                <div style={{ marginTop: 14, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 14 }}>
-                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
-                    Simulating OAuth for {cfg.name}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 180 }}>
-                      <input
-                        style={inputStyle}
-                        placeholder={`Handle (default: ${cfg.mockHandle})`}
-                        value={customHandle}
-                        onChange={(e) => setCustomHandle(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleConnect(platformId)}
-                      />
-                    </div>
-                    <button
-                      onClick={() => handleConnect(platformId)}
-                      disabled={isLoading}
-                      style={{ background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)`, border: 'none', color: '#fff', borderRadius: 8, padding: '8px 18px', fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: isLoading ? 0.6 : 1 }}
-                    >
-                      {isLoading ? '⏳ Connecting…' : 'Authorize →'}
-                    </button>
-                    <button onClick={() => setShowHandleFor(null)} style={ghostBtn()}>Cancel</button>
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, marginTop: 8 }}>
-                    In production this would redirect to {cfg.name}'s OAuth consent screen.
-                  </div>
-                </div>
-              )}
 
               {/* Connected accounts list */}
               {platformAccounts.length > 0 && (
@@ -280,17 +255,18 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
                         {/* Actions */}
                         <div style={{ display: 'flex', gap: 6 }}>
                           {acct.isActive ? (
-                            <button onClick={() => handleDisconnect(acct.id, acct.accountHandle)} style={ghostBtn({ color: '#fbbf24', borderColor: 'rgba(251,191,36,0.25)', fontSize: 10, padding: '4px 10px' })}>
-                              Disconnect
+                            <button
+                              onClick={() => handleDisconnect(acct.id, acct.accountHandle)}
+                              disabled={disconnectingId === acct.id}
+                              style={ghostBtn({ color: '#fbbf24', borderColor: 'rgba(251,191,36,0.25)', fontSize: 10, padding: '4px 10px', opacity: disconnectingId === acct.id ? 0.5 : 1 })}
+                            >
+                              {disconnectingId === acct.id ? '…' : 'Disconnect'}
                             </button>
                           ) : (
-                            <button onClick={() => handleReconnect(acct.id, acct.accountHandle)} style={ghostBtn({ color: '#22c55e', borderColor: 'rgba(34,197,94,0.25)', fontSize: 10, padding: '4px 10px' })}>
-                              Reconnect
-                            </button>
+                            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontStyle: 'italic' }}>
+                              Reconnect via Facebook
+                            </span>
                           )}
-                          <button onClick={() => handleDelete(acct.id)} style={ghostBtn({ color: 'rgba(248,113,113,0.7)', borderColor: 'rgba(248,113,113,0.2)', fontSize: 10, padding: '4px 8px' })}>
-                            ✕
-                          </button>
                         </div>
                       </div>
                     )
@@ -299,7 +275,7 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
               )}
 
               {/* Not connected state */}
-              {platformAccounts.length === 0 && !showingHandle && (
+              {platformAccounts.length === 0 && (
                 <div style={{ marginTop: 10, color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
                   Not connected
                 </div>

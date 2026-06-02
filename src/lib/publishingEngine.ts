@@ -181,16 +181,22 @@ function composeMessage(job: PublishJob): string {
 
 /** Calls /api/publish/now with the social account id. Server-side does the
  *  token decrypt + platform dispatch. No mock fallback — any failure surfaces
- *  as a real publish failure so the publish_jobs lifecycle reports honestly. */
+ *  as a real publish failure so the publish_jobs lifecycle reports honestly.
+ *  Re-reads the latest post for mediaUrl so an image attached after job
+ *  creation still ships with the publish. */
 async function serverPublish(
   job: PublishJob,
 ): Promise<{ url: string; platformPostId: string }> {
+  const post     = loadPosts().find((p) => p.id === job.postId)
+  const mediaUrl = post?.mediaUrl?.trim() || undefined
+
   const res = await fetch('/api/publish/now', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
       accountId: job.accountId,
       message:   composeMessage(job),
+      mediaUrl,
     }),
   })
   const body = await res.json().catch(() => ({})) as {

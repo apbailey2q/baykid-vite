@@ -82,6 +82,16 @@ export default async function handler(req: any, res: any): Promise<void> {
   const meta = account.platform_metadata ?? {}
   const pageId = typeof meta.page_id === 'string' ? meta.page_id : account.external_account_id
 
+  // IG requires a public image URL — surface this as a 400 before hitting Meta
+  // so the History entry says exactly what's wrong rather than a generic 502.
+  if (account.platform === 'instagram' && !mediaUrl) {
+    res.status(400).json({
+      ok:    false,
+      error: 'Instagram requires a public image URL — text-only posts are not supported by the Graph API. Add an image URL on the publish card and try again.',
+    })
+    return
+  }
+
   try {
     let result: { url: string; platformPostId: string }
 

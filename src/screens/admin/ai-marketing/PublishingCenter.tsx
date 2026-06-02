@@ -499,14 +499,33 @@ function defaultScheduleLocal(): string {
 
 function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
   const posts = usePosts()
-  const { schedulePost, cancelPost, retryPost } = useMarketing()
+  const { actions, schedulePost, cancelPost, retryPost } = useMarketing()
   const [jobs, setJobs] = useState<PublishJob[]>(() => loadJobs())
   const [busyId, setBusyId] = useState<string | null>(null)
   const [reschedulingId, setReschedulingId] = useState<string | null>(null)
   const [scheduleValue, setScheduleValue] = useState('')
   const [scheduleTz, setScheduleTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const [mediaUrlDrafts, setMediaUrlDrafts] = useState<Record<string, string>>({})
 
   useEffect(() => subscribeJobs(setJobs), [])
+
+  function mediaUrlFor(post: AIContentResult): string {
+    return mediaUrlDrafts[post.id] ?? post.mediaUrl ?? ''
+  }
+  function setMediaUrlDraft(postId: string, value: string) {
+    setMediaUrlDrafts((prev) => ({ ...prev, [postId]: value }))
+  }
+  /** Persist a draft mediaUrl onto the post (only if it changed). Returns
+   *  the value to publish with. */
+  function commitMediaUrlDraft(post: AIContentResult): string | undefined {
+    const draft = mediaUrlDrafts[post.id]
+    if (draft === undefined) return post.mediaUrl?.trim() || undefined
+    const trimmed = draft.trim()
+    const current = post.mediaUrl?.trim() ?? ''
+    if (trimmed === current) return trimmed || undefined
+    actions.upsertPost({ ...post, mediaUrl: trimmed || undefined })
+    return trimmed || undefined
+  }
 
   const visible = useMemo(() => {
     return posts
@@ -537,6 +556,13 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
 
   async function handlePublishNow(post: AIContentResult) {
     if (busyId) return
+    // For IG, persist any mediaUrl draft before publishing — the engine
+    // re-reads the latest post when calling /api/publish/now.
+    const mediaUrl = commitMediaUrlDraft(post)
+    if (post.platform === 'instagram' && !mediaUrl) {
+      onToast('Instagram needs an image URL — paste a public HTTPS link first.', 'warn')
+      return
+    }
     setBusyId(post.id)
     try {
       let job = jobForPost(post.id)
@@ -683,13 +709,43 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
                   </div>
                 )}
 
+                {!isRescheduling && post.platform === 'instagram' && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}>
+                      📷 Image URL (required for Instagram)
+                    </label>
+                    <input
+                      type="url"
+                      inputMode="url"
+                      placeholder="https://… (public HTTPS image)"
+                      value={mediaUrlFor(post)}
+                      onChange={(e) => setMediaUrlDraft(post.id, e.target.value)}
+                      onBlur={() => commitMediaUrlDraft(post)}
+                      style={{
+                        ...inputStyle,
+                        fontSize: 11,
+                        padding: '6px 10px',
+                        borderColor: mediaUrlFor(post).trim()
+                          ? 'rgba(167,139,250,0.3)'
+                          : 'rgba(248,113,113,0.35)',
+                      }}
+                    />
+                  </div>
+                )}
+
                 {!isRescheduling && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                     {canPublishNow && (
                       <button
                         onClick={() => handlePublishNow(post)}
-                        disabled={isBusy}
-                        style={ghostBtn({ color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', fontSize: 10, padding: '4px 10px', opacity: isBusy ? 0.5 : 1, cursor: isBusy ? 'wait' : 'pointer' })}
+                        disabled={isBusy || (post.platform === 'instagram' && !mediaUrlFor(post).trim())}
+                        title={post.platform === 'instagram' && !mediaUrlFor(post).trim() ? 'Add an image URL above to publish to Instagram' : undefined}
+                        style={ghostBtn({
+                          color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)',
+                          fontSize: 10, padding: '4px 10px',
+                          opacity: (isBusy || (post.platform === 'instagram' && !mediaUrlFor(post).trim())) ? 0.5 : 1,
+                          cursor: isBusy ? 'wait' : ((post.platform === 'instagram' && !mediaUrlFor(post).trim()) ? 'not-allowed' : 'pointer'),
+                        })}
                       >
                         🚀 Publish Now
                       </button>

@@ -128,6 +128,10 @@ export interface AIContentResult {
   _source?: 'claude' | 'demo'
   /** Populated when _source==='demo' due to an API error */
   _error?: string
+  /** Optional public HTTPS image URL. Required when publishing to Instagram
+   *  (IG Graph API rejects text-only posts). Optional for Facebook (Page
+   *  posts go via /photos when set, /feed when not). */
+  mediaUrl?: string
   // ── Cross-system references ──────────────────────────────────────────────
   /** Lead created from or linked to this post */
   linkedLeadId?: string

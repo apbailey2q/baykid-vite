@@ -150,3 +150,39 @@ body {
 button, a {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ================================================
+   Native <select> / <datalist> dropdown readability
+   --------------------------------------------------
+   body { color: #ffffff } is inherited by browser-drawn popup option
+   lists, producing white-on-white when the browser uses its default
+   light popup background. This rule forces a readable palette on every
+   native dropdown option in the app. The closed-state <select> control
+   keeps its component-level styling.
+
+   <option:hover> is only honored by Firefox; Chrome/Edge use the system
+   highlight. <option:checked> works cross-browser.
+================================================ */
+
+select option,
+datalist option {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+select option:checked,
+datalist option:checked {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+
+select option:disabled,
+datalist option:disabled {
+  color: #9ca3af;
+}
+
+select option:hover,
+datalist option:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}

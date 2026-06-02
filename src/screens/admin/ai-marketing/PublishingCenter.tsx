@@ -16,6 +16,7 @@ import {
   type MetaPendingPage,
   isExpiringSoon, isExpired, accountStatusLabel,
 } from '../../../lib/platformConnections'
+import { uploadPostMedia } from '../../../lib/postMedia'
 import {
   loadJobs, loadHistory, subscribeJobs,
   processJob,
@@ -506,6 +507,7 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
   const [scheduleValue, setScheduleValue] = useState('')
   const [scheduleTz, setScheduleTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [mediaUrlDrafts, setMediaUrlDrafts] = useState<Record<string, string>>({})
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
 
   useEffect(() => subscribeJobs(setJobs), [])
 
@@ -525,6 +527,29 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
     if (trimmed === current) return trimmed || undefined
     actions.upsertPost({ ...post, mediaUrl: trimmed || undefined })
     return trimmed || undefined
+  }
+  /** Persist mediaUrl back to the post and clear any pending paste-draft. */
+  function applyMediaUrl(post: AIContentResult, url: string | undefined) {
+    actions.upsertPost({ ...post, mediaUrl: url })
+    setMediaUrlDrafts((prev) => {
+      if (!(post.id in prev)) return prev
+      const next = { ...prev }; delete next[post.id]; return next
+    })
+  }
+  async function handleUpload(post: AIContentResult, file: File | undefined) {
+    if (!file) return
+    setUploadingId(post.id)
+    try {
+      const r = await uploadPostMedia(post.id, file)
+      if (!r.ok || !r.url) {
+        onToast(r.error ?? 'Upload failed', 'error')
+        return
+      }
+      applyMediaUrl(post, r.url)
+      onToast('Image uploaded', 'success')
+    } finally {
+      setUploadingId(null)
+    }
   }
 
   const visible = useMemo(() => {
@@ -711,25 +736,70 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
 
                 {!isRescheduling && post.platform === 'instagram' && (
                   <div style={{ marginTop: 10 }}>
-                    <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}>
-                      📷 Image URL (required for Instagram)
+                    <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 6 }}>
+                      📷 Image (required for Instagram)
                     </label>
-                    <input
-                      type="url"
-                      inputMode="url"
-                      placeholder="https://… (public HTTPS image)"
-                      value={mediaUrlFor(post)}
-                      onChange={(e) => setMediaUrlDraft(post.id, e.target.value)}
-                      onBlur={() => commitMediaUrlDraft(post)}
-                      style={{
-                        ...inputStyle,
-                        fontSize: 11,
-                        padding: '6px 10px',
-                        borderColor: mediaUrlFor(post).trim()
-                          ? 'rgba(167,139,250,0.3)'
-                          : 'rgba(248,113,113,0.35)',
-                      }}
-                    />
+
+                    {mediaUrlFor(post).trim() && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <img
+                          src={mediaUrlFor(post)}
+                          alt=""
+                          style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+                          onError={(e) => { (e.currentTarget.style.display = 'none') }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {mediaUrlFor(post)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => applyMediaUrl(post, undefined)}
+                          disabled={uploadingId === post.id}
+                          style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', color: '#f87171', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                          title="Remove image"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label
+                        style={{
+                          background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.3)', color: '#00c8ff',
+                          borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 700,
+                          cursor: uploadingId === post.id ? 'wait' : 'pointer',
+                          opacity: uploadingId === post.id ? 0.5 : 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {uploadingId === post.id ? '⏳ Uploading…' : (mediaUrlFor(post).trim() ? '🔄 Replace image' : '📤 Upload image')}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={uploadingId === post.id}
+                          onChange={(e) => { void handleUpload(post, e.target.files?.[0]); e.currentTarget.value = '' }}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>or paste URL:</span>
+                      <input
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://…"
+                        value={mediaUrlDrafts[post.id] ?? (mediaUrlFor(post).startsWith('http') ? mediaUrlFor(post) : '')}
+                        onChange={(e) => setMediaUrlDraft(post.id, e.target.value)}
+                        onBlur={() => commitMediaUrlDraft(post)}
+                        disabled={uploadingId === post.id}
+                        style={{
+                          ...inputStyle,
+                          flex: 1, minWidth: 140,
+                          fontSize: 11, padding: '5px 9px',
+                          borderColor: mediaUrlFor(post).trim() ? 'rgba(167,139,250,0.3)' : 'rgba(248,113,113,0.35)',
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
 

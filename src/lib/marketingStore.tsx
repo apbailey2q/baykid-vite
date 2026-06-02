@@ -329,15 +329,14 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
           (a) => a.isActive && (!p.platform || a.platform === p.platform),
         )
         if (!account) continue
-        try {
-          createPublishJob({
-            postId:             p.id,
-            accountId:          account.id,
-            scheduledFor:       p.scheduledFor,
-            autoPublishAllowed: true,
-          })
-          created++
-        } catch { /* skip orphan we can't reconcile */ }
+        createPublishJob({
+          postId:             p.id,
+          accountId:          account.id,
+          scheduledFor:       p.scheduledFor,
+          autoPublishAllowed: true,
+        })
+          .then(() => { created++ })
+          .catch(() => { /* skip orphan we can't reconcile */ })
       }
       console.info('v2 reconcile: created ' + created + ' publish jobs for orphaned posts')
     } catch (err) {
@@ -421,7 +420,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       return r
     }
     try {
-      createPublishJob({ postId: id, accountId: account.id, autoPublishAllowed: true })
+      await createPublishJob({ postId: id, accountId: account.id, autoPublishAllowed: true })
       return { ok: true }
     } catch (err) {
       await transitionPostStatus(id, prevStatus)
@@ -464,7 +463,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
       return r
     }
     try {
-      createPublishJob({ postId: id, accountId: account.id, scheduledFor, autoPublishAllowed: true })
+      await createPublishJob({ postId: id, accountId: account.id, scheduledFor, autoPublishAllowed: true })
       return { ok: true }
     } catch (err) {
       await transitionPostStatus(id, prevStatus)
@@ -479,7 +478,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
     const active = loadJobs().find(
       (j) => j.postId === id && (j.status === 'queued' || j.status === 'publishing' || j.status === 'retrying'),
     )
-    if (active) cancelJob(active.id)
+    if (active) await cancelJob(active.id).catch(() => undefined)
     const r = await transitionPostStatus(
       id,
       'approved',
@@ -491,7 +490,7 @@ export function MarketingProvider({ children }: { children: ReactNode }) {
 
   const retryPost = useCallback(async (id: string): Promise<DomainActionResult> => {
     const failed = loadJobs().find((j) => j.postId === id && j.status === 'failed')
-    if (failed) retryJob(failed.id)
+    if (failed) await retryJob(failed.id).catch(() => undefined)
     const r = await transitionPostStatus(id, 'queued', makeActivity('note', 'Retry requested'))
     if (!r.ok) toastRef.current(r.error ?? 'Retry failed', 'error')
     return r

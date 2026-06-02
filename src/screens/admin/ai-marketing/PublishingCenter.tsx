@@ -599,11 +599,15 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
           return
         }
         try {
-          job = createPublishJob({ postId: post.id, accountId: account.id, autoPublishAllowed: true })
+          job = await createPublishJob({ postId: post.id, accountId: account.id, autoPublishAllowed: true })
         } catch (err) {
           onToast(err instanceof Error ? err.message : 'Failed to queue post', 'error')
           return
         }
+      }
+      if (!job) {
+        onToast('Failed to queue post', 'error')
+        return
       }
       await processJob(job.id)
       setJobs(loadJobs())

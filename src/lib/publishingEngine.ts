@@ -133,7 +133,7 @@ export function createPublishJob(params: CreateJobParams): PublishJob {
     createdAt:         now,
     retryCount:        0,
     maxRetries:        3,
-    isMock:            true,    // always mock unless server endpoint responds
+    isMock:            false,   // /api/publish/now does real publishing for FB; IG/others throw until wired
     autoPublishAllowed,
   }
 
@@ -169,67 +169,42 @@ function updateJob(id: string, delta: Partial<PublishJob>): PublishJob | null {
   return all[idx]
 }
 
-// ── Mock publish simulation ───────────────────────────────────────────────────
+// ── Real publish via server route ────────────────────────────────────────────
 
-/** Simulate a platform API call. Returns a mock post URL on success. */
-async function mockPublishToPlatform(
-  job: PublishJob,
-): Promise<{ url: string; platformPostId: string }> {
-  // Realistic latency: 1.2–3.5 seconds
-  const ms = 1200 + Math.random() * 2300
-  await new Promise((r) => setTimeout(r, ms))
-
-  // 85% success rate in mock mode, lower on retries to exercise retry logic
-  const successRate = job.retryCount === 0 ? 0.85 : 0.75
-  if (Math.random() > successRate) {
-    const errors = [
-      'Rate limit exceeded — try again in a few minutes',
-      'Media upload failed: unsupported format',
-      'Caption too long for platform limit',
-      'Authentication token expired',
-      'Network timeout',
-    ]
-    throw new Error(errors[Math.floor(Math.random() * errors.length)])
-  }
-
-  const fakeId  = Math.random().toString(36).slice(2, 12).toUpperCase()
-  const handles: Record<PlatformId, string> = {
-    instagram: 'instagram.com/p',
-    facebook:  'facebook.com/permalink',
-    tiktok:    'tiktok.com/@CyansBrooklynn/video',
-    linkedin:  'linkedin.com/feed/update',
-    twitter:   'twitter.com/i/web/status',
-  }
-  const url = `https://${handles[job.platform]}/${fakeId}`
-  return { url, platformPostId: fakeId }
+/** Compose the platform message from the job's caption + hashtags. */
+function composeMessage(job: PublishJob): string {
+  const parts: string[] = []
+  if (job.postCaption) parts.push(job.postCaption)
+  if (job.postHashtags && job.postHashtags.length > 0) parts.push(job.postHashtags.join(' '))
+  return parts.join('\n\n').trim()
 }
 
-/** Try the real server publish endpoint. Falls back to mock automatically. */
+/** Calls /api/publish/now with the social account id. Server-side does the
+ *  token decrypt + platform dispatch. No mock fallback — any failure surfaces
+ *  as a real publish failure so the publish_jobs lifecycle reports honestly. */
 async function serverPublish(
   job: PublishJob,
 ): Promise<{ url: string; platformPostId: string }> {
-  try {
-    const res = await fetch('/api/publish/post', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        postId:      job.postId,
-        platform:    job.platform,
-        accountId:   job.accountId,
-        caption:     job.postCaption,
-        hashtags:    job.postHashtags,
-        scheduledFor: job.scheduledFor,
-      }),
-    })
-    if (res.ok) {
-      const data = await res.json() as { url: string; platformPostId: string }
-      return data
-    }
-  } catch {
-    // Server not available — fall through to mock
+  const res = await fetch('/api/publish/now', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      accountId: job.accountId,
+      message:   composeMessage(job),
+    }),
+  })
+  const body = await res.json().catch(() => ({})) as {
+    ok?: boolean; url?: string; platformPostId?: string
+    error?: string; detail?: string
   }
-  // Mock fallback
-  return mockPublishToPlatform({ ...job, isMock: true })
+  if (!res.ok || !body.ok) {
+    const why = body.error ?? body.detail ?? `HTTP ${res.status}`
+    throw new Error(why)
+  }
+  if (!body.url || !body.platformPostId) {
+    throw new Error('Publish endpoint returned no url or platformPostId')
+  }
+  return { url: body.url, platformPostId: body.platformPostId }
 }
 
 // ── Process a single job ──────────────────────────────────────────────────────

@@ -39,8 +39,8 @@ export const PLATFORM_CONFIGS: Record<PlatformId, PlatformConfig> = {
   linkedin: {
     id: 'linkedin', name: 'LinkedIn', icon: '💼',
     color: '#0077b5', colorBg: 'rgba(0,119,181,0.1)', colorBorder: 'rgba(0,119,181,0.3)',
-    scopes: ['w_member_social', 'r_basicprofile', 'r_organization_social'],
-    mockHandle: 'Cyan\'s Brooklynn', mockName: 'Cyan\'s Brooklynn (Company Page)',
+    scopes: ['openid', 'profile', 'email', 'w_member_social'],
+    mockHandle: 'Cyan\'s Brooklynn', mockName: 'Cyan\'s Brooklynn',
   },
   twitter: {
     id: 'twitter', name: 'X / Twitter', icon: '✕',

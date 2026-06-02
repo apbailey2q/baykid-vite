@@ -141,6 +141,13 @@ export function startMetaOAuth(): void {
   window.location.href = '/api/oauth/facebook/authorize'
 }
 
+/** Redirects the browser to LinkedIn's OAuth consent screen. The callback
+ *  inserts one social_accounts row per authenticated LinkedIn member and
+ *  redirects back to /admin/ai-marketing?connected=linkedin&account=<name>. */
+export function startLinkedInOAuth(): void {
+  window.location.href = '/api/oauth/linkedin/authorize'
+}
+
 export interface MetaPendingPage {
   pageId:         string
   pageName:       string
@@ -195,9 +202,22 @@ export async function finalizeMetaConnection(
   }
 }
 
+/** Routes the disconnect call to the right provider's endpoint based on the
+ *  account's platform. Meta (facebook/instagram) shares one endpoint —
+ *  disconnecting a Page also cascades to its linked IG row. LinkedIn has
+ *  its own endpoint. */
 export async function disconnectAccount(id: string): Promise<{ ok: boolean; error?: string }> {
+  const account = cache.find((a) => a.id === id)
+  const platform = account?.platform
+  let endpoint: string
+  if (platform === 'linkedin') {
+    endpoint = '/api/oauth/linkedin/disconnect'
+  } else {
+    // facebook + instagram both go through the Meta endpoint (one OAuth, one cascade)
+    endpoint = '/api/oauth/facebook/disconnect'
+  }
   try {
-    const res = await fetch('/api/oauth/facebook/disconnect', {
+    const res = await fetch(endpoint, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ accountId: id }),

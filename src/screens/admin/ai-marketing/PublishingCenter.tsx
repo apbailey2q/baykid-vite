@@ -11,7 +11,7 @@ import type { ConnectedAccount, PlatformId, PublishJob, PublishHistoryEntry } fr
 import { PLATFORM_CONFIGS } from '../../../lib/publishTypes'
 import {
   loadAccounts, subscribeAccounts,
-  startMetaOAuth, disconnectAccount,
+  startMetaOAuth, startLinkedInOAuth, disconnectAccount,
   fetchMetaPending, finalizeMetaConnection,
   type MetaPendingPage,
   isExpiringSoon, isExpired, accountStatusLabel,
@@ -117,9 +117,10 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
   useEffect(() => subscribeAccounts(setAccounts), [])
 
   // OAuth callback handling:
-  //   ?connected=meta&fb=N&ig=M     → fast-path success toast
-  //   ?connected=meta&error=...     → error toast
-  //   ?meta-select=<token>          → open Page selection modal
+  //   ?connected=meta&fb=N&ig=M           → Meta fast-path success toast
+  //   ?meta-select=<token>                → open Meta Page selection modal
+  //   ?connected=linkedin&account=<name>  → LinkedIn success toast
+  //   ?connected=<x>&error=...            → platform-specific error toast
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const selectToken = params.get('meta-select')
@@ -148,25 +149,38 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
       return
     }
 
-    if (connected !== 'meta') return
+    if (!connected) return
     const err = params.get('error')
-    if (err) {
-      onToast(`Meta connect failed: ${err}`, 'error')
-    } else {
-      const fb = Number(params.get('fb') ?? 0)
-      const ig = Number(params.get('ig') ?? 0)
-      const bits: string[] = []
-      if (fb > 0) bits.push(`${fb} Facebook Page${fb !== 1 ? 's' : ''}`)
-      if (ig > 0) bits.push(`${ig} Instagram account${ig !== 1 ? 's' : ''}`)
-      onToast(`Connected ${bits.join(' + ') || 'Meta'}`, 'success')
+
+    if (connected === 'meta') {
+      if (err) {
+        onToast(`Meta connect failed: ${err}`, 'error')
+      } else {
+        const fb = Number(params.get('fb') ?? 0)
+        const ig = Number(params.get('ig') ?? 0)
+        const bits: string[] = []
+        if (fb > 0) bits.push(`${fb} Facebook Page${fb !== 1 ? 's' : ''}`)
+        if (ig > 0) bits.push(`${ig} Instagram account${ig !== 1 ? 's' : ''}`)
+        onToast(`Connected ${bits.join(' + ') || 'Meta'}`, 'success')
+      }
+    } else if (connected === 'linkedin') {
+      if (err) {
+        onToast(`LinkedIn connect failed: ${err}`, 'error')
+      } else {
+        const account = params.get('account')
+        onToast(account ? `Connected LinkedIn as ${account}` : 'Connected LinkedIn', 'success')
+      }
     }
     cleanUrl()
   }, [onToast])
 
   function handleConnect(platform: PlatformId) {
-    // Meta OAuth covers Facebook + Instagram. Other platforms aren't wired yet.
     if (platform === 'facebook' || platform === 'instagram') {
       startMetaOAuth()
+      return
+    }
+    if (platform === 'linkedin') {
+      startLinkedInOAuth()
       return
     }
     onToast(`${PLATFORM_CONFIGS[platform].name} connect is not enabled yet`, 'warn')
@@ -202,10 +216,14 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
           const cfg = PLATFORM_CONFIGS[platformId]
           const platformAccounts = activeByPlatform(platformId)
           const hasActive = platformAccounts.some((a) => a.isActive)
-          const isMeta    = platformId === 'facebook' || platformId === 'instagram'
-          const connectLabel = isMeta
-            ? (platformId === 'instagram' ? '+ Connect via Facebook' : '+ Connect')
-            : '+ Coming soon'
+          const isMeta      = platformId === 'facebook' || platformId === 'instagram'
+          const isLinkedIn  = platformId === 'linkedin'
+          const isConnectable = isMeta || isLinkedIn
+          const connectLabel = !isConnectable
+            ? '+ Coming soon'
+            : platformId === 'instagram'
+              ? '+ Connect via Facebook'
+              : '+ Connect'
 
           return (
             <div
@@ -235,14 +253,14 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
                 {!hasActive && (
                   <button
                     onClick={() => handleConnect(platformId)}
-                    disabled={!isMeta}
+                    disabled={!isConnectable}
                     style={{
-                      background: isMeta ? cfg.colorBg : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${isMeta ? cfg.colorBorder : 'rgba(255,255,255,0.1)'}`,
-                      color: isMeta ? cfg.color : 'rgba(255,255,255,0.3)',
+                      background: isConnectable ? cfg.colorBg : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isConnectable ? cfg.colorBorder : 'rgba(255,255,255,0.1)'}`,
+                      color: isConnectable ? cfg.color : 'rgba(255,255,255,0.3)',
                       borderRadius: 8, padding: '8px 16px',
                       fontWeight: 700, fontSize: 12,
-                      cursor: isMeta ? 'pointer' : 'not-allowed',
+                      cursor: isConnectable ? 'pointer' : 'not-allowed',
                     }}
                   >
                     {connectLabel}
@@ -404,7 +422,7 @@ function MetaPageSelectModal({ fbUserName, pages, onConfirm, onCancel }: MetaPag
           <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>Select Facebook Pages to connect</div>
           <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 4 }}>
             Signed in as <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{fbUserName}</strong>. We discovered{' '}
-            <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{pages.length} Pages</strong>. Pick which ones can publish from BayKid.
+            <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{pages.length} Pages</strong>. Pick which ones can publish from Cyan's Brooklynn Marketing.
           </div>
         </div>
 
@@ -581,8 +599,8 @@ function QueueTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) =>
 
   async function handlePublishNow(post: AIContentResult) {
     if (busyId) return
-    // For IG, persist any mediaUrl draft before publishing — the engine
-    // re-reads the latest post when calling /api/publish/now.
+    // For IG, persist any mediaUrl draft before publishing — createPublishJob
+    // snapshots it onto the new publish_jobs row.
     const mediaUrl = commitMediaUrlDraft(post)
     if (post.platform === 'instagram' && !mediaUrl) {
       onToast('Instagram needs an image URL — paste a public HTTPS link first.', 'warn')

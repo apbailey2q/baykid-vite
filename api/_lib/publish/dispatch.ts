@@ -7,6 +7,7 @@ import { ACTIVE_ORG_ID } from '../org.js'
 import { decodeBytea, decryptToken } from '../encrypt.js'
 import { publishToFacebookPage } from './providers/facebook.js'
 import { publishToInstagram } from './providers/instagram.js'
+import { publishToLinkedIn } from './providers/linkedin.js'
 
 export interface ExecutePublishOpts {
   supa:      SupabaseClient
@@ -18,7 +19,7 @@ export interface ExecutePublishOpts {
 export interface ExecutePublishResult {
   url:            string
   platformPostId: string
-  platform:       'facebook' | 'instagram'
+  platform:       'facebook' | 'instagram' | 'linkedin'
 }
 
 interface AccountRow {
@@ -63,6 +64,16 @@ export async function executePublish(opts: ExecutePublishOpts): Promise<ExecuteP
   } else if (account.platform === 'instagram') {
     const igUserId = typeof meta.ig_user_id === 'string' ? meta.ig_user_id : account.external_account_id
     result = await publishToInstagram({ igUserId, pageAccessToken, message, mediaUrl })
+  } else if (account.platform === 'linkedin') {
+    // For LinkedIn the "page access token" name is misleading — it's the
+    // member access_token decrypted from the same column. external_account_id
+    // is the LinkedIn member id (sub).
+    result = await publishToLinkedIn({
+      memberSub:   account.external_account_id,
+      accessToken: pageAccessToken,
+      message,
+      mediaUrl,
+    })
   } else {
     throw new Error(`platform_not_implemented: ${account.platform}`)
   }

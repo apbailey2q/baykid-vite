@@ -3,22 +3,26 @@
 // Route: GET /api/oauth/facebook/callback?code=&state=
 //
 // 1. Verify state matches the signed cookie (CSRF).
-// 2. Exchange auth code → short-lived user token.
-// 3. Upgrade short → long-lived user token (60 days).
-// 4. Fetch /me + /me/accounts → Pages + linked IG Business Accounts.
-// 5. Encrypt each Page Access Token and UPSERT one social_accounts row per
-//    Page. UPSERT a sibling row per linked IG account using the same token
-//    (IG publishes via the Page token).
-// 6. Redirect the browser back to /admin/ai-marketing?connected=meta&fb=N&ig=M.
+// 2. Exchange auth code → short-lived user token, upgrade to long-lived (60d).
+// 3. Fetch /me + /me/accounts (Pages + linked IG Business Accounts).
+// 4. Branch on Page count:
+//      0 pages   → redirect with error
+//      1 page    → fast path: persist immediately, redirect with fb=1[&ig=0|1]
+//      2+ pages  → stash discovery in meta_pending_connections, redirect to
+//                  /admin/ai-marketing?meta-select=<token> so the user picks
+//                  which Pages to connect.
 
+import { randomBytes } from 'node:crypto'
 import { adminClient } from '../../_lib/supabase-admin.js'
 import { ACTIVE_ORG_ID } from '../../_lib/org.js'
 import { encryptToken } from '../../_lib/encrypt.js'
 import { consumeOAuthState, clearStateCookie } from '../../_lib/oauth/state.js'
 import {
   exchangeCodeForToken, exchangeForLongLivedToken,
-  fetchMetaUser, fetchPages, META_SCOPES, APP_BASE_URL,
+  fetchMetaUser, fetchPages, APP_BASE_URL,
 } from '../../_lib/oauth/providers/meta.js'
+import { persistPages } from '../../_lib/oauth/providers/meta-persist.js'
+import type { MetaPage } from '../../_lib/oauth/providers/meta.js'
 
 function redirect(res: any, query: string): void { // eslint-disable-line @typescript-eslint/no-explicit-any
   const url = `${APP_BASE_URL}/admin/ai-marketing?${query}`
@@ -50,7 +54,6 @@ export default async function handler(req: any, res: any): Promise<void> {
     return
   }
 
-  // 1. CSRF — consume state row (single-use)
   const stateCheck = await consumeOAuthState(state, req.headers['cookie'])
   if (!stateCheck.ok) {
     redirect(res, `connected=meta&error=${encodeURIComponent(stateCheck.error)}`)
@@ -62,110 +65,76 @@ export default async function handler(req: any, res: any): Promise<void> {
   }
 
   try {
-    // 2-3. Token exchange + upgrade to long-lived
     const shortLived = await exchangeCodeForToken(code)
     const longLived  = await exchangeForLongLivedToken(shortLived.access_token)
-    const expiresAt  = longLived.expires_in
-      ? new Date(Date.now() + longLived.expires_in * 1000).toISOString()
-      : null
 
-    // 4. Resolve identity + Pages (+ linked IG accounts)
     const [user, pages] = await Promise.all([
       fetchMetaUser(longLived.access_token),
       fetchPages(longLived.access_token),
     ])
 
     if (pages.length === 0) {
-      redirect(res, `connected=meta&error=${encodeURIComponent('No Facebook Pages found. Connect a Page you manage.')}`)
+      redirect(res, `connected=meta&error=${encodeURIComponent('No Facebook Pages found. You need to manage at least one Page to connect.')}`)
       return
     }
 
-    const supa = adminClient()
-    const nowIso = new Date().toISOString()
-    let fbAdded = 0
-    let igAdded = 0
-
-    for (const page of pages) {
-      const pageTokenEnc = encryptToken(page.access_token)
-
-      // 5a. Facebook Page row
-      const fbRow = {
-        organization_id:         ACTIVE_ORG_ID,
-        platform:                'facebook',
-        account_name:            page.name,
-        account_handle:          page.name,
-        account_avatar_url:      page.picture_url ?? null,
-        external_account_id:     page.id,
-        access_token_encrypted:  pageTokenEnc,
-        refresh_token_encrypted: null,
-        token_type:              'Bearer',
-        scopes:                  Array.from(META_SCOPES),
-        expires_at:              expiresAt,
-        platform_metadata:       {
-          fb_user_id:   user.id,
-          fb_user_name: user.name,
-          page_id:      page.id,
-          category:     page.category ?? null,
-        },
-        is_active:               true,
-        last_used_at:            null,
-        last_error:              null,
-        connected_at:            nowIso,
-        disconnected_at:         null,
-      }
-
-      const { error: fbErr } = await supa
-        .from('social_accounts')
-        .upsert(fbRow, { onConflict: 'organization_id,platform,external_account_id' })
-
-      if (fbErr) {
-        console.error(JSON.stringify({ at: 'oauth/facebook/callback', step: 'upsert_fb', page: page.id, error: fbErr.message }))
-        continue
-      }
-      fbAdded++
-
-      // 5b. Linked Instagram Business Account row (same token, IG publishes via Page)
-      const ig = page.instagram_business_account
-      if (!ig) continue
-
-      const igRow = {
-        organization_id:         ACTIVE_ORG_ID,
-        platform:                'instagram',
-        account_name:            ig.name ?? ig.username,
-        account_handle:          `@${ig.username}`,
-        account_avatar_url:      ig.profile_picture_url ?? null,
-        external_account_id:     ig.id,
-        access_token_encrypted:  pageTokenEnc,
-        refresh_token_encrypted: null,
-        token_type:              'Bearer',
-        scopes:                  Array.from(META_SCOPES),
-        expires_at:              expiresAt,
-        platform_metadata:       {
-          fb_user_id:    user.id,
-          page_id:       page.id,
-          page_name:     page.name,
-          ig_user_id:    ig.id,
-          ig_username:   ig.username,
-        },
-        is_active:               true,
-        last_used_at:            null,
-        last_error:              null,
-        connected_at:            nowIso,
-        disconnected_at:         null,
-      }
-
-      const { error: igErr } = await supa
-        .from('social_accounts')
-        .upsert(igRow, { onConflict: 'organization_id,platform,external_account_id' })
-
-      if (igErr) {
-        console.error(JSON.stringify({ at: 'oauth/facebook/callback', step: 'upsert_ig', ig: ig.id, error: igErr.message }))
-        continue
-      }
-      igAdded++
+    // Fast path: exactly one Page → just persist it (and any linked IG)
+    if (pages.length === 1) {
+      const result = await persistPages({
+        pages,
+        fbUserId:              user.id,
+        fbUserName:            user.name,
+        longLivedExpiresInSec: longLived.expires_in ?? null,
+      })
+      redirect(res, `connected=meta&fb=${result.fbAdded}&ig=${result.igAdded}`)
+      return
     }
 
-    redirect(res, `connected=meta&fb=${fbAdded}&ig=${igAdded}`)
+    // Multi-page: stash and redirect to selection UI
+    const selectionToken = randomBytes(32).toString('base64url')
+    const pendingExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    const userTokenExpiresAt = longLived.expires_in
+      ? new Date(Date.now() + longLived.expires_in * 1000).toISOString()
+      : null
+
+    // Per-page encrypted tokens packed into discovered_pages so we don't
+    // re-fetch /me/accounts at finalize time.
+    const discoveredPages = pages.map((p: MetaPage) => ({
+      page_id:                    p.id,
+      page_name:                  p.name,
+      page_avatar_url:            p.picture_url ?? null,
+      category:                   p.category ?? null,
+      page_token_encrypted_b64:   encryptToken(p.access_token).toString('base64'),
+      ig: p.instagram_business_account ? {
+        id:                  p.instagram_business_account.id,
+        username:            p.instagram_business_account.username,
+        name:                p.instagram_business_account.name ?? null,
+        profile_picture_url: p.instagram_business_account.profile_picture_url ?? null,
+      } : null,
+    }))
+
+    const supa = adminClient()
+    const { error: pendingErr } = await supa
+      .from('meta_pending_connections')
+      .insert({
+        token:                   selectionToken,
+        organization_id:         ACTIVE_ORG_ID,
+        user_id:                 stateCheck.userId,
+        user_token_encrypted:    encryptToken(longLived.access_token),
+        user_token_expires_at:   userTokenExpiresAt,
+        fb_user_id:              user.id,
+        fb_user_name:            user.name,
+        discovered_pages:        discoveredPages,
+        expires_at:              pendingExpiresAt,
+      })
+
+    if (pendingErr) {
+      console.error(JSON.stringify({ at: 'oauth/facebook/callback', step: 'pending_insert', error: pendingErr.message }))
+      redirect(res, `connected=meta&error=${encodeURIComponent('Could not stash discovered Pages — try Connect again.')}`)
+      return
+    }
+
+    redirect(res, `meta-select=${encodeURIComponent(selectionToken)}`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(JSON.stringify({ at: 'oauth/facebook/callback', error: message }))

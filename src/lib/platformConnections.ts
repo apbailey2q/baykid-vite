@@ -133,9 +133,66 @@ export async function refreshAccounts(): Promise<ConnectedAccount[]> {
 
 /** Redirects the browser to the Meta OAuth authorize endpoint. The callback
  *  on /api/oauth/facebook/callback inserts social_accounts rows server-side
- *  and redirects back to /admin/ai-marketing?connected=meta&fb=N&ig=M. */
+ *  and redirects back to /admin/ai-marketing?connected=meta&fb=N&ig=M.
+ *  When the user manages multiple Pages, the callback instead redirects to
+ *  ?meta-select=<token> and the client opens a selection modal that
+ *  ultimately calls finalizeMetaConnection(). */
 export function startMetaOAuth(): void {
   window.location.href = '/api/oauth/facebook/authorize'
+}
+
+export interface MetaPendingPage {
+  pageId:         string
+  pageName:       string
+  pageAvatarUrl:  string | null
+  category:       string | null
+  ig: null | {
+    id:                 string
+    username:           string
+    name:               string | null
+    profilePictureUrl:  string | null
+  }
+}
+
+export interface MetaPending {
+  fbUserName: string
+  expiresAt:  string
+  pages:      MetaPendingPage[]
+}
+
+export async function fetchMetaPending(token: string): Promise<{ ok: true; data: MetaPending } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`/api/oauth/facebook/pending?token=${encodeURIComponent(token)}`)
+    const body = await res.json().catch(() => ({})) as Partial<MetaPending> & { error?: string; detail?: string }
+    if (!res.ok) return { ok: false, error: body.error ?? body.detail ?? `HTTP ${res.status}` }
+    return { ok: true, data: body as MetaPending }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function finalizeMetaConnection(
+  token:   string,
+  pageIds: string[],
+): Promise<{ ok: boolean; fbAdded?: number; igAdded?: number; error?: string }> {
+  try {
+    const res = await fetch('/api/oauth/facebook/finalize', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ token, pageIds }),
+    })
+    const body = await res.json().catch(() => ({})) as {
+      ok?: boolean; fbAdded?: number; igAdded?: number
+      error?: string; detail?: string
+    }
+    if (!res.ok || !body.ok) {
+      return { ok: false, error: body.error ?? body.detail ?? `HTTP ${res.status}` }
+    }
+    await refreshCache()
+    return { ok: true, fbAdded: body.fbAdded ?? 0, igAdded: body.igAdded ?? 0 }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 export async function disconnectAccount(id: string): Promise<{ ok: boolean; error?: string }> {

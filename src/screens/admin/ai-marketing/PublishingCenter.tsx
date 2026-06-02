@@ -12,6 +12,8 @@ import { PLATFORM_CONFIGS } from '../../../lib/publishTypes'
 import {
   loadAccounts, subscribeAccounts,
   startMetaOAuth, disconnectAccount,
+  fetchMetaPending, finalizeMetaConnection,
+  type MetaPendingPage,
   isExpiringSoon, isExpired, accountStatusLabel,
 } from '../../../lib/platformConnections'
 import {
@@ -108,14 +110,44 @@ const PLATFORM_ORDER: PlatformId[] = ['instagram', 'tiktok', 'facebook', 'linked
 function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type']) => void }) {
   const [accounts,      setAccounts]      = useState<ConnectedAccount[]>(() => loadAccounts())
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
+  const [selectModal, setSelectModal] = useState<{ token: string; fbUserName: string; pages: MetaPendingPage[] } | null>(null)
 
   // Live updates from Supabase realtime + initial fetch
   useEffect(() => subscribeAccounts(setAccounts), [])
 
-  // OAuth callback handling: /admin/ai-marketing?connected=meta&fb=N&ig=M[&error=...]
+  // OAuth callback handling:
+  //   ?connected=meta&fb=N&ig=M     → fast-path success toast
+  //   ?connected=meta&error=...     → error toast
+  //   ?meta-select=<token>          → open Page selection modal
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('connected') !== 'meta') return
+    const selectToken = params.get('meta-select')
+    const connected   = params.get('connected')
+
+    function cleanUrl() {
+      const cleaned = new URL(window.location.href)
+      cleaned.search = ''
+      window.history.replaceState(null, '', cleaned.toString())
+    }
+
+    if (selectToken) {
+      cleanUrl()
+      void (async () => {
+        const r = await fetchMetaPending(selectToken)
+        if (!r.ok) {
+          onToast(`Could not load Page selection: ${r.error}`, 'error')
+          return
+        }
+        if (r.data.pages.length === 0) {
+          onToast('No Pages discovered', 'warn')
+          return
+        }
+        setSelectModal({ token: selectToken, fbUserName: r.data.fbUserName, pages: r.data.pages })
+      })()
+      return
+    }
+
+    if (connected !== 'meta') return
     const err = params.get('error')
     if (err) {
       onToast(`Meta connect failed: ${err}`, 'error')
@@ -127,10 +159,7 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
       if (ig > 0) bits.push(`${ig} Instagram account${ig !== 1 ? 's' : ''}`)
       onToast(`Connected ${bits.join(' + ') || 'Meta'}`, 'success')
     }
-    // Clean the URL so a refresh doesn't re-toast
-    const cleaned = new URL(window.location.href)
-    cleaned.search = ''
-    window.history.replaceState(null, '', cleaned.toString())
+    cleanUrl()
   }, [onToast])
 
   function handleConnect(platform: PlatformId) {
@@ -296,6 +325,158 @@ function ConnectionsTab({ onToast }: { onToast: (msg: string, type?: Toast['type
           </div>
         </div>
       )}
+
+      {selectModal && (
+        <MetaPageSelectModal
+          fbUserName={selectModal.fbUserName}
+          pages={selectModal.pages}
+          onCancel={() => setSelectModal(null)}
+          onConfirm={async (pageIds) => {
+            const r = await finalizeMetaConnection(selectModal.token, pageIds)
+            setSelectModal(null)
+            if (!r.ok) {
+              onToast(`Connect failed: ${r.error}`, 'error')
+              return
+            }
+            const bits: string[] = []
+            if ((r.fbAdded ?? 0) > 0) bits.push(`${r.fbAdded} Facebook Page${r.fbAdded !== 1 ? 's' : ''}`)
+            if ((r.igAdded ?? 0) > 0) bits.push(`${r.igAdded} Instagram account${r.igAdded !== 1 ? 's' : ''}`)
+            onToast(`Connected ${bits.join(' + ') || 'Meta'}`, 'success')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Meta Page selection modal (shown when user manages 2+ Pages) ─────────────
+
+interface MetaPageSelectModalProps {
+  fbUserName: string
+  pages:      MetaPendingPage[]
+  onConfirm:  (pageIds: string[]) => Promise<void>
+  onCancel:   () => void
+}
+
+function MetaPageSelectModal({ fbUserName, pages, onConfirm, onCancel }: MetaPageSelectModalProps) {
+  // Default: all pages selected (matches the previous auto-connect behavior)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(pages.map((p) => p.pageId)))
+  const [busy, setBusy] = useState(false)
+
+  function toggle(pageId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(pageId)) next.delete(pageId); else next.add(pageId)
+      return next
+    })
+  }
+  function selectAll() { setSelected(new Set(pages.map((p) => p.pageId))) }
+  function selectNone() { setSelected(new Set()) }
+
+  async function handleConfirm() {
+    if (selected.size === 0) return
+    setBusy(true)
+    try {
+      await onConfirm(Array.from(selected))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.7)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 20,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }}
+    >
+      <div style={{
+        background: '#0f1628', border: '1px solid rgba(0,190,255,0.25)',
+        borderRadius: 16, padding: 24, width: '100%', maxWidth: 560,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>Select Facebook Pages to connect</div>
+          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 4 }}>
+            Signed in as <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{fbUserName}</strong>. We discovered{' '}
+            <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{pages.length} Pages</strong>. Pick which ones can publish from BayKid.
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, fontSize: 11 }}>
+          <button onClick={selectAll}  style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', color: '#00c8ff', borderRadius: 6, padding: '4px 10px', fontWeight: 700, cursor: 'pointer' }}>Select all</button>
+          <button onClick={selectNone} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', borderRadius: 6, padding: '4px 10px', fontWeight: 600, cursor: 'pointer' }}>Select none</button>
+          <div style={{ flex: 1 }} />
+          <div style={{ color: 'rgba(255,255,255,0.4)', alignSelf: 'center' }}>{selected.size} of {pages.length} selected</div>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {pages.map((p) => {
+            const isChecked = selected.has(p.pageId)
+            return (
+              <label
+                key={p.pageId}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  background: isChecked ? 'rgba(0,200,255,0.06)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${isChecked ? 'rgba(0,200,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggle(p.pageId)}
+                  style={{ accentColor: '#00c8ff', width: 16, height: 16 }}
+                />
+                {p.pageAvatarUrl ? (
+                  <img src={p.pageAvatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📘</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.pageName}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {p.category && <span>{p.category}</span>}
+                    {p.ig && (
+                      <span style={{ color: 'rgba(193,53,132,0.85)' }}>
+                        📷 also connects @{p.ig.username}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </label>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.65)', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={busy || selected.size === 0}
+            style={{
+              background: selected.size === 0 ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg, #0057e7, #00c8ff)',
+              border: 'none', color: selected.size === 0 ? 'rgba(255,255,255,0.3)' : '#fff',
+              borderRadius: 8, padding: '8px 20px', fontWeight: 700, fontSize: 12,
+              cursor: selected.size === 0 ? 'not-allowed' : 'pointer',
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {busy ? 'Connecting…' : `Connect ${selected.size} Page${selected.size !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

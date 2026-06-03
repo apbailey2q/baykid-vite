@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
   try {
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
-    if (!stripeKey) return json({ error: 'STRIPE_SECRET_KEY not configured' }, 500)
+    if (!stripeKey) return json({ error: 'STRIPE_SECRET_KEY not configured' }, req, 500)
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const cancelUrl  = body.cancel_url  as string
 
     if (!planCode || !cycle || !orgId || !successUrl || !cancelUrl) {
-      return json({ error: 'missing required fields' }, 400)
+      return json({ error: 'missing required fields' }, req, 400)
     }
 
     // 1. Resolve plan + price id from DB
@@ -58,11 +58,11 @@ Deno.serve(async (req) => {
       .eq('code', planCode)
       .maybeSingle()
 
-    if (planErr || !plan) return json({ error: 'plan not found' }, 404)
+    if (planErr || !plan) return json({ error: 'plan not found' }, req, 404)
 
     const priceId = cycle === 'yearly' ? plan.stripe_price_yearly_id : plan.stripe_price_monthly_id
     if (!priceId) {
-      return json({ error: `plan ${planCode} (${cycle}) has no stripe_price id configured` }, 400)
+      return json({ error: `plan ${planCode} (${cycle}) has no stripe_price id configured. Run the Stripe product setup script first.` }, req, 400)
     }
 
     // 2. Find or create Stripe customer for the org. We store the customer id
@@ -79,13 +79,13 @@ Deno.serve(async (req) => {
     let customerId = existingSub?.stripe_customer_id ?? null
     if (!customerId) {
       const { data: org } = await supabase
-        .from('ai_organizations')
+        .from('ai_orgs')
         .select('id, name, slug')
         .eq('id', orgId)
         .maybeSingle()
 
       const customer = await stripe.customers.create({
-        name: org?.name ?? 'BayKid org',
+        name: org?.name ?? "Cyan's Brooklynn Recycling",
         metadata: { organization_id: orgId, organization_slug: org?.slug ?? '' },
       })
       customerId = customer.id
@@ -113,11 +113,11 @@ Deno.serve(async (req) => {
       metadata: { organization_id: orgId, plan_code: planCode, cycle },
     })
 
-    if (!session.url) return json({ error: 'stripe returned no url' }, 502)
-    return json({ url: session.url })
+    if (!session.url) return json({ error: 'stripe returned no url' }, req, 502)
+    return json({ url: session.url }, req)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown error'
     console.error('[stripe-create-checkout]', msg)
-    return json({ error: msg }, 500)
+    return json({ error: msg }, req, 500)
   }
 })

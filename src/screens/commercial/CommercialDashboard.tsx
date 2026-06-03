@@ -67,6 +67,7 @@ const QUICK_ACTIONS = [
   { icon: '🚨', label: 'Emergency\nOverflow',  path: '/dashboard/commercial/pickup?type=emergency'  },
   { icon: '🗑️', label: 'Manage\nContainers',  path: '/dashboard/commercial/bins'                   },
   { icon: '📊', label: 'View\nReports',        path: '/dashboard/commercial/reports'                },
+  { icon: '💳', label: 'Billing &\nPlan',      path: '/dashboard/commercial/billing'                },
   { icon: '🧾', label: 'Pay\nInvoice',          path: '/dashboard/commercial/invoices'               },
   { icon: '📞', label: 'Contact\nDispatch',     path: ''                                             },
 ]

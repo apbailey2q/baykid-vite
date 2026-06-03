@@ -73,6 +73,27 @@ export default function AdminDashboard() {
         >
           🤖 AI Marketing
         </Link>
+        <Link
+          to="/dashboard/admin/analytics"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', color: '#00c8ff', textDecoration: 'none' }}
+        >
+          ♻️ Recycling Analytics
+        </Link>
+        <Link
+          to="/dashboard/admin/investor"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)', color: '#fbbf24', textDecoration: 'none' }}
+        >
+          💼 Investor Dashboard
+        </Link>
+        <Link
+          to="/dashboard/admin/dispatch-map"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)', color: '#4ade80', textDecoration: 'none' }}
+        >
+          🗺️ Dispatcher Map
+        </Link>
       </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"

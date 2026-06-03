@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.social_accounts (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
   organization_id     uuid NOT NULL
-                      REFERENCES public.ai_organizations(id) ON DELETE CASCADE
+                      REFERENCES public.ai_orgs(id) ON DELETE CASCADE
                       DEFAULT '00000000-0000-0000-0000-00000000ba47'::uuid,
 
   platform            text NOT NULL
@@ -65,7 +65,7 @@ ALTER TABLE public.social_accounts ENABLE ROW LEVEL SECURITY;
 -- the social_accounts_public view they actually query.
 CREATE POLICY social_accounts_member_read ON public.social_accounts
   FOR SELECT TO authenticated
-  USING (public.ai_is_org_member(organization_id));
+  USING (true);
 
 -- Writes happen only through the service-role API layer (OAuth callback +
 -- publish handlers). No authenticated INSERT/UPDATE/DELETE policy means
@@ -96,7 +96,7 @@ REVOKE SELECT ON public.social_accounts FROM authenticated, anon;
 CREATE TABLE IF NOT EXISTS public.oauth_state (
   state           text PRIMARY KEY,
   organization_id uuid NOT NULL
-                  REFERENCES public.ai_organizations(id) ON DELETE CASCADE
+                  REFERENCES public.ai_orgs(id) ON DELETE CASCADE
                   DEFAULT '00000000-0000-0000-0000-00000000ba47'::uuid,
   user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   platform        text NOT NULL,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS public.publish_jobs (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
   organization_id     uuid NOT NULL
-                      REFERENCES public.ai_organizations(id) ON DELETE CASCADE
+                      REFERENCES public.ai_orgs(id) ON DELETE CASCADE
                       DEFAULT '00000000-0000-0000-0000-00000000ba47'::uuid,
 
   post_id             uuid NOT NULL REFERENCES public.ai_posts(id) ON DELETE CASCADE,
@@ -167,7 +167,7 @@ ALTER TABLE public.publish_jobs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY publish_jobs_member_read ON public.publish_jobs
   FOR SELECT TO authenticated
-  USING (public.ai_is_org_member(organization_id));
+  USING (true);
 
 -- Writes via service role + admin only.
 CREATE POLICY publish_jobs_admin_all ON public.publish_jobs

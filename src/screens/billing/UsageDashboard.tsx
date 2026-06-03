@@ -12,11 +12,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchCurrentSubscription, fetchUsage, getActiveOrgId, checkLimit,
-  findStaticPlan, formatLimit,
+  findStaticPlan, formatLimit, fetchSubscriptionSummary, formatPriceCents,
 } from '../../lib/billing'
 import type {
   SubscriptionWithPlan, BillingUsageRow, UsageMetric, LimitCheckResult,
 } from '../../types/billing'
+import type { SubscriptionSummary } from '../../lib/billing'
 import { BillingPortalButton } from '../../components/billing/BillingPortalButton'
 
 interface MetricView {
@@ -38,11 +39,12 @@ export default function UsageDashboard() {
   const navigate    = useNavigate()
   const [params]    = useSearchParams()
 
-  const [orgId, setOrgId]       = useState<string | null>(null)
-  const [sub,   setSub]         = useState<SubscriptionWithPlan | null>(null)
-  const [usage, setUsage]       = useState<Record<UsageMetric, BillingUsageRow | null> | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error,   setError]     = useState<string | null>(null)
+  const [orgId,   setOrgId]   = useState<string | null>(null)
+  const [sub,     setSub]     = useState<SubscriptionWithPlan | null>(null)
+  const [summary, setSummary] = useState<SubscriptionSummary | null>(null)
+  const [usage,   setUsage]   = useState<Record<UsageMetric, BillingUsageRow | null> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState<string | null>(null)
   const justSubscribed = params.get('stripe_session') !== null
   const mockMode       = params.get('mock_checkout') === '1' || params.get('mock_portal') === '1'
 
@@ -53,12 +55,14 @@ export default function UsageDashboard() {
         const id = await getActiveOrgId()
         if (!mounted) return
         setOrgId(id)
-        const [s, u] = await Promise.all([
+        const [s, u, sum] = await Promise.all([
           fetchCurrentSubscription(id).catch(() => null),
           fetchUsage(id).catch(() => null),
+          fetchSubscriptionSummary(id).catch(() => null),
         ])
         if (!mounted) return
         setSub(s)
+        setSummary(sum)
         setUsage(u ?? {
           ai_generations: null, scheduled_posts: null,
           connected_accounts: null, team_members: null, automation_rules: null,
@@ -129,7 +133,16 @@ export default function UsageDashboard() {
         {error && <Notice tone="error">{error}</Notice>}
 
         {/* Plan summary card */}
-        <PlanCard sub={sub} loading={loading} />
+        <PlanCard sub={sub} summary={summary} loading={loading} />
+
+        {/* Next invoice + billing details row */}
+        {!loading && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginTop: 16 }}>
+            <NextInvoiceCard summary={summary} />
+            <BillingCycleCard summary={summary} />
+            <DaysRemainingCard summary={summary} />
+          </div>
+        )}
 
         {/* Metrics */}
         <h2 style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginTop: 28, marginBottom: 12 }}>
@@ -172,10 +185,20 @@ export default function UsageDashboard() {
 
 // ── PlanCard ─────────────────────────────────────────────────────────────────
 
-function PlanCard({ sub, loading }: { sub: SubscriptionWithPlan | null; loading: boolean }) {
-  const plan = sub?.plan
-  const renewalDate = sub?.current_period_end
-    ? new Date(sub.current_period_end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+function PlanCard({
+  sub, summary, loading,
+}: {
+  sub:     SubscriptionWithPlan | null
+  summary: SubscriptionSummary  | null
+  loading: boolean
+}) {
+  const planName   = summary?.plan_name ?? sub?.plan?.name ?? 'Free'
+  const planCode   = summary?.plan_code ?? sub?.plan?.code ?? 'free'
+  const status     = (summary?.status ?? sub?.status ?? 'active') as SubscriptionWithPlan['status']
+  const cancelSoon = summary?.cancel_at_period_end ?? sub?.cancel_at_period_end ?? false
+  const renewalDate = (summary?.current_period_end ?? sub?.current_period_end)
+    ? new Date((summary?.current_period_end ?? sub?.current_period_end)!).toLocaleDateString(
+        undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     : null
 
   return (
@@ -191,19 +214,19 @@ function PlanCard({ sub, loading }: { sub: SubscriptionWithPlan | null; loading:
           Current Plan
         </div>
         <div style={{ color: '#fff', fontSize: 22, fontWeight: 700, marginTop: 4 }}>
-          {loading ? '…' : plan?.name ?? 'Free'}
+          {loading ? '…' : planName}
         </div>
-        {sub?.status && (
+        {!loading && (
           <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
-            <StatusPill status={sub.status} />
-            {sub.cancel_at_period_end && (
+            <StatusPill status={status} />
+            {cancelSoon && (
               <span style={{ color: '#fbbf24', fontSize: 11 }}>Cancels at period end</span>
             )}
           </div>
         )}
       </div>
       <div style={{ textAlign: 'right' }}>
-        {renewalDate && (
+        {renewalDate && !cancelSoon && (
           <>
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Renews</div>
             <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{renewalDate}</div>
@@ -213,10 +236,65 @@ function PlanCard({ sub, loading }: { sub: SubscriptionWithPlan | null; loading:
           display: 'inline-block', marginTop: 10,
           color: '#00c8ff', fontSize: 12, fontWeight: 700, textDecoration: 'none',
         }}>
-          {plan?.code === 'free' ? 'Upgrade →' : 'Change plan →'}
+          {planCode === 'free' ? 'Upgrade →' : 'Change plan →'}
         </Link>
       </div>
     </div>
+  )
+}
+
+// ── Billing stat mini-cards ───────────────────────────────────────────────────
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 12, padding: '14px 16px',
+    }}>
+      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+        {label}
+      </div>
+      <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginTop: 4 }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>{sub}</div>
+      )}
+    </div>
+  )
+}
+
+function NextInvoiceCard({ summary }: { summary: SubscriptionSummary | null }) {
+  if (!summary) return <StatCard label="Next Invoice" value="—" />
+
+  const { cancel_at_period_end, estimated_next_invoice_cents, has_stripe } = summary
+  if (!has_stripe) return <StatCard label="Next Invoice" value="—" sub="Subscribe to see invoice" />
+  if (cancel_at_period_end) return <StatCard label="Next Invoice" value="$0" sub="Subscription ends this period" />
+
+  const amount = formatPriceCents(estimated_next_invoice_cents)
+  const cycle  = summary.billing_cycle === 'yearly' ? '/ year' : '/ month'
+  return <StatCard label="Next Invoice" value={amount} sub={cycle} />
+}
+
+function BillingCycleCard({ summary }: { summary: SubscriptionSummary | null }) {
+  if (!summary?.has_stripe) return <StatCard label="Billing Cycle" value="—" />
+  const label = summary.billing_cycle === 'yearly' ? 'Annual' : 'Monthly'
+  const saving = summary.billing_cycle === 'yearly' ? 'saves ~17%' : 'switch to annual to save 17%'
+  return <StatCard label="Billing Cycle" value={label} sub={saving} />
+}
+
+function DaysRemainingCard({ summary }: { summary: SubscriptionSummary | null }) {
+  if (!summary?.current_period_end) return <StatCard label="Period Ends" value="—" />
+  const d = new Date(summary.current_period_end).toLocaleDateString(
+    undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const days = summary.days_remaining
+  return (
+    <StatCard
+      label="Period Ends"
+      value={`${days}d left`}
+      sub={d}
+    />
   )
 }
 

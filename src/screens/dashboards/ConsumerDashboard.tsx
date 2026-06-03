@@ -15,6 +15,9 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
 import { SectionLabel } from '../../components/ui/dashboard'
+import { NotificationBell } from '../../components/notifications/NotificationBell'
+import { NotificationCenter } from '../../components/notifications/NotificationCenter'
+import { ConsumerPickupStatus } from '../consumer/ConsumerPickupStatus'
 
 async function fetchWalletBalance(userId: string) {
   const [txRes, prRes] = await Promise.all([
@@ -452,6 +455,7 @@ export default function ConsumerDashboard() {
   const [recycledWeekIdx, setRecycledWeekIdx]  = useState(0)
 
   // Scan state
+  const [showNotif, setShowNotif]                 = useState(false)
   const [showCameraOverlay, setShowCameraOverlay] = useState(false)
   const [showQrModal, setShowQrModal]             = useState(false)
   const [qrModalCode, setQrModalCode]             = useState('')
@@ -762,15 +766,7 @@ export default function ConsumerDashboard() {
           </button>
         ) : (
           <div className="flex items-center gap-2.5">
-            <button
-              className="flex items-center justify-center transition-opacity hover:opacity-80 active:scale-90"
-              style={{ padding: '6px' }}
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            </button>
+            <NotificationBell role="consumer" onClick={() => setShowNotif(true)} />
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold"
               style={{
@@ -847,6 +843,43 @@ export default function ConsumerDashboard() {
               </button>
             </div>
 
+
+            {/* ── Active Pickup Status ─────────────────────────────────────────── */}
+            <div className="px-5 mb-3">
+              <ConsumerPickupStatus />
+            </div>
+
+            {/* ── Request Pickup CTA ──────────────────────────────────────────── */}
+            <div className="px-5 mb-5">
+              <button
+                onClick={() => navigate('/dashboard/consumer/pickup')}
+                className="w-full flex items-center gap-4 rounded-2xl px-5 py-4 text-left transition-all active:scale-[0.98] hover:brightness-110"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(0,200,255,0.2)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                }}
+              >
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl"
+                  style={{
+                    background: 'rgba(0,200,255,0.1)',
+                    border: '1px solid rgba(0,200,255,0.25)',
+                  }}
+                >
+                  🚛
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#fff', margin: 0 }}>
+                    Request a Pickup
+                  </p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                    Schedule curbside recycling collection
+                  </p>
+                </div>
+                <span style={{ color: '#00c8ff', fontSize: 18, lineHeight: 1 }}>→</span>
+              </button>
+            </div>
 
             {/* ── Quick Access — horizontal icon-only scroll ──────────────────── */}
             <div className="mb-5">
@@ -1785,6 +1818,10 @@ export default function ConsumerDashboard() {
             </button>
           </div>
         </div>
+      )}
+
+      {showNotif && (
+        <NotificationCenter role="consumer" onClose={() => setShowNotif(false)} />
       )}
     </div>
   )

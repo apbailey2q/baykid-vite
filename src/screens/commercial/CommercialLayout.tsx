@@ -5,13 +5,13 @@ import { BottomNav } from '../../components/ui/BottomNav'
 import { PageHeader } from '../../components/ui/PageHeader'
 
 const NAV_ITEMS = [
-  { label: 'Home',     icon: '🏢', path: '/dashboard/commercial' },
-  { label: 'Pickup',   icon: '🚛', path: '/dashboard/commercial/pickup' },
-  { label: 'Bins',     icon: '🗑️', path: '/dashboard/commercial/bins' },
-  { label: 'Reports',  icon: '📊', path: '/dashboard/commercial/reports' },
-  { label: 'Invoices', icon: '🧾', path: '/dashboard/commercial/invoices' },
-  { label: 'Support',  icon: '🎧', path: '/dashboard/commercial/support' },
-  { label: 'Profile',  icon: '👤', path: '/dashboard/commercial/profile' },
+  { label: 'Home',    icon: '🏢', path: '/dashboard/commercial' },
+  { label: 'Pickup',  icon: '🚛', path: '/dashboard/commercial/pickup' },
+  { label: 'Billing', icon: '💳', path: '/dashboard/commercial/billing' },
+  { label: 'Reports', icon: '📊', path: '/dashboard/commercial/reports' },
+  { label: 'Invoices',icon: '🧾', path: '/dashboard/commercial/invoices' },
+  { label: 'Support', icon: '🎧', path: '/dashboard/commercial/support' },
+  { label: 'Profile', icon: '👤', path: '/dashboard/commercial/profile' },
 ]
 
 interface Props {

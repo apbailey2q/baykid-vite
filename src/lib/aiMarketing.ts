@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { BadgeVariant } from '../components/ui/StatusBadge'
+import { supabase } from './supabaseClient'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1172,9 +1173,16 @@ export async function generateAIContent(params: AIContentParams): Promise<AICont
   let apiError: string | undefined
 
   try {
+    // Attach the Supabase session token so the server can validate the caller.
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData?.session?.access_token
+    const authHeaders: Record<string, string> = accessToken
+      ? { Authorization: `Bearer ${accessToken}` }
+      : {}
+
     const res = await fetch('/api/ai/generate-content', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       // Only send user inputs — the server looks up the system prompt by
       // contentType. The API key and system prompts never leave the server.
       body:    JSON.stringify({

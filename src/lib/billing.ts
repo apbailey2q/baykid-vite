@@ -257,6 +257,59 @@ export async function incrementUsage(
   return data as BillingUsageRow
 }
 
+// ── Server-side subscription summary ────────────────────────────────────────
+
+export interface SubscriptionSummary {
+  plan_code:                   string
+  plan_name:                   string
+  status:                      string
+  billing_cycle:               'monthly' | 'yearly'
+  has_stripe:                  boolean
+  stripe_customer_id?:         string | null
+  stripe_subscription_id?:     string | null
+  current_period_start?:       string | null
+  current_period_end?:         string | null
+  cancel_at_period_end:        boolean
+  trial_end?:                  string | null
+  days_remaining:              number
+  limits:                      PlanLimits
+  features:                    string[]
+  estimated_next_invoice_cents: number
+}
+
+/** Fetches the org's subscription summary from the server-side RPC.
+ *  Includes estimated_next_invoice_cents and days_remaining. */
+export async function fetchSubscriptionSummary(orgId: string): Promise<SubscriptionSummary | null> {
+  const { data, error } = await supabase.rpc('billing_get_subscription_summary', {
+    p_organization_id: orgId,
+  })
+  if (error) {
+    console.warn('[billing] fetchSubscriptionSummary failed', error.message)
+    return null
+  }
+  return data as SubscriptionSummary
+}
+
+/** Server-side check-and-increment: returns { allowed, used, limit, metric }.
+ *  Call before performing a billable action. Silently returns allowed=true on
+ *  RPC error so quota bugs never block the user from working. */
+export async function checkAndIncrementUsage(
+  orgId: string,
+  metric: UsageMetric,
+  delta = 1,
+): Promise<{ allowed: boolean; used: number; limit: number | null; reason?: string }> {
+  const { data, error } = await supabase.rpc('billing_check_and_increment', {
+    p_organization_id: orgId,
+    p_metric:          metric,
+    p_delta:           delta,
+  })
+  if (error) {
+    console.warn('[billing] checkAndIncrementUsage RPC failed — defaulting to allowed', error.message)
+    return { allowed: true, used: 0, limit: null }
+  }
+  return data as { allowed: boolean; used: number; limit: number | null; reason?: string }
+}
+
 // ── Stripe Edge Function calls ───────────────────────────────────────────────
 // We use supabase.functions.invoke() so the auth.uid() of the caller is
 // forwarded to the Edge Function automatically (RLS-aware).

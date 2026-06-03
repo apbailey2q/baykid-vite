@@ -15,7 +15,7 @@
 CREATE TABLE IF NOT EXISTS public.meta_pending_connections (
   token                       text PRIMARY KEY,
   organization_id             uuid NOT NULL
-                              REFERENCES public.ai_organizations(id) ON DELETE CASCADE
+                              REFERENCES public.ai_orgs(id) ON DELETE CASCADE
                               DEFAULT '00000000-0000-0000-0000-00000000ba47'::uuid,
   user_id                     uuid REFERENCES auth.users(id) ON DELETE CASCADE,
 

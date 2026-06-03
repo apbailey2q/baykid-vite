@@ -49,8 +49,66 @@ interface MunicipalAlert {
   timestamp: string
 }
 
-type TabId = 'overview' | 'zones' | 'alerts' | 'esg'
+type TabId = 'overview' | 'zones' | 'alerts' | 'esg' | 'contracts' | 'analytics'
 type ExportState = 'idle' | 'exporting' | 'done'
+
+// ── Contract data (static — no contracts DB table yet) ─────────────────────────
+
+interface MunicipalContract {
+  city:        string
+  status:      'active' | 'negotiating' | 'planned'
+  valuePerYear: number           // estimated annual contract value
+  renewalDate:  string | null    // ISO date string or null
+  slaScore:     number | null    // 0–100
+  compliance:   number | null    // % service compliance
+  notes:        string
+}
+
+const CONTRACTS: MunicipalContract[] = [
+  {
+    city: 'Nashville', status: 'active', valuePerYear: 540_000,
+    renewalDate: '2027-06-01', slaScore: 97, compliance: 98,
+    notes: 'Primary partnership. Includes 14 active routes, NASH-01 warehouse, and commercial overlay.',
+  },
+  {
+    city: 'Murfreesboro', status: 'active', valuePerYear: 102_000,
+    renewalDate: '2026-12-01', slaScore: 84, compliance: 89,
+    notes: 'Bi-weekly residential pilot. Routed through Nashville warehouse. SLA gap in contamination response.',
+  },
+  {
+    city: 'Clarksville', status: 'active', valuePerYear: 72_000,
+    renewalDate: '2026-09-15', slaScore: 91, compliance: 93,
+    notes: 'Single-route limited service. Renewal discussion begins Q2 2026.',
+  },
+  {
+    city: 'Memphis', status: 'negotiating', valuePerYear: 864_000,
+    renewalDate: null, slaScore: null, compliance: null,
+    notes: 'LOI signed. Final contract pending warehouse site selection.',
+  },
+  {
+    city: 'Chattanooga', status: 'negotiating', valuePerYear: 456_000,
+    renewalDate: null, slaScore: null, compliance: null,
+    notes: 'City council presentation scheduled Q3 2026.',
+  },
+  {
+    city: 'Knoxville', status: 'planned', valuePerYear: 300_000,
+    renewalDate: null, slaScore: null, compliance: null,
+    notes: 'Prospective contract. RFP response filed June 2026.',
+  },
+  {
+    city: 'Johnson City', status: 'planned', valuePerYear: 216_000,
+    renewalDate: null, slaScore: null, compliance: null,
+    notes: 'Early-stage discussion. Awaiting city budget approval.',
+  },
+]
+
+// ── Analytics trend data (last 6 months) ──────────────────────────────────────
+
+const ANA_MONTHS        = ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May']
+const ANA_PARTICIPATION = [55, 59, 63, 67, 71, 73]    // participation %
+const ANA_CONTAMINATION = [12.1, 11.4, 10.8, 9.6, 8.7, 8.4] // contamination %
+const ANA_PICKUPS       = [310, 370, 430, 490, 550, 612]    // pickup count
+const ANA_WEIGHT        = [128, 148, 166, 182, 196, 205]    // lbs ÷ 1000
 
 // ── Static city zone data (reflects real pilot geography) ─────────────────────
 
@@ -356,10 +414,12 @@ export default function MunicipalDashboard() {
   }
 
   const tabs: { id: TabId; label: string; icon: string }[] = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'zones',    label: 'City Zones', icon: '🗺️' },
-    { id: 'alerts',   label: `Alerts${alerts.length > 0 ? ` (${alerts.length})` : ''}`, icon: '🔔' },
-    { id: 'esg',      label: 'ESG Report', icon: '🌿' },
+    { id: 'overview',   label: 'Overview',   icon: '📊' },
+    { id: 'zones',      label: 'City Zones', icon: '🗺️' },
+    { id: 'contracts',  label: 'Contracts',  icon: '📋' },
+    { id: 'analytics',  label: 'Analytics',  icon: '📈' },
+    { id: 'alerts',     label: `Alerts${alerts.length > 0 ? ` (${alerts.length})` : ''}`, icon: '🔔' },
+    { id: 'esg',        label: 'ESG Report', icon: '🌿' },
   ]
 
   const m = metrics
@@ -583,6 +643,219 @@ export default function MunicipalDashboard() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── CONTRACTS TAB ───────────────────────────────────────────────── */}
+        {tab === 'contracts' && (
+          <div style={fade(visible, 0)}>
+            {/* Summary strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px,1fr))', gap: 10, marginBottom: 24 }}>
+              {[
+                { label: 'Active Contracts',    value: CONTRACTS.filter(c => c.status === 'active').length,      color: '#4ade80' },
+                { label: 'In Negotiation',       value: CONTRACTS.filter(c => c.status === 'negotiating').length, color: '#fbbf24' },
+                { label: 'Planned',              value: CONTRACTS.filter(c => c.status === 'planned').length,     color: '#94a3b8' },
+                {
+                  label: 'Est. Annual Value',
+                  value: `$${(CONTRACTS.filter(c => c.status === 'active').reduce((s,c) => s + c.valuePerYear, 0) / 1000).toFixed(0)}k`,
+                  color: '#00c8ff',
+                },
+              ].map(s => (
+                <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Contract cards */}
+            {CONTRACTS.map((c, i) => {
+              const statusColor  = c.status === 'active' ? '#4ade80' : c.status === 'negotiating' ? '#fbbf24' : '#94a3b8'
+              const statusLabel  = c.status === 'active' ? 'Active' : c.status === 'negotiating' ? 'Negotiating' : 'Planned'
+              const renewalLabel = c.renewalDate
+                ? new Date(c.renewalDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : '—'
+              const daysToRenewal = c.renewalDate
+                ? Math.ceil((new Date(c.renewalDate).getTime() - Date.now()) / 86400000)
+                : null
+              return (
+                <div key={c.city} style={{
+                  ...fade(visible, i * 50),
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 14, padding: 18, marginBottom: 12,
+                }}>
+                  {/* Header row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <span style={{ fontSize: 20 }}>{c.status === 'active' ? '✅' : c.status === 'negotiating' ? '🤝' : '⏳'}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{c.city}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}44`, borderRadius: 6, padding: '2px 8px' }}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                        Est. {`$${(c.valuePerYear / 1000).toFixed(0)}k`}/yr
+                      </div>
+                    </div>
+                    {c.status === 'active' && daysToRenewal !== null && (
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 11, color: daysToRenewal < 90 ? '#fbbf24' : 'rgba(255,255,255,0.35)' }}>
+                          {daysToRenewal < 0 ? 'Expired' : daysToRenewal < 90 ? `Renews in ${daysToRenewal}d` : `Renews ${renewalLabel}`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Metrics row (active contracts only) */}
+                  {c.status === 'active' && c.slaScore != null && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                      {[
+                        { label: 'SLA Score',        value: `${c.slaScore}%`,   color: c.slaScore >= 90 ? '#4ade80' : '#fbbf24' },
+                        { label: 'Compliance',        value: `${c.compliance}%`, color: (c.compliance ?? 0) >= 90 ? '#4ade80' : '#fbbf24' },
+                        { label: 'Renewal',           value: renewalLabel,       color: daysToRenewal !== null && daysToRenewal < 90 ? '#fbbf24' : 'rgba(255,255,255,0.6)' },
+                      ].map(stat => (
+                        <div key={stat.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>{stat.label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* SLA bar (active) */}
+                  {c.status === 'active' && c.slaScore != null && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>
+                        <span>SLA Performance</span><span>{c.slaScore}%</span>
+                      </div>
+                      <PctBar pct={c.slaScore} color={c.slaScore >= 90 ? '#4ade80' : '#fbbf24'} />
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, margin: 0 }}>{c.notes}</p>
+
+                  {/* Actions */}
+                  {isManager && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => navigate('/dashboard/municipal/reports')}
+                        style={{ background: 'rgba(0,200,255,0.1)', border: '1px solid rgba(0,200,255,0.25)', borderRadius: 6, color: '#00c8ff', fontSize: 11, padding: '4px 10px', cursor: 'pointer' }}
+                      >
+                        View Reports →
+                      </button>
+                      {c.status === 'active' && (
+                        <button
+                          onClick={() => handleExport('report')}
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.5)', fontSize: 11, padding: '4px 10px', cursor: 'pointer' }}
+                        >
+                          Export SLA Report
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Pipeline value note */}
+            <div style={{ background: 'rgba(0,200,255,0.04)', border: '1px solid rgba(0,200,255,0.12)', borderRadius: 12, padding: 16, marginTop: 8 }}>
+              <p style={{ color: '#00c8ff', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Pipeline Value</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                Est. full-pipeline annual contract value:{' '}
+                <strong style={{ color: '#4ade80' }}>
+                  ${(CONTRACTS.reduce((s, c) => s + c.valuePerYear, 0) / 1_000_000).toFixed(2)}M
+                </strong>
+                {' '}across {CONTRACTS.length} municipalities.
+                Active contracts total:{' '}
+                <strong style={{ color: '#00c8ff' }}>
+                  ${(CONTRACTS.filter(c => c.status === 'active').reduce((s, c) => s + c.valuePerYear, 0) / 1000).toFixed(0)}k/yr
+                </strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── ANALYTICS TAB ───────────────────────────────────────────────── */}
+        {tab === 'analytics' && (
+          <div style={fade(visible, 0)}>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20 }}>
+              6-month trends across all active service zones. Data reflects pilot period Dec 2025 – May 2026.
+            </p>
+
+            {/* Trend charts grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 18 }}>
+                <BarChart months={ANA_MONTHS} values={ANA_PARTICIPATION} color="#4ade80"   label="Participation Rate"  unit="%" />
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 18 }}>
+                <BarChart months={ANA_MONTHS} values={ANA_PICKUPS}       color="#00c8ff"   label="Monthly Pickups"    unit="pickups" />
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 18 }}>
+                <BarChart months={ANA_MONTHS} values={ANA_WEIGHT}        color="#a78bfa"   label="Weight Recycled"    unit="k lbs" />
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 18 }}>
+                <BarChart months={ANA_MONTHS} values={ANA_CONTAMINATION} color="#fbbf24"   label="Contamination Rate" unit="%" />
+              </div>
+            </div>
+
+            {/* Pickup density by zone */}
+            <div style={{ ...fade(visible, 100), background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 16 }}>Pickup Density by Zone (lbs/mo)</p>
+              {CITY_ZONES.filter(z => z.pickupVolume > 0).map(z => {
+                const maxVol = Math.max(...CITY_ZONES.map(x => x.pickupVolume))
+                const pct    = Math.round((z.pickupVolume / maxVol) * 100)
+                return (
+                  <div key={z.name} style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>{z.name}</span>
+                      <span style={{ fontSize: 12, color: '#00c8ff', fontWeight: 700 }}>
+                        {(z.pickupVolume / 1000).toFixed(1)}k lbs
+                      </span>
+                    </div>
+                    <PctBar pct={pct} color="#00c8ff" />
+                  </div>
+                )
+              })}
+              {CITY_ZONES.filter(z => z.pickupVolume === 0).map(z => (
+                <div key={z.name} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>{z.name}</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>Not yet launched</span>
+                  </div>
+                  <PctBar pct={0} color="#94a3b8" />
+                </div>
+              ))}
+            </div>
+
+            {/* Growth summary */}
+            <div style={{ ...fade(visible, 200), background: 'rgba(78,222,128,0.05)', border: '1px solid rgba(78,222,128,0.15)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <p style={{ color: '#4ade80', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>📈 Growth Summary — Dec 2025 → May 2026</p>
+              {[
+                { label: 'Participation rate',  from: `${ANA_PARTICIPATION[0]}%`, to: `${ANA_PARTICIPATION[ANA_PARTICIPATION.length-1]}%`, delta: `+${ANA_PARTICIPATION[ANA_PARTICIPATION.length-1]-ANA_PARTICIPATION[0]}pp` },
+                { label: 'Monthly pickups',     from: `${ANA_PICKUPS[0]}`,        to: `${ANA_PICKUPS[ANA_PICKUPS.length-1]}`,             delta: `+${Math.round(((ANA_PICKUPS[ANA_PICKUPS.length-1]-ANA_PICKUPS[0])/ANA_PICKUPS[0])*100)}%` },
+                { label: 'Weight recycled',     from: `${ANA_WEIGHT[0]}k lbs`,    to: `${ANA_WEIGHT[ANA_WEIGHT.length-1]}k lbs`,          delta: `+${Math.round(((ANA_WEIGHT[ANA_WEIGHT.length-1]-ANA_WEIGHT[0])/ANA_WEIGHT[0])*100)}%` },
+                { label: 'Contamination rate',  from: `${ANA_CONTAMINATION[0]}%`, to: `${ANA_CONTAMINATION[ANA_CONTAMINATION.length-1]}%`, delta: `−${(ANA_CONTAMINATION[0]-ANA_CONTAMINATION[ANA_CONTAMINATION.length-1]).toFixed(1)}pp` },
+              ].map(row => (
+                <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', minWidth: 160 }}>{row.label}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{row.from}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>→</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{row.to}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#4ade80', marginLeft: 'auto' }}>{row.delta}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Neighborhood performance note */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>📍 Neighborhood-Level Granularity</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, margin: 0 }}>
+                Block-level pickup density and neighborhood participation maps are available when route GPS data is fully integrated.
+                Contact operations@cbrecycling.org to enable neighborhood-level reporting for your zone.
+              </p>
+            </div>
           </div>
         )}
 

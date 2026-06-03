@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
 
   try {
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
-    if (!stripeKey) return json({ error: 'STRIPE_SECRET_KEY not configured' }, 500)
+    if (!stripeKey) return json({ error: 'STRIPE_SECRET_KEY not configured' }, req, 500)
 
     const stripe = new Stripe(stripeKey, { apiVersion: '2024-12-18.acacia' })
     const supabase = createClient(
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     const orgId     = body.org_id    as string
     const returnUrl = body.return_url as string
 
-    if (!orgId || !returnUrl) return json({ error: 'missing org_id or return_url' }, 400)
+    if (!orgId || !returnUrl) return json({ error: 'missing org_id or return_url' }, req, 400)
 
     // Find the latest active subscription so we can pull its customer id.
     const { data: sub } = await supabase
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!sub?.stripe_customer_id) {
-      return json({ error: 'no Stripe customer for this org — subscribe first' }, 404)
+      return json({ error: 'no Stripe customer for this org — subscribe first' }, req, 404)
     }
 
     const session = await stripe.billingPortal.sessions.create({
@@ -54,10 +54,10 @@ Deno.serve(async (req) => {
       return_url: returnUrl,
     })
 
-    return json({ url: session.url })
+    return json({ url: session.url }, req)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown error'
     console.error('[stripe-create-portal]', msg)
-    return json({ error: msg }, 500)
+    return json({ error: msg }, req, 500)
   }
 })

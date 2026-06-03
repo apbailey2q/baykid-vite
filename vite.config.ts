@@ -296,7 +296,7 @@ function aiApiPlugin(apiKey: string, model: string): Plugin {
   }
 
   return {
-    name: 'baykid-ai-api',
+    name: 'cbre-ai-api',
     configureServer(server) {
       server.middlewares.use('/api/ai/generate-content', (req, res) => {
         void handleRequest(req, res)
@@ -335,7 +335,7 @@ export default defineConfig(({ mode }) => {
   const envLabel = mode === 'production' ? '🔴 production' : mode === 'staging' ? '🟡 staging' : '🟢 development'
 
   console.log('\n┌─────────────────────────────────────────┐')
-  console.log('│         BayKid AI API Plugin            │')
+  console.log('│    Cyan\'s Brooklynn AI API Plugin       │')
   console.log('├─────────────────────────────────────────┤')
   console.log(`│ Mode   : ${envLabel.slice(0, 30).padEnd(30)} │`)
   console.log(`│ Model  : ${model.padEnd(30)} │`)
@@ -348,5 +348,55 @@ export default defineConfig(({ mode }) => {
       react(),
       aiApiPlugin(apiKey, model),
     ],
+
+    build: {
+      // ── Manual chunk splitting ─────────────────────────────────────────────
+      // Separates vendor libraries and app feature areas into distinct chunks
+      // so each lazy-loaded route only downloads what it needs.
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            // ── Vendor: core React ───────────────────────────────────────────
+            if (id.includes('node_modules/react/')
+              || id.includes('node_modules/react-dom/')
+              || id.includes('node_modules/react-router-dom/')
+              || id.includes('node_modules/scheduler/')) {
+              return 'vendor-react'
+            }
+
+            // ── Vendor: Supabase client ──────────────────────────────────────
+            if (id.includes('node_modules/@supabase/')) {
+              return 'vendor-supabase'
+            }
+
+            // ── Vendor: React Query ──────────────────────────────────────────
+            if (id.includes('node_modules/@tanstack/')) {
+              return 'vendor-query'
+            }
+
+            // ── Vendor: Stripe ───────────────────────────────────────────────
+            if (id.includes('node_modules/@stripe/') || id.includes('node_modules/stripe')) {
+              return 'vendor-stripe'
+            }
+
+            // ── App feature chunks (matches lazy route groups) ───────────────
+            if (id.includes('/screens/admin/ai-marketing/')) return 'chunk-ai-marketing'
+            if (id.includes('/screens/admin/'))              return 'chunk-admin'
+            if (id.includes('/screens/driver/'))             return 'chunk-driver'
+            if (id.includes('/screens/warehouse/'))          return 'chunk-warehouse'
+            if (id.includes('/screens/commercial/'))         return 'chunk-commercial'
+            if (id.includes('/screens/marketing/'))          return 'chunk-marketing'
+            if (id.includes('/screens/legal/'))              return 'chunk-legal'
+            if (id.includes('/screens/live/'))               return 'chunk-live'
+            if (id.includes('/screens/fundraisers/'))        return 'chunk-fundraisers'
+            if (id.includes('/screens/municipal/'))          return 'chunk-municipal'
+            if (id.includes('/screens/executive/'))          return 'chunk-executive'
+            if (id.includes('/screens/billing/'))            return 'chunk-billing'
+            if (id.includes('/screens/beta/'))               return 'chunk-beta'
+            if (id.includes('/screens/dashboards/'))         return 'chunk-dashboards'
+          },
+        },
+      },
+    },
   }
 })

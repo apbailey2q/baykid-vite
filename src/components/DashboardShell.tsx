@@ -1,6 +1,10 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { logout } from '../lib/auth'
 import { useAuthStore } from '../store/authStore'
+import { NotificationBell } from './notifications/NotificationBell'
+import { NotificationCenter } from './notifications/NotificationCenter'
+import type { NotificationRole } from '../store/notificationStore'
 
 // ── Unchanged logic ───────────────────────────────────────────────────────────
 const SCAN_ROLES = new Set(['driver', 'warehouse_employee', 'warehouse_supervisor', 'admin'])
@@ -36,9 +40,19 @@ function RecyclingIcon({ size }: { size: number }) {
   )
 }
 
+/** Maps auth role strings to NotificationRole. */
+function toNotifRole(role: string | null | undefined): NotificationRole {
+  if (role === 'admin') return 'admin'
+  if (role === 'warehouse_employee' || role === 'warehouse_supervisor') return 'warehouse'
+  if (role === 'driver') return 'driver'
+  if (role === 'commercial') return 'commercial'
+  return 'admin'
+}
+
 export function DashboardShell({ title, children }: Props) {
   const { profile, role } = useAuthStore()
   const location  = useLocation()
+  const [showNotif, setShowNotif] = useState(false)
 
   const handleSignOut = async () => {
     await logout()
@@ -47,8 +61,9 @@ export function DashboardShell({ title, children }: Props) {
   // Unchanged
   const showScanBtn = role ? SCAN_ROLES.has(role) : false
 
-  const initials = profile?.full_name ? getInitials(profile.full_name) : '??'
-  const onScan   = location.pathname === '/scan'
+  const initials    = profile?.full_name ? getInitials(profile.full_name) : '??'
+  const onScan      = location.pathname === '/scan'
+  const notifRole   = toNotifRole(role)
 
   return (
     <div
@@ -101,17 +116,8 @@ export function DashboardShell({ title, children }: Props) {
 
         {/* Right controls */}
         <div className="flex items-center gap-3">
-          {/* Bell */}
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-full transition-opacity hover:opacity-70"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
-            aria-label="Notifications"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-            </svg>
-          </button>
+          {/* Notification bell — live unread count */}
+          <NotificationBell role={notifRole} onClick={() => setShowNotif(true)} />
 
           {/* Avatar */}
           <div
@@ -238,6 +244,11 @@ export function DashboardShell({ title, children }: Props) {
           </span>
         </button>
       </nav>
+
+      {/* ── Notification panel ─────────────────────────────────────────────── */}
+      {showNotif && (
+        <NotificationCenter role={notifRole} onClose={() => setShowNotif(false)} />
+      )}
     </div>
   )
 }

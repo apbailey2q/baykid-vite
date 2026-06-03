@@ -1,16 +1,16 @@
 // errorHandling.ts — Production-grade error handling utilities
-// BayKid AI Marketing Center
 //
 // Provides:
 //   withRetry()        — exponential-backoff retry for async operations
 //   useAsyncAction()   — React hook wrapping async calls with loading/error state
-//   sanitizeContent()  — strip HTML/scripts from AI-generated content
+//   sanitizeContent()  — strip HTML/scripts from AI-generated content (DOMPurify)
 //   validateInput()    — field validation with rules
 //   RateLimiter        — token-bucket rate limiting (client-side)
 //   usePaginatedData() — pagination hook
 //   useDebounceValue() — debounce hook for filter inputs
 
 import { useState, useCallback, useRef, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 
 // ── Retry with exponential backoff ────────────────────────────────────────────
 
@@ -103,25 +103,36 @@ export function useAsyncAction<T>(
   return { data, loading, error, execute, reset }
 }
 
-// ── Content sanitization ──────────────────────────────────────────────────────
+// ── Content sanitization (DOMPurify) ─────────────────────────────────────────
+//
+// DOMPurify is a battle-tested HTML sanitizer that handles the full attack
+// surface of XSS, including mixed-case variants, HTML entities, and nested
+// vectors that custom regex patterns regularly miss.
+//
+// Config: ALLOWED_TAGS/ATTR is set to an empty allow-list because AI-generated
+// text is displayed in pre-formatted text nodes (not as HTML markup), so we
+// want to strip ALL HTML tags and keep only plain text content.
 
-const DANGEROUS_PATTERNS = [
-  /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
-  /<iframe[\s\S]*?>/gi,
-  /javascript:/gi,
-  /on\w+\s*=/gi,           // onclick=, onerror=, etc.
-  /<\s*\/?\s*(script|iframe|object|embed|form|input|button)[^>]*>/gi,
-  /data:text\/html/gi,
-]
-
-/** Strip dangerous HTML/script content from AI-generated text. Returns sanitized string. */
+/** Strip all HTML and dangerous content from AI-generated text. Returns plain text. */
 export function sanitizeContent(text: string): string {
   if (!text || typeof text !== 'string') return ''
-  let clean = text
-  for (const pattern of DANGEROUS_PATTERNS) {
-    clean = clean.replace(pattern, '')
+
+  // DOMPurify requires a DOM environment. In test/SSR contexts it falls back
+  // gracefully — check for the sanitize method before calling.
+  let clean: string
+  if (typeof DOMPurify.sanitize === 'function') {
+    // ALLOWED_TAGS:[] strips all HTML; KEEP_CONTENT:true preserves inner text
+    clean = String(DOMPurify.sanitize(text, {
+      ALLOWED_TAGS: [],
+      ALLOWED_ATTR: [],
+      KEEP_CONTENT: true,
+    }))
+  } else {
+    // Fallback for non-browser environments (tests, SSR): strip HTML tags with regex
+    clean = text.replace(/<[^>]*>/g, '')
   }
-  // Collapse triple+ newlines to double
+
+  // Collapse triple+ newlines to double (cosmetic, not security-related)
   clean = clean.replace(/\n{3,}/g, '\n\n')
   return clean.trim()
 }

@@ -18,8 +18,14 @@ export type NotificationEventType =
   | 'inspection_rejected'
   | 'inspection_reinspection_required'
   | 'inspection_escalated'
+  // consumer-facing events
+  | 'pickup_requested'
+  | 'pickup_confirmed'
+  | 'pickup_driver_assigned'
+  | 'pickup_completed'
+  | 'reward_earned'
 
-export type NotificationRole = 'commercial' | 'driver' | 'warehouse' | 'admin'
+export type NotificationRole = 'commercial' | 'driver' | 'warehouse' | 'admin' | 'consumer'
 
 export interface NotificationEvent {
   id:           string

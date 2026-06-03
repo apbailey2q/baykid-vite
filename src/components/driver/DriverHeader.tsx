@@ -1,11 +1,13 @@
 import { StatusBadge } from './StatusBadge'
 import { EmergencyButton } from '../EmergencyButton'
+import { NotificationBell } from '../notifications/NotificationBell'
 
 interface DriverHeaderProps {
   initials: string
+  onNotifClick?: () => void
 }
 
-export function DriverHeader({ initials }: DriverHeaderProps) {
+export function DriverHeader({ initials, onNotifClick }: DriverHeaderProps) {
   return (
     <>
       <div className="flex items-center gap-2.5">
@@ -52,6 +54,9 @@ export function DriverHeader({ initials }: DriverHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {onNotifClick && (
+          <NotificationBell role="driver" onClick={onNotifClick} />
+        )}
         <StatusBadge label="Driver" />
         <EmergencyButton variant="inline" />
         <div

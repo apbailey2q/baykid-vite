@@ -24,8 +24,10 @@ import { getDriverRates } from '../../lib/systemConfig'
 import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { logout } from '../../lib/auth'
 import { DriverHeader } from '../../components/driver/DriverHeader'
+import { NotificationCenter } from '../../components/notifications/NotificationCenter'
 import { DriverBottomNav } from '../../components/driver/DriverBottomNav'
 import { SectionLabel } from '../../components/ui/dashboard'
+import { useDriverLocation } from '../../hooks/useDriverLocation'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -122,6 +124,7 @@ export default function DriverDashboard() {
   const [bagHistoryDropdownOpen, setBagHistoryDropdownOpen] = useState(false)
   const [dayOffRequested, setDayOffRequested]           = useState(false)
   const [shiftAccepted, setShiftAccepted]               = useState(false)
+  const [showNotif, setShowNotif]                       = useState(false)
 
   const { data: broadcasts = [] } = useQuery({
     queryKey: ['driver-broadcasts'],
@@ -160,6 +163,17 @@ export default function DriverDashboard() {
     profile?.role ?? null,
     useCallback((msg: string) => setMsgBanner(msg), []),
   )
+
+  // ── GPS tracking — active while driver is online ─────────────────────────
+  const {
+    isTracking:  gpsTracking,
+    permState:   gpsPermState,
+    lastCoordAt: gpsLastAt,
+    gpsError:    gpsError,
+  } = useDriverLocation({
+    enabled: driverStatus?.is_online ?? false,
+    userId:  user?.id ?? null,
+  })
 
   useEffect(() => {
     if (!user) return
@@ -366,7 +380,7 @@ export default function DriverDashboard() {
             </div>
           </>
         ) : (
-          <DriverHeader initials={initials} />
+          <DriverHeader initials={initials} onNotifClick={() => setShowNotif(true)} />
         )}
       </header>
 
@@ -405,6 +419,39 @@ export default function DriverDashboard() {
           {isOnline ? 'Online' : 'Offline'}
         </button>
       </div>
+
+      {/* ── GPS tracking status strip (visible when online) ──────────────── */}
+      {isOnline && (
+        <div
+          className="flex items-center justify-between px-5 py-2"
+          style={{ background: 'rgba(0,200,255,0.04)', borderBottom: '1px solid rgba(0,200,255,0.08)' }}
+        >
+          {gpsPermState === 'denied' ? (
+            <p style={{ fontSize: 10, color: '#f87171', fontWeight: 600 }}>
+              🚫 Location access denied — enable in device settings
+            </p>
+          ) : gpsPermState === 'unavailable' ? (
+            <p style={{ fontSize: 10, color: '#fbbf24', fontWeight: 600 }}>
+              ⚠ GPS not available on this device
+            </p>
+          ) : gpsTracking && gpsLastAt ? (
+            <p style={{ fontSize: 10, color: '#4ade80', fontWeight: 600 }}>
+              📍 Tracking · Updated {Math.floor((Date.now() - gpsLastAt.getTime()) / 60_000) === 0
+                ? 'just now'
+                : `${Math.floor((Date.now() - gpsLastAt.getTime()) / 60_000)}m ago`}
+            </p>
+          ) : gpsError ? (
+            <p style={{ fontSize: 10, color: '#fbbf24', fontWeight: 600 }}>⚠ {gpsError}</p>
+          ) : (
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+              📍 Acquiring GPS signal…
+            </p>
+          )}
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+            Location shared while online
+          </p>
+        </div>
+      )}
 
       {/* Broadcast banner */}
       {msgBanner && (
@@ -1134,6 +1181,9 @@ export default function DriverDashboard() {
         </div>
       )}
 
+      {showNotif && (
+        <NotificationCenter role="driver" onClose={() => setShowNotif(false)} />
+      )}
     </div>
   )
 }

@@ -3,20 +3,24 @@
 // Route: POST /api/ai/generate-content
 //
 // Security:
-//   ANTHROPIC_API_KEY → set via Vercel Dashboard → Environment Variables (no VITE_ prefix)
-//   System prompts    → loaded server-side, never sent to or from the browser
-//   Input validation  → enum-validated + length-limited before forwarding to Anthropic
-//   Prompt injection  → user values are label-prefixed and newline-escaped
-//   CORS              → explicit allowlist (no wildcard in production)
-//   Rate limiting     → 20 req/min per IP (sliding window, in-memory per cold-start)
-//   Request size      → body capped at 8 KB
+//   ANTHROPIC_API_KEY  → set via Vercel Dashboard → Environment Variables (no VITE_ prefix)
+//   Supabase JWT auth  → caller must send Authorization: Bearer <supabase-access-token>
+//                        validated against SUPABASE_URL + SUPABASE_ANON_KEY
+//   System prompts     → loaded server-side, never sent to or from the browser
+//   Input validation   → enum-validated + length-limited before forwarding to Anthropic
+//   Prompt injection   → user values are label-prefixed and newline-escaped
+//   CORS               → explicit allowlist (no wildcard in production)
+//   Rate limiting      → 20 req/min per IP (sliding window, in-memory per cold-start)
+//   Request size       → body capped at 8 KB
 //
 // Fallback chain (matches dev Vite plugin):
+//   No/invalid JWT      → 401 { error: 'Authentication required' }
 //   Key missing/invalid → 503 { demo:true }
 //   Anthropic error     → 502 { demo:true, details }
 //   Parse failure       → 500 { demo:true, details }
 
 import { getSystemPrompt } from '../systemPrompts.js'
+import { createClient } from '@supabase/supabase-js'
 
 // ── Allowed enum values ───────────────────────────────────────────────────────
 
@@ -55,6 +59,36 @@ function getAllowedOrigin(origin: string | undefined): string {
   const appUrl = process.env.VITE_APP_URL ?? process.env.APP_URL
   if (appUrl && origin === appUrl) return origin
   return 'null'  // triggers CORS block for unknown origins
+}
+
+// ── Supabase JWT validation ───────────────────────────────────────────────────
+
+/**
+ * Validates the Supabase access token from the Authorization header.
+ * Returns the authenticated user, or null if the token is missing/invalid.
+ * Uses the anon key (safe for server-side validation — RLS still enforces access).
+ */
+async function validateSupabaseJwt(
+  authHeader: string | undefined
+): Promise<{ id: string; email?: string } | null> {
+  const supabaseUrl  = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
+  const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? ''
+
+  if (!supabaseUrl || !supabaseAnon) return null
+
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+  if (!token) return null
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseAnon, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    const { data, error } = await supabase.auth.getUser()
+    if (error || !data?.user) return null
+    return { id: data.user.id, email: data.user.email }
+  } catch {
+    return null
+  }
 }
 
 // ── Structured server logging (replaces console.log/warn/error) ──────────────
@@ -175,7 +209,7 @@ export default async function handler(req: any, res: any): Promise<void> {
   res.setHeader('Content-Type', 'application/json')
   res.setHeader('Access-Control-Allow-Origin',  allowedOrigin)
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   res.setHeader('Vary', 'Origin')
 
   // ── Pre-flight ───────────────────────────────────────────────────────────
@@ -183,6 +217,19 @@ export default async function handler(req: any, res: any): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method Not Allowed' })
     return
+  }
+
+  // ── Authentication — require valid Supabase JWT ──────────────────────────
+  // Skip auth only in local development (no SUPABASE_URL set in CI env)
+  const skipAuth = process.env.NODE_ENV === 'development' && !process.env.VITE_SUPABASE_URL && !process.env.SUPABASE_URL
+  if (!skipAuth) {
+    const user = await validateSupabaseJwt(req.headers['authorization'] as string | undefined)
+    if (!user) {
+      slog('WARN', 'Unauthenticated AI generation attempt rejected', { ip: getIp(req).slice(0, 20) })
+      res.status(401).json({ error: 'Authentication required. Please sign in to use AI generation.' })
+      return
+    }
+    slog('INFO', 'JWT validated', { userId: user.id.slice(0, 8) })
   }
 
   // ── Rate limiting ────────────────────────────────────────────────────────

@@ -56,6 +56,8 @@ const TYPE_ICON: Record<NotificationEventType, string> = {
 // ── Preference filtering ──────────────────────────────────────────────────────
 
 const DEFAULT_PREFS: NotifPrefs = {
+  email_enabled:      true,
+  push_enabled:       true,
   operational_alerts: true,
   billing_alerts:     true,
   dispatch_messages:  true,

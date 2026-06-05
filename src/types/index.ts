@@ -7,6 +7,11 @@ export type Role =
   | 'partner'
   | 'admin'
   | 'fundraiser'
+  | 'fundraiser_admin'      // Phase G.3 — fundraiser org owner/manager
+  | 'school_partner'        // Phase G.3 — sub-types all route to fundraiser wizard
+  | 'nonprofit_partner'
+  | 'church_partner'
+  | 'sports_team_partner'
   | 'municipal_viewer'
   | 'municipal_manager'
   | 'city_admin'
@@ -14,6 +19,27 @@ export type Role =
   | 'investor_viewer'
   | 'regional_admin'
   | 'city_manager'
+
+// ── Fundraiser ───────────────────────────────────────────────────────────────
+
+export type FundraiserOrgType =
+  | 'school' | 'church' | 'nonprofit' | 'sports_team' | 'youth_program'
+  | 'community_group' | 'pta_pto' | 'booster_club' | 'other'
+
+export type FundraiserVerificationStatus = 'pending' | 'verified' | 'flagged'
+export type FundraiserPayoutStatus       = 'pending_setup' | 'manual_review' | 'ready_for_payout' | 'paid'
+export type FundraiserCampaignStatus     = 'draft' | 'active' | 'paused' | 'completed'
+
+/** Roles that belong to the fundraiser onboarding/dashboard family. Used by
+ *  OnboardingDispatcher and route guards to gate fundraiser-specific surfaces. */
+export const FUNDRAISER_ROLES: readonly Role[] = [
+  'fundraiser', 'fundraiser_admin',
+  'school_partner', 'nonprofit_partner', 'church_partner', 'sports_team_partner',
+] as const
+
+export function isFundraiserRole(role: string | null | undefined): boolean {
+  return !!role && (FUNDRAISER_ROLES as readonly string[]).includes(role)
+}
 
 // ── Commercial ───────────────────────────────────────────────────────────────
 

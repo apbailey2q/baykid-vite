@@ -74,6 +74,7 @@ const WalletPage               = lazy(() => import('./screens/WalletPage'))
 const NotificationsPage        = lazy(() => import('./screens/NotificationsPage'))
 const ConsumerOnboarding       = lazy(() => import('./screens/onboarding/ConsumerOnboarding'))
 const OnboardingDispatcher     = lazy(() => import('./screens/onboarding/OnboardingDispatcher'))
+const WaitlistScreen           = lazy(() => import('./screens/onboarding/WaitlistScreen'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 const ScanResultPage           = lazy(() => import('./screens/fundraisers/ScanResultPage'))
@@ -385,6 +386,7 @@ function App() {
               <Route path="/dashboard/warehouse/onboarding" element={<ProtectedRoute><WarehouseOnboarding /></ProtectedRoute>} />
               <Route path="/onboarding"                      element={<ProtectedRoute><OnboardingDispatcher /></ProtectedRoute>} />
               <Route path="/onboarding/consumer"             element={<ProtectedRoute><ConsumerOnboarding /></ProtectedRoute>} />
+              <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 
               {/* ── Driver mode flow (approved drivers only) ── */}

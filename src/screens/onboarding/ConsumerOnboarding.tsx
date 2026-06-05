@@ -34,6 +34,11 @@ import { celebrate, playPop } from '../../lib/celebrate'
 import { AvatarBurst, SparkleLayer, RotatingMessage } from '../../components/Celebration'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
+import { checkZipInServiceArea, markServiceAreaVerified } from '../../lib/serviceArea'
+import {
+  getReferralInfo, smsHref, mailtoHref, copyReferralLink, nativeShare,
+  type ReferralInfo,
+} from '../../lib/referral'
 
 // localStorage key prefix for in-progress onboarding state. Per-user so a
 // browser shared between accounts can't leak one user's draft to another.
@@ -47,11 +52,15 @@ const ONBOARDING_KEY_PREFIX = 'baykid-onboarding:'
 const STEPS = [
   'welcome',
   'profile',
+  'service_area',   // Phase G.2 — gate before continuing if outside coverage
   'recycling',
   'favorites',
   'goals',
   'avatar',
   'permissions',
+  'first_scan',     // Phase G.2 — required scan before activation
+  'first_pickup',   // Phase G.2 — required pickup schedule before activation
+  'referral',       // Phase G.2 — invite friends after first success
   'done',
 ] as const
 type StepId = typeof STEPS[number]
@@ -514,6 +523,10 @@ export default function ConsumerOnboarding() {
             />
           )}
           {step === 'permissions' && <StepPermissions onBack={goBack} onContinue={goNext} />}
+          {step === 'service_area'  && <StepServiceArea form={form} userId={user?.id ?? null} onBack={goBack} onContinue={goNext} navigate={navigate} />}
+          {step === 'first_scan'    && <StepFirstScan userId={user?.id ?? null} onBack={goBack} onContinue={goNext} />}
+          {step === 'first_pickup'  && <StepFirstPickup form={form} userId={user?.id ?? null} onBack={goBack} onContinue={goNext} />}
+          {step === 'referral'      && <StepReferral userId={user?.id ?? null} onBack={goBack} onContinue={goNext} />}
           {step === 'done'        && (
             <StepDone
               form={form} avatarPreview={avatarPreview}
@@ -985,6 +998,388 @@ function ExitConfirm({ onStay, onLeave }: { onStay: () => void; onLeave: () => v
   )
 }
 
+// ── Phase G.2: first-success activation steps ────────────────────────────────
+
+function StepServiceArea({
+  form, userId, onBack, onContinue, navigate,
+}: {
+  form: FormState
+  userId: string | null
+  onBack: () => void
+  onContinue: () => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  navigate: any
+}) {
+  const [checking, setChecking] = useState(false)
+  const [result, setResult]     = useState<{ inService: boolean; areaId?: string; areaName?: string; error?: string } | null>(null)
+  const [marking, setMarking]   = useState(false)
+
+  // Auto-check on entry using the ZIP collected in StepProfile.
+  useEffect(() => {
+    let cancelled = false
+    async function go() {
+      if (!form.zip_code.trim()) { setResult({ inService: false, error: 'Enter a ZIP on the previous step.' }); return }
+      setChecking(true)
+      const r = await checkZipInServiceArea(form.zip_code)
+      if (cancelled) return
+      setChecking(false)
+      setResult(r)
+    }
+    void go()
+    return () => { cancelled = true }
+  }, [form.zip_code])
+
+  async function handleContinue() {
+    if (!result?.inService || !result.areaId || !userId) return
+    setMarking(true)
+    const r = await markServiceAreaVerified({ userId, areaId: result.areaId })
+    setMarking(false)
+    if (!r.ok) return
+    onContinue()
+  }
+
+  function goWaitlist() {
+    navigate('/waitlist', { state: { zip: form.zip_code, city: form.city, state: form.state, name: form.full_name } })
+  }
+
+  return (
+    <div>
+      <StepHeader title="Service area check" subtitle="Make sure Cyan's Brooklynn already covers your address." />
+
+      {checking && (
+        <div style={{ padding: 18, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+          Checking coverage for {form.zip_code}…
+        </div>
+      )}
+
+      {!checking && result?.inService && (
+        <div style={{ padding: 18, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+          <p style={{ color: '#4ade80', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>You're in our service area!</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.5 }}>
+            Pickups are available in <strong>{result.areaName ?? 'your area'}</strong>. Let's get you set up.
+          </p>
+        </div>
+      )}
+
+      {!checking && result && !result.inService && !result.error && (
+        <div style={{ padding: 18, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>📍</div>
+          <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>We're not in your area yet</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+            Cyan's Brooklynn doesn't cover ZIP {form.zip_code} yet. Join the waitlist and we'll let you know when we expand.
+          </p>
+          <button
+            onClick={goWaitlist}
+            style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24', borderRadius: 10, padding: '8px 16px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+          >
+            Join waitlist →
+          </button>
+        </div>
+      )}
+
+      {!checking && result?.error && (
+        <div style={{ padding: 14, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 12, color: '#fca5a5', fontSize: 12, marginBottom: 16 }}>
+          {result.error}
+        </div>
+      )}
+
+      <NavRow onBack={onBack} onContinue={handleContinue} continueDisabled={!result?.inService || marking} continueLabel={marking ? 'Saving…' : 'Continue'} />
+    </div>
+  )
+}
+
+function StepFirstScan({
+  userId, onBack, onContinue,
+}: {
+  userId: string | null
+  onBack: () => void
+  onContinue: () => void
+}) {
+  const [phase, setPhase] = useState<'idle' | 'scanning' | 'success' | 'saving'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  async function startScan() {
+    if (!userId) return
+    setError(null)
+    setPhase('scanning')
+    // Demo flow — ScannerScreen is currently a UI preview. We simulate the
+    // scan client-side so the activation timestamp is real even though the
+    // camera/QR pipeline isn't wired yet. Replace this with a real scan
+    // callback once the scanner is live.
+    await new Promise(r => setTimeout(r, 1600))
+    setPhase('saving')
+    const { error: e } = await supabase
+      .from('profiles')
+      .update({ first_bag_scanned_at: new Date().toISOString() })
+      .eq('id', userId)
+    if (e) {
+      setPhase('idle')
+      setError(e.message)
+      return
+    }
+    setPhase('success')
+    try { playPop() } catch { /* */ }
+  }
+
+  return (
+    <div>
+      <StepHeader title="Scan your first QR bag" subtitle="Earn 50 bonus points for your first scan." />
+
+      {phase === 'idle' && (
+        <div style={{ textAlign: 'center', padding: '18px 0' }}>
+          <div style={{ fontSize: 56, marginBottom: 12 }}>📦</div>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18, lineHeight: 1.5 }}>
+            Open the scanner and point it at the QR code on your first Cyan's Brooklynn bag. Once verified, you'll earn 50 bonus points and unlock pickup scheduling.
+          </p>
+          <button
+            onClick={startScan}
+            disabled={!userId}
+            style={{
+              background: 'linear-gradient(135deg,#0057e7,#00c8ff)', color: '#fff',
+              border: 'none', borderRadius: 14, padding: '14px 28px',
+              fontWeight: 800, fontSize: 14, cursor: 'pointer',
+            }}
+          >
+            📷 Open scanner
+          </button>
+        </div>
+      )}
+
+      {(phase === 'scanning' || phase === 'saving') && (
+        <div style={{ textAlign: 'center', padding: '36px 0', color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>
+          <div style={{ fontSize: 40, marginBottom: 12, animation: 'pulse 1.2s ease-in-out infinite' }}>📷</div>
+          {phase === 'scanning' ? 'Scanning…' : 'Saving your scan…'}
+        </div>
+      )}
+
+      {phase === 'success' && (
+        <div style={{ padding: 22, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 14, textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 52, marginBottom: 10 }}>♻️</div>
+          <p style={{ color: '#4ade80', fontWeight: 800, fontSize: 16, marginBottom: 4 }}>First bag scanned successfully.</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>+ 50 bonus points</p>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: 12, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 10, color: '#fca5a5', fontSize: 12, marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
+      <NavRow
+        onBack={onBack}
+        onContinue={onContinue}
+        continueDisabled={phase !== 'success'}
+        continueLabel="Continue"
+      />
+    </div>
+  )
+}
+
+function StepFirstPickup({
+  form, userId, onBack, onContinue,
+}: {
+  form: FormState
+  userId: string | null
+  onBack: () => void
+  onContinue: () => void
+}) {
+  const [preferredDate, setPreferredDate] = useState('')
+  const [bagCount,      setBagCount]      = useState(1)
+  const [notes,         setNotes]         = useState('')
+  const [submitting,    setSubmitting]    = useState(false)
+  const [done,          setDone]          = useState(false)
+  const [error,         setError]         = useState<string | null>(null)
+
+  async function handleSubmit() {
+    if (!userId || !preferredDate) return
+    setError(null)
+    setSubmitting(true)
+
+    const { error: pickupErr } = await supabase.from('consumer_pickups').insert({
+      user_id:        userId,
+      preferred_date: preferredDate,
+      time_window:    'flexible',
+      address_line1:  [form.address, form.apartment_unit].filter(Boolean).join(' ').trim(),
+      address_city:   form.city,
+      address_state:  form.state,
+      address_zip:    form.zip_code,
+      notes:          notes.trim() || null,
+    })
+    if (pickupErr) {
+      setSubmitting(false)
+      setError(pickupErr.message)
+      return
+    }
+
+    const { error: profErr } = await supabase
+      .from('profiles')
+      .update({ first_pickup_scheduled_at: new Date().toISOString() })
+      .eq('id', userId)
+
+    setSubmitting(false)
+    if (profErr) { setError(profErr.message); return }
+    setDone(true)
+    try { playPop() } catch { /* */ }
+  }
+
+  return (
+    <div>
+      <StepHeader title="Schedule your first pickup" subtitle="We'll come by your address on the day you pick." />
+
+      <Labeled label="Pickup address">
+        <div style={{ ...INPUT_STYLE, color: 'rgba(255,255,255,0.55)', cursor: 'not-allowed' }}>
+          {[form.address, form.apartment_unit].filter(Boolean).join(' ')}, {form.city}, {form.state} {form.zip_code}
+        </div>
+      </Labeled>
+
+      <Labeled label="Preferred date *">
+        <input
+          type="date"
+          value={preferredDate}
+          min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+          onChange={e => setPreferredDate(e.target.value)}
+          disabled={done}
+          style={{ ...INPUT_STYLE, colorScheme: 'dark' }}
+        />
+      </Labeled>
+
+      <Labeled label="How many bags?">
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={bagCount}
+          onChange={e => setBagCount(Math.max(1, Number(e.target.value) || 1))}
+          disabled={done}
+          style={INPUT_STYLE}
+        />
+      </Labeled>
+
+      <Labeled label="Notes (optional)">
+        <textarea
+          rows={3}
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          disabled={done}
+          placeholder="Gate code, parking notes, where to leave bags…"
+          style={{ ...INPUT_STYLE, resize: 'vertical' }}
+        />
+      </Labeled>
+
+      {done && (
+        <div style={{ padding: 14, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 12, marginBottom: 14 }}>
+          <p style={{ color: '#4ade80', fontWeight: 700, fontSize: 13 }}>📅 Pickup scheduled for {preferredDate}</p>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: 12, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 10, color: '#fca5a5', fontSize: 12, marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
+      {!done && (
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !preferredDate}
+          style={{
+            width: '100%', marginBottom: 12,
+            background: 'linear-gradient(135deg,#0057e7,#00c8ff)', color: '#fff', border: 'none',
+            borderRadius: 12, padding: '12px 16px', fontWeight: 700, fontSize: 14,
+            opacity: (!preferredDate || submitting) ? 0.5 : 1,
+            cursor: submitting ? 'wait' : 'pointer',
+          }}
+        >
+          {submitting ? 'Scheduling…' : 'Schedule pickup'}
+        </button>
+      )}
+
+      <NavRow onBack={onBack} onContinue={onContinue} continueDisabled={!done} />
+    </div>
+  )
+}
+
+function StepReferral({
+  userId, onBack, onContinue,
+}: {
+  userId: string | null
+  onBack: () => void
+  onContinue: () => void
+}) {
+  const [info, setInfo]     = useState<ReferralInfo | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!userId) return
+    void getReferralInfo(userId).then(setInfo)
+  }, [userId])
+
+  async function handleCopy() {
+    if (!info) return
+    const ok = await copyReferralLink(info.url)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  async function handleNativeShare() {
+    if (!info) return
+    const used = await nativeShare(info.code)
+    if (!used) await handleCopy()
+  }
+
+  return (
+    <div>
+      <StepHeader title="Invite friends" subtitle="Share Cyan's Brooklynn with someone who'd love it." />
+
+      {info ? (
+        <>
+          <div style={{ padding: 18, background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.25)', borderRadius: 14, marginBottom: 18, textAlign: 'center' }}>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Your referral code</p>
+            <p style={{ fontSize: 28, fontWeight: 900, color: '#00c8ff', letterSpacing: '0.1em' }}>{info.code}</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+            <a href={smsHref(info.code)} style={shareBtnStyle}>📱 Invite by text</a>
+            <a href={mailtoHref(info.code)} style={shareBtnStyle}>✉️ Invite by email</a>
+            <button onClick={handleCopy} style={{ ...shareBtnStyle, border: 'none', textAlign: 'left' }}>
+              {copied ? '✅ Link copied' : '🔗 Copy referral link'}
+            </button>
+            {typeof navigator !== 'undefined' && 'share' in navigator && (
+              <button onClick={handleNativeShare} style={{ ...shareBtnStyle, border: 'none', textAlign: 'left' }}>
+                📤 Share via…
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div style={{ padding: 18, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+          Loading your referral code…
+        </div>
+      )}
+
+      <NavRow onBack={onBack} onContinue={onContinue} continueLabel="Finish" />
+    </div>
+  )
+}
+
+const shareBtnStyle: React.CSSProperties = {
+  display: 'block',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  color: '#fff',
+  borderRadius: 12,
+  padding: '12px 14px',
+  fontSize: 13, fontWeight: 600,
+  textDecoration: 'none',
+  cursor: 'pointer',
+  width: '100%', textAlign: 'left',
+  boxSizing: 'border-box',
+}
+
 // ── Small reusable bits ──────────────────────────────────────────────────────
 
 function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -1045,14 +1440,17 @@ function ChipRow({ options, value, onSelect }: { options: readonly string[]; val
   )
 }
 
-function NavRow({ onBack, onContinue, continueLabel = 'Continue' }: {
-  onBack: () => void; onContinue: () => void; continueLabel?: string
+function NavRow({ onBack, onContinue, continueLabel = 'Continue', continueDisabled = false }: {
+  onBack: () => void
+  onContinue: () => void
+  continueLabel?: string
+  continueDisabled?: boolean
 }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
       <PrimaryButton variant="secondary" onClick={onBack}>Back</PrimaryButton>
       <div style={{ flex: 1 }}>
-        <PrimaryButton onClick={onContinue}>{continueLabel}</PrimaryButton>
+        <PrimaryButton onClick={onContinue} disabled={continueDisabled}>{continueLabel}</PrimaryButton>
       </div>
     </div>
   )

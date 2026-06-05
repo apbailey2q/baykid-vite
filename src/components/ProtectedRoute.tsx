@@ -55,7 +55,7 @@ const COMMERCIAL_DRIVER_PATHS = [
 ]
 
 export function ProtectedRoute({ children, requireApproved = false }: Props) {
-  const { user, role, profile, approvalStatus, isLoading } = useAuthStore()
+  const { user, role, profile, approvalStatus, driverComplianceStatus, isLoading } = useAuthStore()
   const { pathname } = useLocation()
 
   if (isLoading) return <Spinner />
@@ -102,6 +102,22 @@ export function ProtectedRoute({ children, requireApproved = false }: Props) {
     if (isConsumerDriverPath && dst === 'commercial_only') {
       return <AccessDenied role={role} />
     }
+  }
+
+  // Driver Compliance Pack V1 gate — drivers entering any /dashboard/driver/*
+  // route must have driver_profiles.status='approved_for_dispatch'. Otherwise
+  // bounce them to the compliance wizard so they can finish (or restart)
+  // their application. The wizard itself lives at /driver/compliance and is
+  // excluded here so it can render. Admins are exempt — they reach driver
+  // surfaces in read-only contexts.
+  if (
+    role === 'driver' &&
+    pathname.startsWith('/dashboard/driver') &&
+    pathname !== '/driver/compliance' &&
+    !pathname.startsWith('/dashboard/driver/onboarding') &&
+    driverComplianceStatus !== 'approved_for_dispatch'
+  ) {
+    return <Navigate to="/driver/compliance" replace />
   }
 
   return <>{children}</>

@@ -105,6 +105,7 @@ const DriverModeSelect         = lazy(() => import('./screens/driver/DriverModeS
 const DriverModeLanding        = lazy(() => import('./screens/driver/DriverModeLanding'))
 const DriverScanInspect        = lazy(() => import('./screens/driver/DriverScanInspect'))
 const DriverOnboarding         = lazy(() => import('./screens/driver/DriverOnboarding'))
+const DriverComplianceWizard   = lazy(() => import('./screens/driver/DriverComplianceWizard'))
 const EarningsDashboardPage    = lazy(() => import('./screens/EarningsDashboardPage'))
 const DriverRoutesPage         = lazy(() => import('./screens/DriverRoutesPage'))
 
@@ -152,6 +153,7 @@ const AdminWarehouseDetail           = lazy(() => import('./screens/admin/AdminW
 const AdminWarehouseAlerts           = lazy(() => import('./screens/admin/AdminWarehouseAlerts'))
 const AdminMessagingQA               = lazy(() => import('./screens/admin/AdminMessagingQA'))
 const AdminApprovalsPage             = lazy(() => import('./screens/admin/AdminApprovalsPage'))
+const AdminDriverCompliance          = lazy(() => import('./screens/admin/AdminDriverCompliance'))
 const AdminRegions                   = lazy(() => import('./screens/admin/AdminRegions'))
 const AdminForecasting               = lazy(() => import('./screens/admin/AdminForecasting'))
 const AdminLaunchRoadmap             = lazy(() => import('./screens/admin/AdminLaunchRoadmap'))
@@ -366,6 +368,7 @@ function App() {
               <Route path="/dashboard/admin/warehouse-alerts"        element={<ProtectedRoute requireApproved><AdminWarehouseAlerts /></ProtectedRoute>} />
               <Route path="/dashboard/admin/messaging-qa"            element={<ProtectedRoute requireApproved><AdminMessagingQA /></ProtectedRoute>} />
               <Route path="/dashboard/admin/approvals"               element={<ProtectedRoute requireApproved><AdminApprovalsPage /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/driver-compliance"       element={<ProtectedRoute requireApproved><AdminDriverCompliance /></ProtectedRoute>} />
               <Route path="/dashboard/admin/regions"                 element={<ProtectedRoute requireApproved><AdminRegions /></ProtectedRoute>} />
               <Route path="/dashboard/admin/forecasting"             element={<ProtectedRoute requireApproved><AdminForecasting /></ProtectedRoute>} />
               <Route path="/dashboard/admin/launch-roadmap"          element={<ProtectedRoute requireApproved><AdminLaunchRoadmap /></ProtectedRoute>} />
@@ -373,6 +376,9 @@ function App() {
               <Route path="/dashboard/municipal"                     element={<ProtectedRoute requireApproved><MunicipalDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/municipal/reports"             element={<ProtectedRoute requireApproved><MunicipalReports /></ProtectedRoute>} />
               <Route path="/dashboard/executive"                     element={<ProtectedRoute requireApproved><ExecutiveDashboard /></ProtectedRoute>} />
+
+              {/* Driver Compliance Pack V1 — wizard is the approval flow, so requireApproved is false */}
+              <Route path="/driver/compliance"             element={<ProtectedRoute requireApproved={false}><DriverComplianceWizard /></ProtectedRoute>} />
 
               {/* Onboarding — accessible before approval so new users can complete their application */}
               <Route path="/dashboard/driver/onboarding"    element={<ProtectedRoute><DriverOnboarding /></ProtectedRoute>} />

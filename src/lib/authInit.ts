@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { useAuthStore } from '../store/authStore'
+import type { DriverComplianceStatus } from '../types'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -27,10 +28,47 @@ async function fetchProfileDirect(userId: string, accessToken: string) {
   return Array.isArray(rows) ? (rows[0] ?? null) : null
 }
 
+// Fetch the driver_profiles.status (Driver Compliance Pack V1) for the given
+// driver. Returns null for non-drivers or when no driver_profile exists yet.
+// Failure is silently swallowed so a missing row never blocks login.
+async function fetchDriverComplianceStatus(userId: string, accessToken: string): Promise<string | null> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/driver_profiles?driver_id=eq.${encodeURIComponent(userId)}&select=status`
+    const res = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    })
+    if (!res.ok) return null
+    const rows = await res.json()
+    return Array.isArray(rows) && rows[0]?.status ? String(rows[0].status) : null
+  } catch {
+    return null
+  }
+}
+
+const DRIVER_COMPLIANCE_STATUSES: ReadonlySet<DriverComplianceStatus> = new Set([
+  'pending_review',
+  'documents_submitted',
+  'approved_for_dispatch',
+  'rejected',
+  'more_info_required',
+])
+
+function coerceDriverComplianceStatus(v: string | null): DriverComplianceStatus | null {
+  if (!v) return null
+  return DRIVER_COMPLIANCE_STATUSES.has(v as DriverComplianceStatus)
+    ? (v as DriverComplianceStatus)
+    : null
+}
+
 // Read the Supabase session from localStorage WITHOUT acquiring the Web Lock.
 // This avoids the StrictMode double-invoke deadlock on the Web Lock.
 async function bootstrapFromStorage(): Promise<void> {
-  const { setUser, setProfile, setLoading } = useAuthStore.getState()
+  const { setUser, setProfile, setDriverComplianceStatus, setLoading } = useAuthStore.getState()
   try {
     const raw = localStorage.getItem(getStorageKey())
     if (raw) {
@@ -41,8 +79,15 @@ async function bootstrapFromStorage(): Promise<void> {
         try {
           const profile = await fetchProfileDirect(session.user.id, session.access_token)
           profile ? setProfile(profile) : setProfile(null)
+          if (profile?.role === 'driver') {
+            const status = await fetchDriverComplianceStatus(session.user.id, session.access_token)
+            setDriverComplianceStatus(coerceDriverComplianceStatus(status))
+          } else {
+            setDriverComplianceStatus(null)
+          }
         } catch {
           setProfile(null)
+          setDriverComplianceStatus(null)
         }
         return
       }
@@ -64,7 +109,7 @@ export function initAuth(): () => void {
   // and may fire after bootstrapFromStorage completes — that's fine; it is
   // always authoritative and will override any stale bootstrap state.
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    const { setUser, setProfile, clearAuth, setLoading } = useAuthStore.getState()
+    const { setUser, setProfile, setDriverComplianceStatus, clearAuth, setLoading } = useAuthStore.getState()
 
     if (session?.user) {
       setUser(session.user)
@@ -73,8 +118,15 @@ export function initAuth(): () => void {
         // the onAuthStateChange callback (which itself holds the lock).
         const profile = await fetchProfileDirect(session.user.id, session.access_token)
         profile ? setProfile(profile) : setProfile(null)
+        if (profile?.role === 'driver') {
+          const status = await fetchDriverComplianceStatus(session.user.id, session.access_token)
+          setDriverComplianceStatus(coerceDriverComplianceStatus(status))
+        } else {
+          setDriverComplianceStatus(null)
+        }
       } catch {
         setProfile(null)
+        setDriverComplianceStatus(null)
       }
     } else {
       clearAuth()

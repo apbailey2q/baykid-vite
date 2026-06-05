@@ -353,3 +353,89 @@ export interface PartnerStats {
   pendingReview: number
   weeklyActivity: Array<{ date: string; bags: number }>
 }
+
+// ── Driver Compliance Pack V1 ────────────────────────────────────────────────
+// Schema lives in supabase/migrations/20260605000002_driver_compliance.sql.
+// driver_1099 ≡ DriverServiceType 'consumer_only'
+// commercial_driver ≡ DriverServiceType 'hybrid' OR 'commercial_only'
+
+export type DriverComplianceStatus =
+  | 'pending_review'
+  | 'documents_submitted'
+  | 'approved_for_dispatch'
+  | 'rejected'
+  | 'more_info_required'
+
+export type DriverDocumentType =
+  | 'license_front'
+  | 'license_back'
+  | 'insurance'
+  | 'registration'
+
+export type DriverDocumentStatus = 'pending_review' | 'approved' | 'rejected'
+
+export type BackgroundCheckStatus = 'pending' | 'clear' | 'flagged' | 'failed'
+
+export type PayoutAccountStatus = 'pending' | 'onboarding' | 'complete' | 'rejected'
+
+export interface DriverProfile {
+  driver_id:              string
+  driver_type:            'driver_1099' | 'commercial_driver'
+  status:                 DriverComplianceStatus
+  approved_at:            string | null
+  approved_by:            string | null
+  rejected_at:            string | null
+  rejection_reason:       string | null
+  // W9 — w9_tin_encrypted is bytea, never exposed to the browser.
+  w9_legal_name:          string | null
+  w9_address:             string | null
+  w9_submitted_at:        string | null
+  // Vehicle
+  vehicle_make:           string | null
+  vehicle_model:          string | null
+  vehicle_year:           number | null
+  vehicle_color:          string | null
+  vehicle_plate:          string | null
+  // Driver agreement
+  agreement_signed_at:    string | null
+  agreement_signature:    string | null
+  // Training
+  training_completed_at:  string | null
+  created_at:             string
+  updated_at:             string
+}
+
+export interface DriverDocument {
+  id:            string
+  driver_id:     string
+  document_type: DriverDocumentType
+  file_path:     string
+  status:        DriverDocumentStatus
+  uploaded_at:   string
+  reviewed_at:   string | null
+  reviewed_by:   string | null
+  expires_at:    string | null
+  notes:         string | null
+}
+
+export interface DriverBackgroundCheck {
+  id:                 string
+  driver_id:          string
+  consent_timestamp:  string
+  consent_ip:         string | null
+  status:             BackgroundCheckStatus
+  provider:           string
+  provider_reference: string | null
+  requested_at:       string
+  completed_at:       string | null
+}
+
+export interface DriverPayoutAccount {
+  id:                string
+  driver_id:         string
+  stripe_account_id: string | null
+  status:            PayoutAccountStatus
+  onboarding_url:    string | null
+  created_at:        string
+  updated_at:        string
+}

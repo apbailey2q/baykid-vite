@@ -8,6 +8,16 @@ import { AdminAlerts } from '../admin/AdminAlerts'
 import { EmergencyAlerts } from '../admin/EmergencyAlerts'
 import { RouteDispatch } from '../admin/RouteDispatch'
 import { getAllUsers, getAllAlerts } from '../../lib/admin'
+import { supabase } from '../../lib/supabase'
+
+async function fetchPendingDriverComplianceCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('driver_profiles')
+    .select('driver_id', { count: 'exact', head: true })
+    .in('status', ['pending_review', 'documents_submitted', 'more_info_required'])
+  if (error) return 0
+  return count ?? 0
+}
 
 type Tab = 'overview' | 'users' | 'broadcasts' | 'emergencies' | 'dispatch'
 
@@ -24,6 +34,12 @@ export default function AdminDashboard() {
     queryKey: ['admin-alerts'],
     queryFn: getAllAlerts,
     refetchInterval: 30_000,
+  })
+
+  const { data: pendingDriverCompliance = 0 } = useQuery({
+    queryKey: ['admin-driver-compliance-pending'],
+    queryFn: fetchPendingDriverComplianceCount,
+    refetchInterval: 60_000,
   })
 
   const pendingCount = users.filter((u) => u.approval_status === 'pending').length
@@ -93,6 +109,18 @@ export default function AdminDashboard() {
           style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)', color: '#4ade80', textDecoration: 'none' }}
         >
           🗺️ Dispatcher Map
+        </Link>
+        <Link
+          to="/dashboard/admin/driver-compliance"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa', textDecoration: 'none' }}
+        >
+          🚚 Driver Compliance
+          {pendingDriverCompliance > 0 && (
+            <span style={{ background: '#fbbf24', color: '#000', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              {pendingDriverCompliance}
+            </span>
+          )}
         </Link>
       </div>
       <div

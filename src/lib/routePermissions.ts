@@ -28,6 +28,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/warehouse-alerts':               ['admin'],
   '/dashboard/admin/messaging-qa':                   ['admin'],
   '/dashboard/admin/approvals':                      ['admin'],
+  '/dashboard/admin/driver-compliance':              ['admin'],
   '/dashboard/admin/regions':                        ['admin', 'regional_admin', 'city_manager'],
   '/dashboard/admin/forecasting':                    ['admin'],
   '/dashboard/admin/launch-roadmap':                 ['admin'],
@@ -140,6 +141,9 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
     'regional_admin','city_manager',
   ],
   '/driver/pending-approval':                        ['admin', 'driver'],
+
+  // ── Driver Compliance Pack V1 wizard (pre-approval) ───────────────────────
+  '/driver/compliance':                              ['admin', 'driver'],
 
   // ── Driver mode flow (post-login, mode selector + landings + scans) ──────
   '/driver/mode':                                    ['admin', 'driver'],

@@ -88,7 +88,7 @@ export async function executePublish(opts: ExecutePublishOpts): Promise<ExecuteP
   return {
     url:            result.url,
     platformPostId: result.platformPostId,
-    platform:       account.platform as 'facebook' | 'instagram',
+    platform:       account.platform as 'facebook' | 'instagram' | 'linkedin',
   }
 }
 

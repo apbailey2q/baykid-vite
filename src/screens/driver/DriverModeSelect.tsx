@@ -4,8 +4,10 @@
 // Choice is persisted to localStorage so the same browser remembers the
 // last-used mode for the "Switch mode" affordance on each landing.
 
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { canAccessCommercialDriver } from '../../lib/auth'
 
 const MODE_KEY = 'baykid-driver-mode'
 
@@ -27,6 +29,18 @@ export default function DriverModeSelect() {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
   const firstName = (profile?.full_name ?? '').split(' ')[0]
+
+  // 1099 consumer-only drivers must NEVER see the selection screen. Whether
+  // they got here via direct URL or stale localStorage, route them straight
+  // to the residential dashboard. The server-side RLS gate
+  // (is_commercial_capable_driver) is the authoritative defense; this is
+  // the matching client-side UX.
+  useEffect(() => {
+    if (profile && !canAccessCommercialDriver(profile)) {
+      setDriverMode('residential')
+      navigate('/dashboard/driver', { replace: true })
+    }
+  }, [profile, navigate])
 
   function choose(mode: DriverMode) {
     setDriverMode(mode)

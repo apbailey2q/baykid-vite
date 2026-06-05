@@ -5,6 +5,32 @@ import { useAuthStore } from '../store/authStore'
 
 export const AUTO_APPROVED_ROLES: Role[] = ['consumer']
 
+// ── Driver subtype access helpers ────────────────────────────────────────────
+// Spec mapping (user terminology ↔ schema):
+//   driver_1099       ≡ role='driver' AND driver_service_type='consumer_only'
+//   commercial_driver ≡ role='driver' AND driver_service_type IN ('hybrid','commercial_only')
+//
+// These wrap the rule so every client check stays consistent. Server-side the
+// same rule is encoded in public.is_commercial_capable_driver() (RLS).
+
+interface DriverGateInput {
+  role?:                Role | string | null
+  driver_service_type?: DriverServiceType | string | null
+}
+
+export function is1099Driver(p: DriverGateInput | null | undefined): boolean {
+  if (!p) return false
+  if (p.role !== 'driver') return false
+  return p.driver_service_type === 'consumer_only'
+}
+
+export function canAccessCommercialDriver(p: DriverGateInput | null | undefined): boolean {
+  if (!p) return false
+  if (p.role === 'admin') return true
+  if (p.role !== 'driver') return false
+  return p.driver_service_type === 'hybrid' || p.driver_service_type === 'commercial_only'
+}
+
 /**
  * Canonical role normalizer. Maps legacy/variant DB values to the Role type
  * used throughout the app. This is the single implementation — App.tsx and
@@ -65,8 +91,8 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
     case 'municipal_viewer':
     case 'municipal_manager':
     case 'city_admin':          return '/dashboard/municipal'
-    case 'executive':
-    case 'investor_viewer':     return '/dashboard/executive'
+    case 'executive':           return '/dashboard/executive'
+    case 'investor_viewer':     return '/dashboard/admin/investor'
     case 'regional_admin':
     case 'city_manager':        return '/dashboard/admin/regions'
     default:                    return '/real-login'

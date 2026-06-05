@@ -1,22 +1,23 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-// TODO: Replace with real scan data from route state or Supabase query
-const demoScanRewardSplit = {
-  bagId: 'BAG-DEMO0001',
-  totalEarnings: 1.40,
-  co2Saved: 2.1,
-  pointsEarned: 140,
-  userAmount: 0.98,
-  fundraiserAmount: 0.42,
-}
-const activeFundraiser = {
-  emoji: '🏀',
-  name: 'East Nashville High Basketball',
-  percentToCause: 30,
-}
 
-// ── Demo-only: no real camera, no Supabase ────────────────────────────────────
-// This screen is a visual simulation only.
+// ── UI Preview state — no real camera or Supabase connection ─────────────────
+// This screen demonstrates the scanning UX. Real bag scan values are
+// populated from route state (bagId in URL params) once the camera
+// integration is complete. Values shown after scan are illustrative only.
+const PREVIEW_SCAN = {
+  bagId:            '—',
+  totalEarnings:    0,
+  co2Saved:         0,
+  pointsEarned:     0,
+  userAmount:       0,
+  fundraiserAmount: 0,
+}
+const PREVIEW_FUNDRAISER = {
+  emoji:          '♻️',
+  name:           'Your Active Fundraiser',
+  percentToCause: 0,
+}
 
 type ScanState = 'idle' | 'scanning' | 'verified'
 
@@ -66,9 +67,8 @@ export default function ScannerScreen() {
   const [showFlash, setShowFlash]             = useState(false)
   const [soundOn, setSoundOn]                 = useState(true)
 
-  // Default to 'personal' so the page never crashes if fundraiser is unavailable
-  const scan = demoScanRewardSplit ?? { bagId: 'CB-NASH-000421', totalEarnings: 2.85, userAmount: 2.00, fundraiserAmount: 0.85, pointsEarned: 285, co2Saved: 4.2 }
-  const fund = activeFundraiser  ?? { id: 'fund-001', name: 'East Nashville High Basketball', percentToCause: 30 }
+  const scan = PREVIEW_SCAN
+  const fund = PREVIEW_FUNDRAISER
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimate(true))
@@ -107,14 +107,15 @@ export default function ScannerScreen() {
     { bottom: 10, right: 10, borderBottom: `3px solid ${bracketColor}`, borderRight: `3px solid ${bracketColor}`, borderRadius: '0 0 7px 0' },
   ] as const
 
+  // Preview result rows — real values come from route state once camera integration ships
   const resultRows = [
-    { label: 'Bag ID',              value: scan.bagId,                              mono: true,  accent: false },
-    { label: 'Warehouse',           value: 'NASH-01',                               mono: true,  accent: false },
-    { label: 'Estimated Value',     value: `$${scan.totalEarnings.toFixed(2)}`,     mono: false, accent: false },
-    { label: 'Fundraiser',          value: fund.name,                               mono: false, accent: true  },
-    { label: 'Fundraiser Receives', value: `$${scan.fundraiserAmount.toFixed(2)}`,  mono: false, accent: true  },
-    { label: 'CO₂ Saved',           value: `${scan.co2Saved} lbs`,                 mono: false, accent: false },
-    { label: 'Points Earned',       value: scan.pointsEarned.toLocaleString(),      mono: false, accent: false },
+    { label: 'Bag ID',              value: 'Scanned via camera',  mono: true,  accent: false },
+    { label: 'Warehouse',           value: 'Assigned on scan',    mono: true,  accent: false },
+    { label: 'Estimated Value',     value: 'Calculated on scan',  mono: false, accent: false },
+    { label: 'Fundraiser',          value: fund.name,             mono: false, accent: true  },
+    { label: 'Fundraiser Receives', value: 'Calculated on scan',  mono: false, accent: true  },
+    { label: 'CO₂ Saved',           value: 'Calculated on scan',  mono: false, accent: false },
+    { label: 'Points Earned',       value: 'Calculated on scan',  mono: false, accent: false },
   ]
 
   return (
@@ -154,6 +155,12 @@ export default function ScannerScreen() {
           <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Scan Bag</span>
+          <span
+            className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+            style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24', letterSpacing: '0.06em' }}
+          >
+            UI PREVIEW
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {/* Sound toggle */}

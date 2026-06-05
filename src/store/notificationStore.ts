@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,34 +53,46 @@ interface NotificationStore {
   clearAll:             (role: NotificationRole) => void
 }
 
-export const useNotificationStore = create<NotificationStore>((set) => ({
-  notifications: [], // populated by real-time subscription in useBroadcastAlerts / notificationRouter
+export const useNotificationStore = create<NotificationStore>()(
+  persist(
+    (set) => ({
+      notifications: [], // populated by real-time subscription in useBroadcastAlerts / notificationRouter
 
-  addNotification: (event) =>
-    set(s => ({
-      notifications: [{
-        ...event,
-        id:        `live-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        timestamp: 'Just now',
-        read:      false,
-      }, ...s.notifications],
-    })),
+      addNotification: (event) =>
+        set(s => ({
+          // Keep at most 100 notifications to avoid unbounded localStorage growth
+          notifications: [{
+            ...event,
+            id:        `live-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            timestamp: 'Just now',
+            read:      false,
+          }, ...s.notifications].slice(0, 100),
+        })),
 
-  // Inserts only if the exact id is not already present — safe to call on every reload
-  upsertNotification: (event) =>
-    set(s => s.notifications.some(n => n.id === event.id)
-      ? s
-      : { notifications: [event, ...s.notifications] }),
+      // Inserts only if the exact id is not already present — safe to call on every reload
+      upsertNotification: (event) =>
+        set(s => s.notifications.some(n => n.id === event.id)
+          ? s
+          : { notifications: [event, ...s.notifications].slice(0, 100) }),
 
-  markRead: (id) =>
-    set(s => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) })),
+      markRead: (id) =>
+        set(s => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) })),
 
-  markAllRead: (role) =>
-    set(s => ({ notifications: s.notifications.map(n => n.relatedRole === role ? { ...n, read: true } : n) })),
+      markAllRead: (role) =>
+        set(s => ({ notifications: s.notifications.map(n => n.relatedRole === role ? { ...n, read: true } : n) })),
 
-  clearNotification: (id) =>
-    set(s => ({ notifications: s.notifications.filter(n => n.id !== id) })),
+      clearNotification: (id) =>
+        set(s => ({ notifications: s.notifications.filter(n => n.id !== id) })),
 
-  clearAll: (role) =>
-    set(s => ({ notifications: s.notifications.filter(n => n.relatedRole !== role) })),
-}))
+      clearAll: (role) =>
+        set(s => ({ notifications: s.notifications.filter(n => n.relatedRole !== role) })),
+    }),
+    {
+      name:        'cbr-notifications',
+      // Only persist the notification list. Limited to 100 entries above.
+      // Live notifications are re-fetched from the realtime subscription on
+      // reconnect, so persistence is for display continuity only.
+      partialize: (state) => ({ notifications: state.notifications }),
+    },
+  ),
+)

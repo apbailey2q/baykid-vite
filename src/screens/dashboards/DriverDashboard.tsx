@@ -466,7 +466,7 @@ export default function DriverDashboard() {
       )}
 
       {/* Scrollable body */}
-      <main className="relative flex-1 overflow-y-auto pb-40" style={{ zIndex: 1 }}>
+      <main id="main-content" className="relative flex-1 overflow-y-auto pb-40" style={{ zIndex: 1 }}>
 
         {/* ── HOME ─────────────────────────────────────────────────────────── */}
         {driverTab === 'home' && (
@@ -494,7 +494,6 @@ export default function DriverDashboard() {
             )}
 
             {/* ── Pickup Activity Card ─────────────────────────────────── */}
-            {/* TODO: Replace placeholder with real map when route optimizer is connected */}
             <div style={{ borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(0,200,255,0.15)', background: 'rgba(0,12,30,0.7)' }}>
 
               {/* ── Earnings row ── */}
@@ -509,7 +508,7 @@ export default function DriverDashboard() {
                 </div>
               </div>
 
-              {/* ── Map placeholder ── */}
+              {/* ── Route map coming soon ── */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', minHeight: 160 }}>
                 <div style={{ width: 52, height: 52, borderRadius: 16, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -519,7 +518,7 @@ export default function DriverDashboard() {
                 </div>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Live pickup map</p>
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: 5, maxWidth: 220, lineHeight: 1.5 }}>
-                  Available when the route optimizer is connected
+                  Use the Pickups tab to view and manage your assigned stops
                 </p>
               </div>
 

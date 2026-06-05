@@ -440,6 +440,8 @@ export default function AdminRecyclingAnalytics() {
             <button
               key={p}
               onClick={() => setPeriod(p)}
+              aria-pressed={period === p}
+              aria-label={`Show data for ${p === 'all' ? 'all time' : p === '30d' ? 'last 30 days' : p === '90d' ? 'last 90 days' : 'last 6 months'}`}
               style={{
                 flex: 1, padding: '7px 0', borderRadius: 9,
                 fontSize: 11, fontWeight: 700,
@@ -456,7 +458,7 @@ export default function AdminRecyclingAnalytics() {
 
         {/* ── Environmental Impact Stats ── */}
         <SectionLabel>Environmental Impact</SectionLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 20 }}>
           <HeroStat
             icon="⚖️"
             label="Pounds Recycled"
@@ -493,7 +495,7 @@ export default function AdminRecyclingAnalytics() {
 
         {/* ── Pickup Volume Stats ── */}
         <SectionLabel>Pickup Volume</SectionLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 20 }}>
           <HeroStat
             icon="✅"
             label="Completed"

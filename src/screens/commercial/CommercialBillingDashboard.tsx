@@ -426,7 +426,7 @@ export default function CommercialBillingDashboard() {
 
         {/* ── 3. Monthly Usage ── */}
         <SectionLabel>Pickup Usage — This Month</SectionLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 20 }}>
           <StatPill label="This Month"  value={thisMonth.length} color="#00c8ff" />
           <StatPill label="Completed"   value={completed}        color="#4ade80" />
           <StatPill label="Pending"     value={pending}          color="#fbbf24" />

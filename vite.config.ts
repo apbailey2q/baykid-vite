@@ -350,6 +350,10 @@ export default defineConfig(({ mode }) => {
     ],
 
     build: {
+      // Hidden source maps ship to the server (Sentry / error tracker) but are
+      // never served to the browser, so users cannot reconstruct the source.
+      sourcemap: 'hidden',
+
       // ── Manual chunk splitting ─────────────────────────────────────────────
       // Separates vendor libraries and app feature areas into distinct chunks
       // so each lazy-loaded route only downloads what it needs.
@@ -372,6 +376,11 @@ export default defineConfig(({ mode }) => {
             // ── Vendor: React Query ──────────────────────────────────────────
             if (id.includes('node_modules/@tanstack/')) {
               return 'vendor-query'
+            }
+
+            // ── Vendor: PostHog — large analytics SDK in its own chunk ───────
+            if (id.includes('node_modules/posthog-js')) {
+              return 'vendor-posthog'
             }
 
             // ── Vendor: Stripe ───────────────────────────────────────────────

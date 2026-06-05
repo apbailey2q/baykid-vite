@@ -1,6 +1,6 @@
 {
-  "name": "Cyan's Brooklynn — Smart Recycling",
-  "short_name": "Cyan's Brooklynn",
+  "name": "Smart Recycling",
+  "short_name": "Recycling",
   "description": "Track every recycling bag from your door to the warehouse — QR scanning, real-time logistics, and environmental impact reporting.",
   "lang": "en",
   "start_url": "/",
@@ -8,7 +8,8 @@
   "display": "standalone",
   "background_color": "#060e24",
   "theme_color": "#00c8ff",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "id": "/",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -35,6 +36,22 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Scan Bag",
+      "short_name": "Scan",
+      "url": "/scan",
+      "description": "Scan a QR recycling bag",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Request Pickup",
+      "short_name": "Pickup",
+      "url": "/dashboard/consumer/pickup",
+      "description": "Request a curbside pickup",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["productivity", "utilities", "lifestyle"],
   "screenshots": []
 }

@@ -2,11 +2,46 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- ── PWA manifest + theme ────────────────────────────────────────────── -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#00c8ff" />
+    <meta name="description" content="Smart recycling pickup, QR bag tracking, and environmental impact reporting for your community." />
+
+    <!-- ── iOS / Safari PWA ───────────────────────────────────────────────── -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Recycling" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- ── Viewport + icons ───────────────────────────────────────────────── -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>baykid-vite</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>Smart Recycling · Cyan's Brooklynn</title>
+
+    <!-- ── Skip-link for keyboard / screen-reader users ──────────────────── -->
+    <style>
+      .skip-link {
+        position: absolute;
+        top: -100%;
+        left: 0;
+        z-index: 9999;
+        padding: 10px 18px;
+        background: #00c8ff;
+        color: #060e24;
+        font-weight: 700;
+        font-size: 14px;
+        text-decoration: none;
+        border-radius: 0 0 10px 0;
+        transition: top 0.1s;
+      }
+      .skip-link:focus { top: 0; }
+    </style>
   </head>
   <body>
+    <!-- Visible-on-focus skip link jumps keyboard users past nav to content -->
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

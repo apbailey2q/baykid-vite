@@ -127,9 +127,26 @@ export default function DispatcherLiveMap() {
     void fetchDrivers()
   }, [fetchDrivers])
 
-  // ── Realtime subscription ──────────────────────────────────────────────────
+  // ── Realtime subscription with polling fallback ────────────────────────────
+  // Polling only activates if realtime fails to connect; it is cleared
+  // immediately if realtime recovers. This prevents the double-fetch on every
+  // change that occurred when both ran unconditionally.
 
   useEffect(() => {
+    let pollingInterval: ReturnType<typeof setInterval> | null = null
+
+    const startPolling = () => {
+      if (pollingInterval) return                    // already running
+      pollingInterval = setInterval(() => { void fetchDrivers() }, 20_000)
+    }
+
+    const stopPolling = () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval)
+        pollingInterval = null
+      }
+    }
+
     const channel = supabase
       .channel('dispatcher-live-map')
       .on(
@@ -137,14 +154,19 @@ export default function DispatcherLiveMap() {
         { event: '*', schema: 'public', table: 'driver_live_locations' },
         () => { void fetchDrivers() },
       )
-      .subscribe()
-
-    // Polling fallback (20 s) in case realtime is unavailable
-    const interval = setInterval(() => { void fetchDrivers() }, 20_000)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          // Realtime connected — polling is not needed
+          stopPolling()
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          // Realtime unavailable — fall back to polling
+          startPolling()
+        }
+      })
 
     return () => {
       void supabase.removeChannel(channel)
-      clearInterval(interval)
+      stopPolling()
     }
   }, [fetchDrivers])
 

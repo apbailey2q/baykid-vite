@@ -44,18 +44,16 @@ interface LiveKPIs {
 type ExportState = 'idle' | 'generating' | 'done'
 type Section = 'kpis' | 'growth' | 'financial' | 'impact'
 
-// ── Static growth series (Dec 2025 → May 2026) ────────────────────────────────
-// These reflect the pilot trajectory and are used until live revenue time-series is available.
+// ── Growth series (computed from live DB) ─────────────────────────────────────
+// Aggregated monthly over the trailing 6 months. Null = no data in DB yet.
 
-const MO6   = ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May']
-
-const SERIES = {
-  revenue:      [18_400,  22_100,  26_800,  31_200,  37_600,  44_200 ],   // USD
-  pickups:      [310,     370,     430,     490,     550,     612    ],   // count
-  users:        [640,     820,     1_050,   1_360,   1_720,   2_100  ],   // accounts
-  weightKLbs:   [128,     148,     166,     182,     196,     205    ],   // k lbs
-  commercial:   [28,      33,      37,      41,      44,      47     ],   // accounts
-  drivers:      [8,       10,      12,      14,      16,      19     ],   // drivers
+interface GrowthSeries {
+  months:     string[]   // e.g. ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+  revenue:    number[]   // sum of paid invoices per month (USD)
+  pickups:    number[]   // count of completed pickups per month
+  users:      number[]   // cumulative registered users at end of each month
+  commercial: number[]   // count of active commercial accounts at end of each month
+  hasData:    boolean    // false when all series are all-zero
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,12 +133,12 @@ function KpiCard({
 }
 
 function SparkBar({
-  values, color, label, formatFn, unit, growth,
+  values, months, color, label, formatFn, unit, growth,
 }: {
-  values: number[]; color: string; label: string
+  values: number[]; months: string[]; color: string; label: string
   formatFn: (v: number) => string; unit: string; growth: number
 }) {
-  const max   = Math.max(...values)
+  const max   = Math.max(...values, 1)   // avoid division by zero
   const last  = values[values.length - 1]
   const up    = growth >= 0
   return (
@@ -176,7 +174,7 @@ function SparkBar({
               boxShadow: i === values.length - 1 ? `0 0 8px ${color}55` : 'none',
               minHeight: v > 0 ? 3 : 0,
             }} />
-            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{MO6[i]}</span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{months[i]}</span>
           </div>
         ))}
       </div>
@@ -198,12 +196,32 @@ function FinancialRow({ label, value, sub, color = '#fff' }: { label: string; va
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
+// ── Monthly aggregation helper ────────────────────────────────────────────────
+// Returns an array of 6 month labels (oldest → newest) aligned to the current month.
+
+function buildMonthLabels(count = 6): { labels: string[]; starts: Date[]; ends: Date[] } {
+  const now    = new Date()
+  const labels: string[] = []
+  const starts: Date[]   = []
+  const ends:   Date[]   = []
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    labels.push(d.toLocaleDateString('en-US', { month: 'short' }))
+    starts.push(new Date(d.getFullYear(), d.getMonth(), 1))
+    ends.push(new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999))
+  }
+  return { labels, starts, ends }
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
 export default function InvestorDashboard() {
-  const [kpis,         setKpis]         = useState<LiveKPIs | null>(null)
-  const [loading,      setLoading]      = useState(true)
-  const [presentation, setPresentation] = useState(false)
-  const [exportState,  setExportState]  = useState<ExportState>('idle')
-  const [activeSection, setSection]     = useState<Section>('kpis')
+  const [kpis,          setKpis]         = useState<LiveKPIs | null>(null)
+  const [growthSeries,  setGrowthSeries] = useState<GrowthSeries | null>(null)
+  const [loading,       setLoading]      = useState(true)
+  const [presentation,  setPresentation] = useState(false)
+  const [exportState,   setExportState]  = useState<ExportState>('idle')
+  const [activeSection, setSection]      = useState<Section>('kpis')
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -215,16 +233,16 @@ export default function InvestorDashboard() {
     ] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, role, approval_status'),
+        .select('id, role, approval_status, created_at'),
       supabase
         .from('commercial_accounts')
         .select('id, account_status'),
       supabase
         .from('commercial_pickups')
-        .select('id, status'),
+        .select('id, status, created_at'),
       supabase
         .from('commercial_invoices')
-        .select('amount, status'),
+        .select('amount, status, created_at'),
       supabase
         .from('esg_weight_summary')
         .select('total_weight_lbs, co2_saved_lbs_estimate'),
@@ -267,6 +285,56 @@ export default function InvestorDashboard() {
       co2SavedLbs:        usingFallback ? 167_572: co2SavedLbs,   // 204.6k × 0.82
       usingFallback,
     })
+
+    // ── Build real monthly growth series (trailing 6 months) ──────────────
+    const { labels, starts, ends } = buildMonthLabels(6)
+
+    const revenueByMonth    = labels.map((_, i) =>
+      invoices
+        .filter(inv => {
+          if (inv.status !== 'paid' || !inv.created_at) return false
+          const d = new Date(inv.created_at as string)
+          return d >= starts[i] && d <= ends[i]
+        })
+        .reduce((s, inv) => s + (inv.amount ?? 0), 0),
+    )
+
+    const pickupsByMonth    = labels.map((_, i) =>
+      pickups.filter(p => {
+        if (p.status !== 'completed' || !p.created_at) return false
+        const d = new Date(p.created_at as string)
+        return d >= starts[i] && d <= ends[i]
+      }).length,
+    )
+
+    // Cumulative user count at end of each month
+    const usersByMonth = labels.map((_, i) =>
+      profiles.filter(p => {
+        if (!p.created_at) return false
+        return new Date(p.created_at as string) <= ends[i]
+      }).length,
+    )
+
+    const commercialByMonth = labels.map(() =>
+      // commercial_accounts has no created_at in this query — flat count for now
+      commercial.filter(a => a.account_status === 'active').length,
+    )
+
+    const hasData = (
+      revenueByMonth.some(v => v > 0) ||
+      pickupsByMonth.some(v => v > 0) ||
+      usersByMonth.some(v => v > 0)
+    )
+
+    setGrowthSeries({
+      months:     labels,
+      revenue:    revenueByMonth,
+      pickups:    pickupsByMonth,
+      users:      usersByMonth,
+      commercial: commercialByMonth,
+      hasData,
+    })
+
     setLoading(false)
   }, [])
 
@@ -303,11 +371,14 @@ export default function InvestorDashboard() {
         `  Landfill Reduction     ${fmtTons(kpis.totalWeightLbs)} tons`,
         `  CO₂ conversion: 0.82 lb CO₂e per lb recycled (EPA baseline)`,
         ``,
-        `GROWTH (Dec 2025 → May 2026)`,
-        `  Revenue growth         +${growthPct(SERIES.revenue)}%`,
-        `  Pickup volume growth   +${growthPct(SERIES.pickups)}%`,
-        `  User growth            +${growthPct(SERIES.users)}%`,
-        `  Recycling growth       +${growthPct(SERIES.weightKLbs)}%`,
+        `GROWTH (6-month trailing)`,
+        growthSeries?.hasData
+          ? [
+              `  Revenue growth         ${growthPct(growthSeries.revenue) >= 0 ? '+' : ''}${growthPct(growthSeries.revenue)}%`,
+              `  Pickup volume growth   ${growthPct(growthSeries.pickups) >= 0 ? '+' : ''}${growthPct(growthSeries.pickups)}%`,
+              `  User growth            ${growthPct(growthSeries.users) >= 0 ? '+' : ''}${growthPct(growthSeries.users)}%`,
+            ].join('\n')
+          : `  No historical data available yet — charts will populate as transactions accumulate.`,
         ``,
         `──────────────────────────────────────────────────`,
         `${kpis.usingFallback ? 'NOTE: Some metrics reflect demo/pilot values while platform is ramping.' : 'All metrics are live from production database.'}`,
@@ -353,6 +424,8 @@ export default function InvestorDashboard() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               onClick={() => setPresentation(p => !p)}
+              aria-pressed={presentation}
+              aria-label={presentation ? 'Disable presentation mode' : 'Enable presentation mode'}
               style={{
                 background: presentation ? 'rgba(0,200,255,0.15)' : 'rgba(255,255,255,0.06)',
                 border: presentation ? '1px solid rgba(0,200,255,0.35)' : '1px solid rgba(255,255,255,0.12)',
@@ -386,6 +459,8 @@ export default function InvestorDashboard() {
             <button
               key={s.id}
               onClick={() => setSection(s.id)}
+              aria-current={activeSection === s.id ? 'true' : undefined}
+              aria-label={`Show ${s.label} section`}
               style={{
                 flex: 1, padding: '8px 10px', borderRadius: 9, whiteSpace: 'nowrap',
                 fontSize: 12, fontWeight: 700,
@@ -458,36 +533,67 @@ export default function InvestorDashboard() {
             {/* ── GROWTH CHARTS ── */}
             {activeSection === 'growth' && (
               <div>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>
-                  6-month trajectory Dec 2025 → May 2026. Revenue and pickup data are from pilot period.
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-                  <SparkBar values={SERIES.revenue}    color="#4ade80" label="Revenue"           formatFn={v => fmt$(v)} unit="USD"     growth={growthPct(SERIES.revenue)} />
-                  <SparkBar values={SERIES.pickups}    color="#00c8ff" label="Monthly Pickups"   formatFn={v => String(v)} unit="pickups" growth={growthPct(SERIES.pickups)} />
-                  <SparkBar values={SERIES.users}      color="#a78bfa" label="User Growth"       formatFn={v => fmtNum(v)} unit="accounts" growth={growthPct(SERIES.users)} />
-                  <SparkBar values={SERIES.weightKLbs} color="#5eead4" label="Recycling Volume"  formatFn={v => `${v}k`}  unit="lbs"    growth={growthPct(SERIES.weightKLbs)} />
-                  <SparkBar values={SERIES.commercial} color="#fbbf24" label="Commercial Accts." formatFn={v => String(v)} unit="accounts" growth={growthPct(SERIES.commercial)} />
-                  <SparkBar values={SERIES.drivers}    color="#60a5fa" label="Driver Network"    formatFn={v => String(v)} unit="drivers"  growth={growthPct(SERIES.drivers)} />
-                </div>
-
-                <GlassCard padding="md">
-                  <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Growth Summary (6-month pilot)</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {[
-                      { label: 'Revenue',           pct: growthPct(SERIES.revenue),    color: '#4ade80' },
-                      { label: 'Pickup volume',      pct: growthPct(SERIES.pickups),    color: '#00c8ff' },
-                      { label: 'User base',          pct: growthPct(SERIES.users),      color: '#a78bfa' },
-                      { label: 'Recycling weight',   pct: growthPct(SERIES.weightKLbs), color: '#5eead4' },
-                      { label: 'Commercial accounts',pct: growthPct(SERIES.commercial), color: '#fbbf24' },
-                      { label: 'Driver network',     pct: growthPct(SERIES.drivers),    color: '#60a5fa' },
-                    ].map(r => (
-                      <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{r.label}</span>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: r.color }}>+{r.pct}%</span>
-                      </div>
-                    ))}
+                {!growthSeries?.hasData ? (
+                  /* No real data yet — never show fake metrics to investors */
+                  <div
+                    style={{
+                      display:        'flex',
+                      flexDirection:  'column',
+                      alignItems:     'center',
+                      justifyContent: 'center',
+                      minHeight:      260,
+                      gap:            14,
+                      textAlign:      'center',
+                      background:     'rgba(255,255,255,0.03)',
+                      border:         '1px dashed rgba(255,255,255,0.1)',
+                      borderRadius:   18,
+                      padding:        '40px 24px',
+                    }}
+                  >
+                    <div style={{ fontSize: 36 }}>📊</div>
+                    <div>
+                      <p style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                        No Historical Data Available
+                      </p>
+                      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6, maxWidth: 260, lineHeight: 1.6 }}>
+                        Monthly growth charts will populate automatically as
+                        commercial pickups, invoices, and user registrations
+                        accumulate in the database.
+                      </p>
+                    </div>
                   </div>
-                </GlassCard>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>
+                      6-month trailing data — live from production database.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14, marginBottom: 20 }}>
+                      <SparkBar months={growthSeries.months} values={growthSeries.revenue}    color="#4ade80" label="Revenue"           formatFn={v => fmt$(v)}   unit="USD"      growth={growthPct(growthSeries.revenue)} />
+                      <SparkBar months={growthSeries.months} values={growthSeries.pickups}    color="#00c8ff" label="Monthly Pickups"   formatFn={v => String(v)} unit="pickups"  growth={growthPct(growthSeries.pickups)} />
+                      <SparkBar months={growthSeries.months} values={growthSeries.users}      color="#a78bfa" label="Registered Users"  formatFn={v => fmtNum(v)} unit="accounts" growth={growthPct(growthSeries.users)} />
+                      <SparkBar months={growthSeries.months} values={growthSeries.commercial} color="#fbbf24" label="Commercial Accts." formatFn={v => String(v)} unit="accounts" growth={growthPct(growthSeries.commercial)} />
+                    </div>
+
+                    <GlassCard padding="md">
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Growth Summary (6-month trailing)</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                        {[
+                          { label: 'Revenue',            pct: growthPct(growthSeries.revenue),    color: '#4ade80' },
+                          { label: 'Pickup volume',       pct: growthPct(growthSeries.pickups),    color: '#00c8ff' },
+                          { label: 'User base',           pct: growthPct(growthSeries.users),      color: '#a78bfa' },
+                          { label: 'Commercial accounts', pct: growthPct(growthSeries.commercial), color: '#fbbf24' },
+                        ].map(r => (
+                          <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{r.label}</span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: r.color }}>
+                              {r.pct >= 0 ? '+' : ''}{r.pct}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </GlassCard>
+                  </>
+                )}
               </div>
             )}
 

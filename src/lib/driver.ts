@@ -80,30 +80,28 @@ export async function skipStop(stopId: string): Promise<void> {
 }
 
 export async function resumeRoute(routeId: string, driverId: string): Promise<void> {
-  await supabase.from('driver_routes').update({ status: 'active' }).eq('id', routeId)
-  await supabase
-    .from('driver_status')
-    .update({ active_route_id: routeId, updated_at: new Date().toISOString() })
-    .eq('driver_id', driverId)
+  // Atomic: both driver_routes and driver_status updated in a single transaction
+  const { error } = await supabase.rpc('resume_driver_route', {
+    p_route_id:  routeId,
+    p_driver_id: driverId,
+  })
+  if (error) throw error
 }
 
 export async function pauseRoute(routeId: string, driverId: string): Promise<void> {
-  await supabase.from('driver_routes').update({ status: 'paused' }).eq('id', routeId)
-  await supabase
-    .from('driver_status')
-    .update({ active_route_id: null, is_online: false, updated_at: new Date().toISOString() })
-    .eq('driver_id', driverId)
+  const { error } = await supabase.rpc('pause_driver_route', {
+    p_route_id:  routeId,
+    p_driver_id: driverId,
+  })
+  if (error) throw error
 }
 
 export async function completeRoute(routeId: string, driverId: string): Promise<void> {
-  await supabase
-    .from('driver_routes')
-    .update({ status: 'completed', completed_at: new Date().toISOString() })
-    .eq('id', routeId)
-  await supabase
-    .from('driver_status')
-    .update({ active_route_id: null, updated_at: new Date().toISOString() })
-    .eq('driver_id', driverId)
+  const { error } = await supabase.rpc('complete_driver_route', {
+    p_route_id:  routeId,
+    p_driver_id: driverId,
+  })
+  if (error) throw error
 }
 
 export async function createAlert(
@@ -132,14 +130,11 @@ export async function getAllDrivers(): Promise<UserRecord[]> {
 }
 
 export async function startRoute(routeId: string, driverId: string): Promise<void> {
-  await supabase
-    .from('driver_routes')
-    .update({ status: 'active', started_at: new Date().toISOString() })
-    .eq('id', routeId)
-  await supabase
-    .from('driver_status')
-    .update({ active_route_id: routeId, is_online: true, updated_at: new Date().toISOString() })
-    .eq('driver_id', driverId)
+  const { error } = await supabase.rpc('start_driver_route', {
+    p_route_id:  routeId,
+    p_driver_id: driverId,
+  })
+  if (error) throw error
 }
 
 export async function createRouteForDriver(

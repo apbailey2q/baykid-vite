@@ -31,41 +31,66 @@ async function fetchWalletBalance(userId: string) {
 }
 
 async function fetchWeeklyEarnings(userId: string) {
+  // Single batched query covering the full 8-week window — replaces 8 sequential calls.
+  // Client-side bucketing keeps the API surface simple while cutting round-trips from 8→1.
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 8 * 7)
+  cutoff.setHours(0, 0, 0, 0)
+
+  const { data } = await supabase
+    .from('wallet_transactions')
+    .select('amount, created_at')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .in('type', ['earning', 'bonus', 'referral'])
+    .gte('created_at', cutoff.toISOString())
+
+  const txns = data ?? []
   const rows: { label: string; amount: number | null }[] = [{ label: 'Current Week', amount: null }]
+
   for (let w = 1; w <= 8; w++) {
-    const end   = new Date(); end.setDate(end.getDate() - (w - 1) * 7); end.setHours(23,59,59,999)
-    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0,0,0,0)
-    const { data } = await supabase
-      .from('wallet_transactions')
-      .select('amount')
-      .eq('user_id', userId)
-      .eq('status', 'completed')
-      .in('type', ['earning','bonus','referral'])
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString())
-    const total = (data ?? []).reduce((s,t) => s + Number(t.amount), 0)
-    const label = `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`
+    const end   = new Date(); end.setDate(end.getDate() - (w - 1) * 7); end.setHours(23, 59, 59, 999)
+    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0)
+    const endMs   = end.getTime()
+    const startMs = start.getTime()
+    const total = txns
+      .filter(t => { const ts = new Date(t.created_at).getTime(); return ts >= startMs && ts <= endMs })
+      .reduce((s, t) => s + Number(t.amount), 0)
+    const label = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
     rows.push({ label, amount: total })
   }
   return rows
 }
 
 async function fetchWeeklyLbs(userId: string) {
+  // Single batched query covering the full 8-week window — replaces 8 sequential calls.
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 8 * 7)
+  cutoff.setHours(0, 0, 0, 0)
+
+  const { data } = await supabase
+    .from('qr_bags')
+    .select('co2_saved_lbs, created_at')
+    .eq('owner_id', userId)
+    .gte('created_at', cutoff.toISOString())
+
+  const bags = data ?? []
   const rows: { label: string; lbs: number | null }[] = [{ label: 'Current Week', lbs: null }]
+
   for (let w = 1; w <= 8; w++) {
-    const end   = new Date(); end.setDate(end.getDate() - (w - 1) * 7); end.setHours(23,59,59,999)
-    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0,0,0,0)
-    const { data } = await supabase
-      .from('qr_bags')
-      .select('co2_saved_lbs')
-      .eq('owner_id', userId)
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString())
-    const total = Math.round((data ?? []).reduce((s,b) => s + (Number(b.co2_saved_lbs) || 0), 0))
-    const label = `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`
-    rows.push({ label, amount: total } as unknown as { label: string; lbs: number | null })
+    const end   = new Date(); end.setDate(end.getDate() - (w - 1) * 7); end.setHours(23, 59, 59, 999)
+    const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0)
+    const endMs   = end.getTime()
+    const startMs = start.getTime()
+    const total = Math.round(
+      bags
+        .filter(b => { const ts = new Date(b.created_at).getTime(); return ts >= startMs && ts <= endMs })
+        .reduce((s, b) => s + (Number(b.co2_saved_lbs) || 0), 0),
+    )
+    const label = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    rows.push({ label, lbs: total })
   }
-  return rows as { label: string; lbs: number | null }[]
+  return rows
 }
 
 async function fetchTopFundraiser() {

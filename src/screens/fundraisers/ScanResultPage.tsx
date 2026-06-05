@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-// TODO: Replace with real scan data from route state or Supabase query
-const demoScanRewardSplit = {
-  bagId: 'BAG-DEMO0001',
-  totalEarnings: 1.40,
-  co2Saved: 2.1,
-  pointsEarned: 140,
-  userAmount: 0.98,
-  fundraiserAmount: 0.42,
+
+// ── UI Preview state ──────────────────────────────────────────────────────────
+// Real scan result data will be passed via React Router state (location.state)
+// once the camera integration ships. Values here are structural placeholders only.
+const PREVIEW_SCAN = {
+  bagId:            '—',
+  totalEarnings:    0,
+  co2Saved:         0,
+  pointsEarned:     0,
+  userAmount:       0,
+  fundraiserAmount: 0,
 }
-const activeFundraiser = {
-  emoji: '🏀',
-  name: 'East Nashville High Basketball',
-  percentToCause: 30,
-  impact: 'Your recycling helps fund uniforms, equipment, and tournament fees for student athletes.',
+const PREVIEW_FUNDRAISER = {
+  emoji:          '♻️',
+  name:           'Your Active Fundraiser',
+  percentToCause: 0,
+  impact:         'Your recycling supports the cause linked to your account.',
 }
 
 function MetricBadge({ icon, label, value, accent = false }: { icon: string; label: string; value: string; accent?: boolean }) {
@@ -42,8 +45,8 @@ export default function ScanResultPage() {
     return () => { cancelAnimationFrame(t); clearTimeout(b) }
   }, [])
 
-  const scan = demoScanRewardSplit
-  const fund = activeFundraiser
+  const scan = PREVIEW_SCAN
+  const fund = PREVIEW_FUNDRAISER
 
   const userPct       = Math.round((scan.userAmount / scan.totalEarnings) * 100)
   const fundraiserPct = Math.round((scan.fundraiserAmount / scan.totalEarnings) * 100)
@@ -65,6 +68,17 @@ export default function ScanResultPage() {
 
       <div className="relative flex-1 overflow-y-auto pb-24" style={{ zIndex: 1 }}>
         <div className="max-w-[480px] mx-auto px-4 pt-10 pb-6">
+
+          {/* UI Preview banner */}
+          <div
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl mb-4"
+            style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)' }}
+          >
+            <span style={{ fontSize: 14 }}>⚠️</span>
+            <p className="text-[11px] font-semibold" style={{ color: '#fbbf24' }}>
+              UI Preview — live scan values load from camera integration
+            </p>
+          </div>
 
           {/* Confirmed badge */}
           <div className="flex flex-col items-center text-center mb-8" style={fade(0)}>

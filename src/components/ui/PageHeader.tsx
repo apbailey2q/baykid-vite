@@ -5,17 +5,24 @@ interface PageHeaderProps {
 }
 
 export const PageHeader = ({ rightContent }: PageHeaderProps) => (
-  <div
+  // role="banner" is implied by <header> at the top level but explicit here
+  // because this component is rendered inside a React root (not directly in
+  // <body>), which some AT parse differently.
+  <header
+    role="banner"
     style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '36px 18px 0',
+      display:         'flex',
+      alignItems:      'center',
+      justifyContent:  'space-between',
+      padding:         '36px 18px 0',
     }}
   >
     {/* Left: recycling symbol + wordmark */}
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      {/* Decorative icon — hidden from screen readers */}
       <svg
+        aria-hidden="true"
+        focusable="false"
         width="18"
         height="18"
         viewBox="0 0 22 22"
@@ -41,11 +48,13 @@ export const PageHeader = ({ rightContent }: PageHeaderProps) => (
           fill="none"
         />
       </svg>
+
+      {/* Wordmark — use a <span> so screen readers read the brand name as text */}
       <span
         style={{
-          fontSize: '14px',
+          fontSize:   '14px',
           fontWeight: 500,
-          color: '#ffffff',
+          color:      '#ffffff',
         }}
       >
         Cyan's{' '}
@@ -59,7 +68,7 @@ export const PageHeader = ({ rightContent }: PageHeaderProps) => (
         {rightContent}
       </div>
     )}
-  </div>
+  </header>
 )
 
 export default PageHeader

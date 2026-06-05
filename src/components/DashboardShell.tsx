@@ -21,6 +21,8 @@ function getInitials(name: string) {
 function RecyclingIcon({ size }: { size: number }) {
   return (
     <svg
+      aria-hidden="true"
+      focusable="false"
       width={size}
       height={size}
       viewBox="0 0 24 24"
@@ -135,6 +137,7 @@ export function DashboardShell({ title, children }: Props) {
 
       {/* ── Main content ────────────────────────────────────────────────────── */}
       <main
+        id="main-content"
         className="relative mx-auto w-full max-w-[430px] px-4 py-5"
         style={{ zIndex: 1, paddingBottom: '88px' }}
       >
@@ -168,6 +171,7 @@ export function DashboardShell({ title, children }: Props) {
 
       {/* ── Bottom nav ──────────────────────────────────────────────────────── */}
       <nav
+        aria-label="Site navigation"
         className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around px-4 py-2"
         style={{
           background: 'rgba(6,14,36,0.95)',
@@ -232,6 +236,7 @@ export function DashboardShell({ title, children }: Props) {
         {/* Sign out — unchanged handleSignOut logic */}
         <button
           onClick={handleSignOut}
+          aria-label="Sign out"
           className="flex flex-col items-center gap-1 px-4 py-2 transition-opacity hover:opacity-80"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

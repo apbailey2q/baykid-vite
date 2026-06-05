@@ -118,48 +118,101 @@ export function ConsumerPickupStatus() {
   const [driverName, setDriverName] = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
 
+  // ── Separated fetch so realtime callback can call it too ──────────────────
+  const fetchPickupData = async (userId: string) => {
+    try {
+      const { data: pickups } = await supabase
+        .from('consumer_pickups')
+        .select('id, status, preferred_date, time_window, address_line1, address_city, address_state, driver_id, assigned_at, created_at')
+        .eq('user_id', userId)
+        .in('status', ACTIVE_STATUSES)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      const p = pickups?.[0] ?? null
+      setPickup(p as ConsumerPickup | null)
+
+      if (p?.driver_id) {
+        const [locResult, profileResult] = await Promise.all([
+          supabase
+            .from('driver_live_locations')
+            .select('latitude, longitude, speed, updated_at')
+            .eq('driver_id', p.driver_id)
+            .neq('status', 'offline')
+            .maybeSingle(),
+          supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', p.driver_id)
+            .maybeSingle(),
+        ])
+
+        setDriverLoc((locResult.data as DriverLocation | null) ?? null)
+        setDriverName((profileResult.data as DriverProfile | null)?.full_name ?? null)
+      } else {
+        setDriverLoc(null)
+        setDriverName(null)
+      }
+    } catch {
+      // Silent — status card is non-critical
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!user) { setLoading(false); return }
 
-    void (async () => {
-      try {
-        // Most recent active pickup for this user
-        const { data: pickups } = await supabase
-          .from('consumer_pickups')
-          .select('id, status, preferred_date, time_window, address_line1, address_city, address_state, driver_id, assigned_at, created_at')
-          .eq('user_id', user.id)
-          .in('status', ACTIVE_STATUSES)
-          .order('created_at', { ascending: false })
-          .limit(1)
+    // Initial load
+    void fetchPickupData(user.id)
 
-        const p = pickups?.[0] ?? null
-        setPickup(p as ConsumerPickup | null)
+    // ── Realtime subscription: pickup status changes ───────────────────────
+    // Fires whenever the consumer's pickup row is updated (driver assigned,
+    // status change to en_route, etc.) — no page reload needed.
+    const pickupChannel = supabase
+      .channel(`consumer-pickup-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  '*',
+          schema: 'public',
+          table:  'consumer_pickups',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => { void fetchPickupData(user.id) },
+      )
+      .subscribe()
 
-        if (p?.driver_id) {
-          // Fetch driver's live location (RLS allows read when assigned)
-          const [locResult, profileResult] = await Promise.all([
-            supabase
-              .from('driver_live_locations')
-              .select('latitude, longitude, speed, updated_at')
-              .eq('driver_id', p.driver_id)
-              .neq('status', 'offline')
-              .maybeSingle(),
-            supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', p.driver_id)
-              .maybeSingle(),
-          ])
+    // ── Realtime subscription: driver location changes ─────────────────────
+    // Once a driver is assigned, subscribe to their location row so the GPS
+    // freshness and speed update in real time without polling.
+    const locationChannel = supabase
+      .channel(`consumer-driver-loc-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',
+          schema: 'public',
+          table:  'driver_live_locations',
+        },
+        (payload) => {
+          // Only update if this is the driver assigned to our pickup
+          setPickup(current => {
+            if (!current?.driver_id) return current
+            const updated = payload.new as DriverLocation & { driver_id?: string }
+            if (updated.driver_id !== current.driver_id) return current
+            setDriverLoc(updated as DriverLocation)
+            return current
+          })
+        },
+      )
+      .subscribe()
 
-          setDriverLoc((locResult.data as DriverLocation | null) ?? null)
-          setDriverName((profileResult.data as DriverProfile | null)?.full_name ?? null)
-        }
-      } catch {
-        // Silent — status card is non-critical
-      } finally {
-        setLoading(false)
-      }
-    })()
+    return () => {
+      void supabase.removeChannel(pickupChannel)
+      void supabase.removeChannel(locationChannel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   // ── Don't render anything until data loaded, or if no active pickup ────────

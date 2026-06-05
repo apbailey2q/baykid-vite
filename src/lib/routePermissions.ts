@@ -114,6 +114,15 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/municipal':                            ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
   '/dashboard/municipal/reports':                    ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
 
+  // ── Admin — missing sub-routes (Phase 1 stabilization fix) ──────────────
+  '/dashboard/admin/investor':                       ['admin', 'executive', 'investor_viewer'],
+  '/dashboard/admin/analytics':                      ['admin'],
+  '/dashboard/admin/dispatch-map':                   ['admin'],
+  '/dashboard/admin/ai-marketing':                   ['admin'],
+
+  // ── Commercial — missing sub-routes ───────────────────────────────────────
+  '/dashboard/commercial/billing':                   ['admin', 'commercial'],
+
   // ── Executive / Investor ───────────────────────────────────────────────────
   '/dashboard/executive':                            ['admin', 'executive', 'investor_viewer'],
 

@@ -6,6 +6,7 @@ import { normalizeRole } from './lib/auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
+import { PWAInstallPrompt } from './components/ui/PWAInstallPrompt'
 import { RequireAuth } from './components/RequireAuth'
 import { RequireRole } from './components/RequireRole'
 
@@ -294,6 +295,7 @@ function App() {
         <BrowserRouter>
           <PushTokenManager />
           <ServiceWorkerManager />
+          <PWAInstallPrompt />
           {/* Suspense catches any lazy chunk that is still loading */}
           <Suspense fallback={<PageLoader />}>
             <Routes>

@@ -86,6 +86,26 @@ export function clearSynced(): void {
   saveQueue(queue.filter(d => d.sync_status !== 'synced'))
 }
 
+/**
+ * Evict stale terminal-state drafts to prevent unbounded localStorage growth.
+ *
+ * Removes `failed` and `conflict` records whose `created_at` is older than
+ * `maxAgeDays` days, along with any associated pending photos.
+ *
+ * Call this once on app init (e.g. in the offline-sync hook) so that drafts
+ * from crashed sessions don't accumulate indefinitely.
+ */
+export function evictStale(maxAgeDays = 7): void {
+  const cutoffMs = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000
+  const queue    = loadQueue()
+  const stale    = queue.filter(
+    d => (d.sync_status === 'failed' || d.sync_status === 'conflict')
+      && new Date(d.created_at).getTime() < cutoffMs,
+  )
+  stale.forEach(d => removePendingPhoto(d.local_id))
+  saveQueue(queue.filter(d => !stale.some(s => s.local_id === d.local_id)))
+}
+
 // ── Photo storage ─────────────────────────────────────────────────────────────
 // Returns true if photo was stored successfully; false if it was too large.
 // Caller should set has_pending_photo accordingly in the draft payload.

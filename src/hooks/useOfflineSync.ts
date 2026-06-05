@@ -25,6 +25,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   loadQueue, updateDraft, clearSynced, loadPendingPhoto, removePendingPhoto,
+  evictStale,
   type DraftAction,
 } from '../lib/offlineQueue'
 import { useNetworkStatus } from './useNetworkStatus'
@@ -349,8 +350,9 @@ export function useOfflineSync(): OfflineSyncState {
     if (isOnline) { void syncNow() }
   }, [isOnline, syncNow])
 
-  // Refresh counts on mount and after any storage event
+  // Evict stale failed/conflict drafts (>7 days) on mount, then refresh counts
   useEffect(() => {
+    evictStale(7)
     refreshCounts()
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'baykid_offline_queue') refreshCounts()

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCountdownParts } from '../lib/demoFundraisers'
+import { getCountdownParts } from '../lib/fundraisers'
 
 interface Props {
   endDate:  string

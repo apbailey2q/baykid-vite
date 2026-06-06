@@ -45,7 +45,7 @@ export default function PrivacyPolicy() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Privacy Policy</span>
         </div>
@@ -64,14 +64,14 @@ export default function PrivacyPolicy() {
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Privacy Policy</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              Last updated May 2026. This policy applies to the BayKid platform operated by Cyan's Brooklynn Recycling Enterprise. By using this platform you agree to the practices described here.
+              Last updated May 2026. This policy applies to the Cyan's Brooklynn platform operated by Cyan's Brooklynn Recycling Enterprise. By using this platform you agree to the practices described here.
             </p>
           </div>
 
           {/* 1. Who We Are */}
           <Section title="1. Who We Are" delay={60} a={a}>
             <p>
-              Cyan's Brooklynn Recycling Enterprise ("we", "us", "our") operates the BayKid platform — a commercial and consumer recycling logistics application. Our platform serves consumers, commercial customers, drivers, warehouse staff, and partner organizations in the Nashville, TN area and beyond.
+              Cyan's Brooklynn Recycling Enterprise ("we", "us", "our") operates the Cyan's Brooklynn platform — a commercial and consumer recycling logistics application. Our platform serves consumers, commercial customers, drivers, warehouse staff, and partner organizations in the Nashville, TN area and beyond.
             </p>
             <p className="mt-2">
               Contact: <a href="mailto:support@cyansbrooklynnrecycling.com" style={{ color: '#00c8ff', textDecoration: 'none' }}>support@cyansbrooklynnrecycling.com</a>
@@ -80,7 +80,7 @@ export default function PrivacyPolicy() {
 
           {/* 2. Information We Collect */}
           <Section title="2. Information We Collect" delay={90} a={a}>
-            <p>We collect the following information when you use the BayKid platform:</p>
+            <p>We collect the following information when you use the Cyan's Brooklynn platform:</p>
             <p className="mt-3" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Account Information</p>
             <Ul items={[
               'Full name, email address, and phone number provided at registration.',
@@ -121,7 +121,7 @@ export default function PrivacyPolicy() {
 
           {/* 3. How We Use Your Data */}
           <Section title="3. How We Use Your Data" delay={120} a={a}>
-            <p>Your data is used only to operate and improve the BayKid platform:</p>
+            <p>Your data is used only to operate and improve the Cyan's Brooklynn platform:</p>
             <Ul items={[
               'Routing drivers to scheduled pickup stops and commercial locations.',
               'Warehouse intake, weight logging, and contamination tracking.',
@@ -183,7 +183,7 @@ export default function PrivacyPolicy() {
           {/* 7. Payment Processing */}
           <Section title="7. Payment Processing" delay={240} a={a}>
             <p>
-              Payments and payouts on the BayKid platform are processed by <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Stripe</strong>, a PCI-compliant payment processor. Cyan's Brooklynn Recycling Enterprise does not store, transmit, or have access to your full card number, CVV, or bank account credentials.
+              Payments and payouts on the Cyan's Brooklynn platform are processed by <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Stripe</strong>, a PCI-compliant payment processor. Cyan's Brooklynn Recycling Enterprise does not store, transmit, or have access to your full card number, CVV, or bank account credentials.
             </p>
             <p className="mt-2">
               Stripe's collection and use of payment data is governed by the <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#00c8ff', textDecoration: 'none' }}>Stripe Privacy Policy</a>. Invoice records, payout totals, and payment status are stored in our platform for billing and compliance purposes.
@@ -238,7 +238,7 @@ export default function PrivacyPolicy() {
           {/* 11. Security */}
           <Section title="11. Security" delay={360} a={a}>
             <p>
-              All data transmitted between the BayKid app and our servers is encrypted using TLS. Data at rest is encrypted by our cloud storage provider. Access to personal data is restricted by role-based access controls — drivers can only see their own stops, warehouse staff can only access their assigned facility's loads, and consumers can only see their own bag history.
+              All data transmitted between the Cyan's Brooklynn app and our servers is encrypted using TLS. Data at rest is encrypted by our cloud storage provider. Access to personal data is restricted by role-based access controls — drivers can only see their own stops, warehouse staff can only access their assigned facility's loads, and consumers can only see their own bag history.
             </p>
             <p className="mt-2">
               While we take reasonable measures to protect your data, no system is completely secure. If you discover a security concern, please report it to <a href="mailto:support@cyansbrooklynnrecycling.com" style={{ color: '#00c8ff', textDecoration: 'none' }}>support@cyansbrooklynnrecycling.com</a>.
@@ -248,7 +248,7 @@ export default function PrivacyPolicy() {
           {/* 12. Children */}
           <Section title="12. Children's Privacy" delay={390} a={a}>
             <p>
-              The BayKid platform is not directed at children under the age of 13 and we do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us immediately and we will delete it.
+              The Cyan's Brooklynn platform is not directed at children under the age of 13 and we do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us immediately and we will delete it.
             </p>
           </Section>
 

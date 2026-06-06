@@ -5,6 +5,32 @@ import { useAuthStore } from '../store/authStore'
 
 export const AUTO_APPROVED_ROLES: Role[] = ['consumer']
 
+// ── Driver subtype access helpers ────────────────────────────────────────────
+// Spec mapping (user terminology ↔ schema):
+//   driver_1099       ≡ role='driver' AND driver_service_type='consumer_only'
+//   commercial_driver ≡ role='driver' AND driver_service_type IN ('hybrid','commercial_only')
+//
+// These wrap the rule so every client check stays consistent. Server-side the
+// same rule is encoded in public.is_commercial_capable_driver() (RLS).
+
+interface DriverGateInput {
+  role?:                Role | string | null
+  driver_service_type?: DriverServiceType | string | null
+}
+
+export function is1099Driver(p: DriverGateInput | null | undefined): boolean {
+  if (!p) return false
+  if (p.role !== 'driver') return false
+  return p.driver_service_type === 'consumer_only'
+}
+
+export function canAccessCommercialDriver(p: DriverGateInput | null | undefined): boolean {
+  if (!p) return false
+  if (p.role === 'admin') return true
+  if (p.role !== 'driver') return false
+  return p.driver_service_type === 'hybrid' || p.driver_service_type === 'commercial_only'
+}
+
 /**
  * Canonical role normalizer. Maps legacy/variant DB values to the Role type
  * used throughout the app. This is the single implementation — App.tsx and
@@ -24,6 +50,14 @@ export function normalizeRole(role: string | null | undefined): Role | null {
     'warehouse_supervisor', 'partner', 'fundraiser', 'admin',
     'municipal_viewer', 'municipal_manager', 'city_admin',
     'executive', 'investor_viewer', 'regional_admin', 'city_manager',
+    // Phase G.9 — fundraiser sub-roles (G.3) + 10 commercial sub-roles (G.4).
+    // Without these, normalizeRole rejected the DB role, HomeRedirect fell
+    // through to /real-login, and the user was stuck in a login loop.
+    'fundraiser_admin', 'school_partner', 'nonprofit_partner',
+    'church_partner', 'sports_team_partner',
+    'commercial_customer', 'business_customer',
+    'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+    'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
   ]
   return VALID.includes(r) ? r : null
 }
@@ -49,9 +83,10 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
   }
 
   if (role === 'driver') {
-    if (driverServiceType === 'consumer_only') return '/dashboard/driver/consumer-routes'
+    if (driverServiceType === 'consumer_only')   return '/dashboard/driver/consumer-routes'
     if (driverServiceType === 'commercial_only') return '/dashboard/driver/commercial-routes'
-    return '/dashboard/driver'
+    // hybrid — approved for both consumer + commercial routes → show mode-select screen
+    return '/driver/mode'
   }
 
   switch (role) {
@@ -65,10 +100,28 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
     case 'municipal_viewer':
     case 'municipal_manager':
     case 'city_admin':          return '/dashboard/municipal'
-    case 'executive':
-    case 'investor_viewer':     return '/dashboard/executive'
+    case 'executive':           return '/dashboard/executive'
+    case 'investor_viewer':     return '/dashboard/admin/investor'
     case 'regional_admin':
     case 'city_manager':        return '/dashboard/admin/regions'
+    // Phase G.9 — fundraiser sub-roles share the fundraiser dashboard;
+    // fundraiser_admin gets the live per-campaign dashboard.
+    case 'fundraiser_admin':    return '/live-fundraiser-dashboard'
+    case 'school_partner':
+    case 'nonprofit_partner':
+    case 'church_partner':
+    case 'sports_team_partner': return '/dashboard/fundraiser'
+    // Phase G.9 — 10 commercial customer sub-roles share the commercial dashboard.
+    case 'commercial_customer':
+    case 'business_customer':
+    case 'restaurant_partner':
+    case 'bar_partner':
+    case 'hospital_partner':
+    case 'hotel_partner':
+    case 'school_business':
+    case 'apartment_partner':
+    case 'office_partner':
+    case 'manufacturing_partner': return '/dashboard/commercial'
     default:                    return '/real-login'
   }
 }
@@ -85,17 +138,33 @@ export async function signUp(
   fullName: string,
   role: Role,
 ) {
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  // Normalize email — Supabase Auth is case-insensitive but profile lookups
+  // downstream rely on a single canonical lowercase form.
+  const cleanEmail = email.trim().toLowerCase()
+
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password,
+  })
   if (error) throw error
 
   if (data.user) {
     const approvalStatus = AUTO_APPROVED_ROLES.includes(role) ? 'approved' : 'pending'
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      full_name: fullName,
-      role,
-      approval_status: approvalStatus,
-    })
+    // upsert (not insert) — Supabase sometimes creates a profile row via a
+    // trigger on auth.users INSERT, which causes a 409 from a plain insert
+    // here. onConflict:'id' makes this idempotent across retries too.
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: data.user.id,
+          email: cleanEmail,
+          full_name: fullName,
+          role,
+          approval_status: approvalStatus,
+        },
+        { onConflict: 'id' },
+      )
     if (profileError) throw profileError
   }
 
@@ -115,22 +184,24 @@ export async function signOut() {
   if (error) throw error
 }
 
-// Canonical logout. There are three independent auth-persistence layers
-// (zustand `baykid-auth`, demo keys, and AuthProvider's `cb_demo_user`); a
-// partial clear leaves a layer that re-hydrates the user on next load. This
-// clears all of them, then does a HARD redirect so no in-memory state survives
-// (Supabase client, realtime channels, AuthProvider context). Never throws —
-// logout must always complete.
+// Canonical logout. Clears Supabase session and Zustand auth state, then
+// does a HARD redirect so no in-memory state survives (Supabase client,
+// realtime channels, AuthProvider context). Never throws — logout must
+// always complete.
 export async function logout(): Promise<void> {
-  try { await signOut() } catch { /* no real session (dev bypass / demo) — proceed */ }
+  try { await signOut() } catch { /* no active session — proceed */ }
   try { useAuthStore.getState().clearAuth() } catch { /* store may be uninitialized */ }
   try {
-    localStorage.removeItem('baykid-auth')        // zustand persist
-    localStorage.removeItem('baykid-demo-mode')   // demo-mode flag
-    localStorage.removeItem('baykid-demo-role')   // demo-mode role
-    localStorage.removeItem('cb_demo_user')       // AuthProvider (loadUser reads this back)
+    localStorage.removeItem('baykid-auth')      // zustand persist
+    localStorage.removeItem('baykid-last-email') // PII cleanup
+    // Sweep any in-progress onboarding drafts for any user on this browser.
+    // Wizard keys are 'baykid-onboarding:<userId>' — see ConsumerOnboarding.tsx.
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('baykid-onboarding:')) localStorage.removeItem(key)
+    }
   } catch { /* storage unavailable — non-fatal */ }
-  window.location.href = '/real-login'            // hard reload tears down all in-memory state
+  window.location.href = '/real-login'       // hard reload tears down all in-memory state
 }
 
 export async function fetchProfile(userId: string) {

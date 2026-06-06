@@ -16,9 +16,9 @@ const TOPICS = [
   { icon: '🏢', label: 'Commercial Account',       email: 'commercial@cbrecycling.org', subject: 'Commercial Account Question' },
   { icon: '🔍', label: 'Inspection Review',        email: 'safety@cbrecycling.org',     subject: 'Inspection Review Question' },
   { icon: '💳', label: 'Payments & Payouts',       email: 'billing@cbrecycling.org',    subject: 'Payment / Payout Question' },
-  { icon: '🛡️', label: 'Safety Concern',           email: 'safety@cbrecycling.org',     subject: 'Safety Concern — BayKid' },
+  { icon: '🛡️', label: 'Safety Concern',           email: 'safety@cbrecycling.org',     subject: "Safety Concern — Cyan's Brooklynn" },
   { icon: '🗑️', label: 'Data Deletion Request',   email: 'support@cbrecycling.org',    subject: 'Account Deletion Request' },
-  { icon: '🐛', label: 'Bug Report',               email: 'support@cbrecycling.org',    subject: 'Bug Report — BayKid App' },
+  { icon: '🐛', label: 'Bug Report',               email: 'support@cbrecycling.org',    subject: "Bug Report — Cyan's Brooklynn App" },
 ]
 
 export default function ContactSupportPage() {
@@ -33,7 +33,7 @@ export default function ContactSupportPage() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Contact Support</span>
         </div>

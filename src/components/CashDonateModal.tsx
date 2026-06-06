@@ -43,7 +43,7 @@ export default function CashDonateModal({ fundraiserId, fundraiserName, userId, 
       contributor_id: userId,
       amount:         finalAmount,
       type:           'cash' as const,
-      notes:          'Cash donation via BayKid app',
+      notes:          'Cash donation via Cyan\'s Brooklynn app',
       recorded_by:    userId,
     }
 

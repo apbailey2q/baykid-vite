@@ -11,7 +11,7 @@ interface PolicyLink {
 
 const POLICIES: PolicyLink[] = [
   { icon: '🔒', title: 'Privacy Policy',             desc: 'What data we collect, how we use it, and your rights.',           href: '/legal/privacy-policy',     external: false },
-  { icon: '📋', title: 'Terms of Service',            desc: 'The rules and conditions for using the BayKid platform.',         href: '/legal/terms-of-service',   external: false },
+  { icon: '📋', title: 'Terms of Service',            desc: "The rules and conditions for using the Cyan's Brooklynn platform.",         href: '/legal/terms-of-service',   external: false },
   { icon: '🛡️', title: 'Safety Policy',               desc: 'How we keep drivers, warehouse staff, and communities safe.',     href: '/legal/safety',             external: false },
   { icon: '🚛', title: 'Driver Safety Guidelines',   desc: 'Required safety standards for all commercial route drivers.',     href: '/legal/driver-safety',      external: false },
   { icon: '🏢', title: 'Commercial Service Terms',   desc: 'Terms specific to commercial recycling accounts and pickups.',    href: '/legal/commercial-terms',   external: false },
@@ -70,7 +70,7 @@ export default function LegalHubPage() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Legal & Policies</span>
         </div>
@@ -88,7 +88,7 @@ export default function LegalHubPage() {
             </span>
             <h1 className="text-2xl font-extrabold mb-1.5" style={{ color: '#ffffff' }}>Legal Center</h1>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-              CB Recycling · BayKid Platform · All policies last updated May 2026.
+              CB Recycling · Cyan's Brooklynn Platform · All policies last updated May 2026.
             </p>
           </div>
 

@@ -2,29 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { getAllBags } from '../../lib/bags'
 import { supabase } from '../../lib/supabase'
-import { isDemoModeActive } from '../../lib/devBypass'
-const DEV_BYPASS_AUTH = isDemoModeActive()
 import type { Bag, BagStatus } from '../../types'
-
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const NOW = new Date('2026-05-07T14:00:00Z')
-function ts(minsAgo: number) {
-  return new Date(NOW.getTime() - minsAgo * 60_000).toISOString()
-}
-
-const MOCK_BAGS: Bag[] = [
-  { id: 'm1',  bag_code: 'BAG-MRC0001', status: 'completed',    owner_id: 'c1', partner_id: null, created_at: ts(180), updated_at: ts(15)  },
-  { id: 'm2',  bag_code: 'BAG-TBR0002', status: 'at_warehouse', owner_id: 'c2', partner_id: null, created_at: ts(160), updated_at: ts(22)  },
-  { id: 'm3',  bag_code: 'BAG-DCT0003', status: 'inspected',    owner_id: 'c3', partner_id: null, created_at: ts(140), updated_at: ts(10)  },
-  { id: 'm4',  bag_code: 'BAG-RJH0004', status: 'picked_up',    owner_id: 'c4', partner_id: null, created_at: ts(120), updated_at: ts(35)  },
-  { id: 'm5',  bag_code: 'BAG-AMR0005', status: 'assigned',     owner_id: 'c5', partner_id: null, created_at: ts(100), updated_at: ts(50)  },
-  { id: 'm6',  bag_code: 'BAG-JHS0006', status: 'pending',      owner_id: 'c6', partner_id: null, created_at: ts(80),  updated_at: ts(80)  },
-  { id: 'm7',  bag_code: 'BAG-MRC0007', status: 'completed',    owner_id: 'c7', partner_id: null, created_at: ts(240), updated_at: ts(60)  },
-  { id: 'm8',  bag_code: 'BAG-TBR0008', status: 'picked_up',    owner_id: 'c8', partner_id: null, created_at: ts(90),  updated_at: ts(45)  },
-  { id: 'm9',  bag_code: 'BAG-DCT0009', status: 'at_warehouse', owner_id: 'c9', partner_id: null, created_at: ts(75),  updated_at: ts(18)  },
-  { id: 'm10', bag_code: 'BAG-RJH0010', status: 'pending',      owner_id: null, partner_id: null, created_at: ts(30),  updated_at: ts(30)  },
-]
 
 // ── Status config ──────────────────────────────────────────────────────────────
 
@@ -145,10 +123,6 @@ export default function LiveBagsPage() {
     setIsLoading(true)
     setIsError(false)
     try {
-      if (DEV_BYPASS_AUTH) {
-        setBags(MOCK_BAGS)
-        return
-      }
       const data = await getAllBags()
       console.log('[LiveBags] rows', data)
       setBags(data ?? [])
@@ -165,10 +139,8 @@ export default function LiveBagsPage() {
     loadBags()
   }, [loadBags])
 
-  // Realtime subscription (prod only)
+  // Realtime subscription
   useEffect(() => {
-    if (DEV_BYPASS_AUTH) return
-
     const channel = supabase
       .channel('live-bags-changes')
       .on(
@@ -204,10 +176,10 @@ export default function LiveBagsPage() {
         style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Live Bags</span>
-          {(DEV_BYPASS_AUTH || liveConnected) && (
+          {liveConnected && (
             <span className="flex items-center gap-1">
               <span
                 className="rounded-full"
@@ -311,15 +283,8 @@ export default function LiveBagsPage() {
             </div>
           )}
 
-          {/* Back links */}
+          {/* Back links — Phase G.9 removed "View Bag Lifecycle Demo" CTA (mock screen archived) */}
           <div className="flex flex-col gap-2 mt-6">
-            <Link
-              to="/bag-lifecycle"
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all hover:brightness-110"
-              style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.22)', color: '#00c8ff' }}
-            >
-              📦 View Bag Lifecycle Demo
-            </Link>
             <Link
               to="/live-dashboard"
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all hover:brightness-110"

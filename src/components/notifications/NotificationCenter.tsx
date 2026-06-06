@@ -51,11 +51,19 @@ const TYPE_ICON: Record<NotificationEventType, string> = {
   inspection_rejected:                '🚫',
   inspection_reinspection_required:   '🔄',
   inspection_escalated:               '🚨',
+  // consumer events
+  pickup_requested:                   '🚛',
+  pickup_confirmed:                   '✅',
+  pickup_driver_assigned:             '👤',
+  pickup_completed:                   '♻️',
+  reward_earned:                      '💰',
 }
 
 // ── Preference filtering ──────────────────────────────────────────────────────
 
 const DEFAULT_PREFS: NotifPrefs = {
+  email_enabled:      true,
+  push_enabled:       true,
   operational_alerts: true,
   billing_alerts:     true,
   dispatch_messages:  true,
@@ -81,6 +89,12 @@ const TYPE_PREF_KEY: Partial<Record<NotificationEventType, keyof NotifPrefs>> = 
   inspection_rejected:              'inspection_alerts',
   inspection_reinspection_required: 'inspection_alerts',
   inspection_escalated:             'emergency_alerts',
+  // consumer events
+  pickup_requested:                 'operational_alerts',
+  pickup_confirmed:                 'operational_alerts',
+  pickup_driver_assigned:           'operational_alerts',
+  pickup_completed:                 'operational_alerts',
+  reward_earned:                    'billing_alerts',
 }
 
 // Types and priorities that are never filtered regardless of preferences
@@ -137,6 +151,7 @@ export function NotificationCenter({ role, onClose }: Props) {
     driver:     'Driver',
     warehouse:  'Warehouse',
     admin:      'Admin',
+    consumer:   'Consumer',
   }
 
   return (

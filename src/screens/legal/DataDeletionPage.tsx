@@ -29,9 +29,9 @@ export default function DataDeletionPage() {
 
   useEffect(() => { const id = requestAnimationFrame(() => setA(true)); return () => cancelAnimationFrame(id) }, [])
 
-  const subject = encodeURIComponent('BayKid Account Deletion Request')
+  const subject = encodeURIComponent("Cyan's Brooklynn Account Deletion Request")
   const body    = encodeURIComponent(
-    'Hello CB Recycling Support,\n\nI am requesting the deletion of my BayKid account and all associated personal data.\n\nAccount email: [YOUR EMAIL]\n\nI understand this action is permanent and cannot be undone.\n\nThank you.'
+    `Hello CB Recycling Support,\n\nI am requesting the deletion of my Cyan's Brooklynn account and all associated personal data.\n\nAccount email: [YOUR EMAIL]\n\nI understand this action is permanent and cannot be undone.\n\nThank you.`
   )
 
   return (
@@ -41,7 +41,7 @@ export default function DataDeletionPage() {
 
       <header className="relative flex items-center justify-between px-4 py-3" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan's Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Data Deletion Request</span>
         </div>

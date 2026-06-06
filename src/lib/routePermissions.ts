@@ -3,58 +3,25 @@ import type { Role } from '../types'
 // Single source of truth for route-level RBAC.
 // Every dashboard path maps to the roles that may enter it.
 // 'admin' appears in every list — admins have full access everywhere.
+//
+// DEFAULT POLICY: deny. Any /dashboard/* path NOT listed here is blocked
+// for all roles (returns false). Add new routes explicitly.
+
+// Phase G.9 — shared role groups so the 10 commercial sub-roles and 5
+// fundraiser sub-roles can be added to the relevant permissions without
+// repeating long inline lists. Source for the union members: src/types/index.ts
+// COMMERCIAL_CUSTOMER_ROLES and FUNDRAISER_ROLES.
+const COMMERCIAL_CUSTOMER_ROLES: Role[] = [
+  'commercial_customer', 'business_customer',
+  'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+  'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+]
+const FUNDRAISER_SUB_ROLES: Role[] = [
+  'fundraiser_admin', 'school_partner', 'nonprofit_partner',
+  'church_partner', 'sports_team_partner',
+]
+
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
-<<<<<<< Updated upstream
-  '/dashboard/admin':                           ['admin'],
-  '/dashboard/admin/commercial':                ['admin'],
-  '/dashboard/admin/commercial/inspections':    ['admin'],
-  '/dashboard/admin/commercial/dispatch':       ['admin'],
-  '/dashboard/admin/commercial/support':        ['admin'],
-  '/dashboard/commercial/support':              ['admin', 'commercial'],
-  '/dashboard/consumer':                        ['admin', 'consumer'],
-  '/dashboard/commercial':                      ['admin', 'commercial'],
-  '/dashboard/commercial/pickup':               ['admin', 'commercial'],
-  '/dashboard/commercial/schedule':             ['admin', 'commercial'],
-  '/dashboard/commercial/bins':                 ['admin', 'commercial'],
-  '/dashboard/commercial/reports':              ['admin', 'commercial'],
-  '/dashboard/commercial/invoices':             ['admin', 'commercial'],
-  '/dashboard/commercial/history':              ['admin', 'commercial'],
-  '/dashboard/commercial/profile':              ['admin', 'commercial'],
-  '/dashboard/commercial/onboarding':           ['admin', 'commercial'],
-  '/dashboard/driver':                          ['admin', 'driver'],
-  '/dashboard/driver/hybrid':                   ['admin', 'driver'],
-  '/dashboard/driver/consumer-routes':          ['admin', 'driver'],
-  '/dashboard/driver/commercial-routes':        ['admin', 'driver'],
-  '/dashboard/driver/commercial-stop':          ['admin', 'driver'],
-  '/dashboard/driver/commercial-scan':          ['admin', 'driver'],
-  '/dashboard/driver/commercial-safety':        ['admin', 'driver'],
-  '/dashboard/driver/commercial-inspection':    ['admin', 'driver'],
-  '/dashboard/driver/dispatch-messages':        ['admin', 'driver'],
-  '/dashboard/driver/route':                    ['admin', 'driver'],
-  '/dashboard/driver/routes':                   ['admin', 'driver'],
-  '/dashboard/driver/route-map':                ['admin', 'driver'],
-  '/dashboard/driver/scan':                     ['admin', 'driver'],
-  '/dashboard/driver/earnings':                 ['admin', 'driver'],
-  '/dashboard/driver/warehouse-checkin':        ['admin', 'driver'],
-  '/dashboard/driver/hybrid-routes':            ['admin', 'driver'],
-  '/dashboard/driver/onboarding':               ['admin', 'driver'],
-  '/dashboard/warehouse-supervisor':            ['admin', 'warehouse_supervisor'],
-  '/dashboard/warehouse':                       ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/expected-loads':        ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/commercial-intake':     ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/commercial-processing': ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/alerts':                ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/messages':              ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/onboarding':            ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/partner':                         ['admin', 'partner'],
-  '/dashboard/fundraiser':                      ['admin', 'fundraiser'],
-  '/dashboard/municipal':                       ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
-  '/dashboard/municipal/reports':               ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
-  '/dashboard/executive':                       ['admin', 'executive', 'investor_viewer'],
-  '/dashboard/admin/regions':                   ['admin', 'regional_admin', 'city_manager'],
-  '/dashboard/admin/forecasting':               ['admin'],
-  '/dashboard/admin/launch-roadmap':            ['admin'],
-=======
   // ── Admin — top-level ──────────────────────────────────────────────────────
   '/dashboard/admin':                                ['admin'],
 
@@ -79,9 +46,6 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/regions':                        ['admin', 'regional_admin', 'city_manager'],
   '/dashboard/admin/forecasting':                    ['admin'],
   '/dashboard/admin/launch-roadmap':                 ['admin'],
-
-  // ── Admin — Phase G.3 Payouts Center ─────────────────────────────────────
-  '/dashboard/admin/payouts':                        ['admin'],
 
   // ── Billing — admins manage org subscriptions ─────────────────────────────
   '/admin/billing':                                  ['admin'],
@@ -227,7 +191,6 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
     'municipal_manager','city_admin','executive','investor_viewer',
     'regional_admin','city_manager',
   ],
->>>>>>> Stashed changes
 }
 
 // Roles allowed to inspect individual bags (path ends with /inspect)
@@ -236,7 +199,7 @@ const INSPECT_ROLES: Role[] = ['admin', 'warehouse_employee', 'warehouse_supervi
 export function canAccessRoute(role: Role | null, pathname: string): boolean {
   if (!role) return false
 
-  // Bag inspection is a special case (dynamic segment before /inspect)
+  // Bag inspection — dynamic segment before /inspect
   if (pathname.endsWith('/inspect')) return INSPECT_ROLES.includes(role)
 
   // Find the most-specific (longest) matching prefix
@@ -244,6 +207,6 @@ export function canAccessRoute(role: Role | null, pathname: string): boolean {
     .filter(([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/'))
     .sort(([a], [b]) => b.length - a.length)[0]
 
-  // No entry in the map → unrestricted (any authenticated user may visit)
-  return match ? match[1].includes(role) : true
+  // DEFAULT DENY: path not in map → blocked. Add routes explicitly above.
+  return match ? match[1].includes(role) : false
 }

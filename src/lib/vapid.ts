@@ -4,6 +4,16 @@
 
 export const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY ?? ''
 
+/**
+ * Returns true when VITE_VAPID_PUBLIC_KEY is configured.
+ * Use this in UI components to disable push-subscribe buttons and show
+ * a "Push notifications not configured yet" message rather than silently
+ * failing when the env var is absent.
+ */
+export function isPushConfigured(): boolean {
+  return VAPID_PUBLIC_KEY.length > 0
+}
+
 // Converts a base64url string (as used in VAPID keys and PushSubscription)
 // to the Uint8Array that PushManager.subscribe({ applicationServerKey }) expects.
 export function urlBase64ToUint8Array(base64url: string): Uint8Array {

@@ -6,10 +6,13 @@ import { AppShell } from '../../components/ui/AppShell'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
+import { isPushConfigured } from '../../lib/vapid'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface NotifPrefs {
+  email_enabled:      boolean
+  push_enabled:       boolean
   operational_alerts: boolean
   billing_alerts:     boolean
   dispatch_messages:  boolean
@@ -21,6 +24,8 @@ export interface NotifPrefs {
 }
 
 const DEFAULT_PREFS: NotifPrefs = {
+  email_enabled:      true,
+  push_enabled:       true,
   operational_alerts: true,
   billing_alerts:     true,
   dispatch_messages:  true,
@@ -104,6 +109,8 @@ export default function NotificationPreferences() {
 
     if (data) {
       setPrefs({
+        email_enabled:      data.email_enabled ?? true,
+        push_enabled:       data.push_enabled ?? true,
         operational_alerts: data.operational_alerts,
         billing_alerts:     data.billing_alerts,
         dispatch_messages:  data.dispatch_messages,
@@ -184,6 +191,25 @@ export default function NotificationPreferences() {
           </p>
         </div>
 
+        {/* ── Push not configured banner ── */}
+        {!isPushConfigured() && (
+          <GlassCard padding="md" className="mb-5">
+            <div className="flex items-start gap-3">
+              <span style={{ fontSize: 18, flexShrink: 0 }}>🔔</span>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>
+                  Push notifications are being prepared
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  Push notifications may not send live alerts yet during the beta period.
+                  In-app notification preferences below are active and will be used
+                  once push delivery is enabled.
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        )}
+
         {/* ── Emergency lock banner ── */}
         {emergencyLocked && (
           <GlassCard padding="md" className="mb-5">
@@ -196,7 +222,58 @@ export default function NotificationPreferences() {
           </GlassCard>
         )}
 
+        {/* ── Channel master switches ── */}
+        {!loading && (
+          <GlassCard padding="none" className="mb-4">
+            <div style={{ padding: '10px 16px 4px', color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Delivery channels
+            </div>
+            {[
+              { key: 'email_enabled' as const, icon: '📧', label: 'Email', description: 'Receive notifications by email' },
+              { key: 'push_enabled'  as const, icon: '🔔', label: 'Push',  description: 'Receive notifications on this device' },
+            ].map((ch, i, arr) => {
+              const on = prefs[ch.key]
+              return (
+                <button
+                  key={ch.key}
+                  onClick={() => toggle(ch.key)}
+                  className="flex items-center gap-3 w-full px-4 py-3.5 text-left"
+                  style={{
+                    background:   'none',
+                    border:       'none',
+                    borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    cursor:       'pointer',
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                    background: on ? 'rgba(0,200,255,0.1)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${on ? 'rgba(0,200,255,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 18,
+                    transition: 'background 0.2s',
+                  }}>{ch.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: on ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', transition: 'color 0.2s' }}>
+                      {ch.label}
+                    </p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2, lineHeight: 1.4 }}>
+                      {ch.description}
+                    </p>
+                  </div>
+                  <TogglePill on={on} />
+                </button>
+              )
+            })}
+          </GlassCard>
+        )}
+
         {/* ── Preference toggles ── */}
+        {!loading && (
+          <div style={{ padding: '0 4px 6px', color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Categories
+          </div>
+        )}
         {loading ? (
           <GlassCard padding="lg" className="text-center mb-5">
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading preferences…</p>

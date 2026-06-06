@@ -7,6 +7,21 @@ export type Role =
   | 'partner'
   | 'admin'
   | 'fundraiser'
+  | 'fundraiser_admin'      // Phase G.3 — fundraiser org owner/manager
+  | 'school_partner'        // Phase G.3 — sub-types all route to fundraiser wizard
+  | 'nonprofit_partner'
+  | 'church_partner'
+  | 'sports_team_partner'
+  | 'commercial_customer'   // Phase G.4 — all 10 below route to /onboarding/commercial
+  | 'business_customer'
+  | 'restaurant_partner'
+  | 'bar_partner'
+  | 'hospital_partner'
+  | 'hotel_partner'
+  | 'school_business'
+  | 'apartment_partner'
+  | 'office_partner'
+  | 'manufacturing_partner'
   | 'municipal_viewer'
   | 'municipal_manager'
   | 'city_admin'
@@ -14,6 +29,59 @@ export type Role =
   | 'investor_viewer'
   | 'regional_admin'
   | 'city_manager'
+
+// ── Fundraiser ───────────────────────────────────────────────────────────────
+
+export type FundraiserOrgType =
+  | 'school' | 'church' | 'nonprofit' | 'sports_team' | 'youth_program'
+  | 'community_group' | 'pta_pto' | 'booster_club' | 'other'
+
+export type FundraiserVerificationStatus = 'pending' | 'verified' | 'flagged'
+export type FundraiserPayoutStatus       = 'pending_setup' | 'manual_review' | 'ready_for_payout' | 'paid'
+export type FundraiserCampaignStatus     = 'draft' | 'active' | 'paused' | 'completed'
+
+/** Roles that belong to the fundraiser onboarding/dashboard family. Used by
+ *  OnboardingDispatcher and route guards to gate fundraiser-specific surfaces. */
+export const FUNDRAISER_ROLES: readonly Role[] = [
+  'fundraiser', 'fundraiser_admin',
+  'school_partner', 'nonprofit_partner', 'church_partner', 'sports_team_partner',
+] as const
+
+export function isFundraiserRole(role: string | null | undefined): boolean {
+  return !!role && (FUNDRAISER_ROLES as readonly string[]).includes(role)
+}
+
+// ── Commercial Customer Onboarding (Phase G.4) ───────────────────────────────
+
+export type CommercialBusinessType =
+  | 'bar' | 'restaurant' | 'hospital' | 'hotel' | 'school' | 'office_building'
+  | 'apartment_complex' | 'event_venue' | 'retail_store' | 'grocery_store'
+  | 'manufacturing_facility' | 'warehouse' | 'church' | 'nonprofit' | 'other'
+
+export type CommercialAccountStatus =
+  | 'draft' | 'pending_review' | 'approved' | 'rejected' | 'active' | 'suspended' | 'pending'
+
+export type CommercialVolumeTier = 'small' | 'medium' | 'large' | 'enterprise'
+
+export type CommercialPickupFrequency =
+  | 'one_time' | 'weekly' | 'twice_weekly' | 'three_times_weekly' | 'daily' | 'on_demand'
+
+export type CommercialMaterial =
+  | 'cardboard' | 'plastic' | 'aluminum' | 'glass' | 'paper' | 'mixed_recycling'
+  | 'food_packaging' | 'pallets' | 'e_waste' | 'other'
+
+/** 10 sub-roles that go through the new /onboarding/commercial wizard. The
+ *  legacy 'commercial' role keeps its existing /dashboard/commercial/onboarding
+ *  flow. */
+export const COMMERCIAL_CUSTOMER_ROLES: readonly Role[] = [
+  'commercial_customer', 'business_customer',
+  'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+  'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+] as const
+
+export function isCommercialCustomerRole(role: string | null | undefined): boolean {
+  return !!role && (COMMERCIAL_CUSTOMER_ROLES as readonly string[]).includes(role)
+}
 
 // ── Commercial ───────────────────────────────────────────────────────────────
 
@@ -100,6 +168,9 @@ export interface CommercialRouteStop {
   created_at: string
 }
 
+export type CommercialInspectionResultColor = 'green' | 'yellow' | 'red'
+export type CommercialInspectionSource = 'driver' | 'warehouse'
+
 export interface CommercialInspection {
   id: string
   pickup_id: string
@@ -108,6 +179,102 @@ export interface CommercialInspection {
   overall_result: SafetyCheckResult
   notes: string | null
   created_at: string
+  // Phase G.6 — warehouse inspection layer (additive, opt-in)
+  result_color?: CommercialInspectionResultColor | null
+  contamination_notes?: string | null
+  quantity_received?: number | null
+  materials_verified?: Record<string, unknown>
+  supervisor_required?: boolean
+  warehouse_inspector_id?: string | null
+  inspection_started_at?: string | null
+  inspection_completed_at?: string | null
+  inspection_source?: CommercialInspectionSource
+}
+
+// ── Commercial Warehouse Processing — Phase G.6 view rows ───────────────────
+
+export interface CommercialIntakeQueueRow {
+  load_id:              string
+  pickup_id:            string
+  source_pickup_id:     string | null
+  source:               'route_stop' | 'commercial_request'
+  account_id:           string
+  business_name:        string
+  material_type:        string
+  estimated_volume:     string
+  bin_count:            number | null
+  estimated_weight:     number | null
+  actual_weight:        number | null
+  intake_result:        CommercialInspectionResultColor | null
+  load_status:          string
+  warehouse_id:         string | null
+  driver_id:            string | null
+  expected_arrival:     string | null
+  arrived_at:           string | null
+  intake_started_at:    string | null
+  processed_at:         string | null
+  intake_user_id:       string | null
+  warehouse_notes:      string | null
+  pickup_status:        string
+  contact_person:       string | null
+  special_instructions: string | null
+  priority_level:       'low' | 'normal' | 'high' | 'emergency' | null
+  pickup_type:          string | null
+  photo_count:          number
+  last_event_at:        string | null
+  driver_name:          string | null
+}
+
+export interface CommercialVolumeSummaryRow {
+  account_id:             string
+  business_name:          string
+  day:                    string
+  completed_count:        number
+  processed_count:        number
+  in_review_count:        number
+  flagged_count:          number
+  cancelled_count:        number
+  green_count:            number
+  yellow_count:           number
+  red_count:              number
+  clean_weight_lbs:       number
+  total_weight_lbs:       number
+  contamination_rate_pct: number
+}
+
+export interface CommercialGyrCountsRow {
+  warehouse_id:     string | null
+  day:              string
+  green_count:      number
+  yellow_count:     number
+  red_count:        number
+  total_loads:      number
+  total_weight_lbs: number
+}
+
+export interface CommercialDriverCompletionRow {
+  driver_id:         string
+  driver_name:       string | null
+  day:               string
+  completed_count:   number
+  flagged_count:     number
+  cancelled_count:   number
+  total_assignments: number
+}
+
+export interface CommercialBusinessActivityRow {
+  account_id:            string
+  user_id:               string | null
+  business_name:         string
+  total_pickups:         number
+  processed_count:       number
+  in_review_count:       number
+  flagged_count:         number
+  total_weight_lbs:      number
+  clean_weight_lbs:      number
+  co2_saved_tons_approx: number
+  diversion_pct:         number
+  last_completed_at:     string | null
 }
 
 export interface CommercialNotification {
@@ -123,26 +290,99 @@ export interface CommercialNotification {
 export interface ExpectedWarehouseLoad {
   id: string
   pickup_id: string
+  source_pickup_id: string | null
+  source: 'route_stop' | 'commercial_request'
   account_id: string
   business_name: string
   material_type: string
   estimated_volume: string
   expected_arrival: string | null
-  status: 'expected' | 'received' | 'rejected'
+  // Expanded by 20260516000020 + Phase G.5 — includes the full lifecycle.
+  status: 'expected' | 'arrived' | 'intake_started' | 'received' | 'flagged' | 'processed' | 'cancelled' | 'rejected'
   warehouse_notes: string | null
+  driver_id: string | null
+  warehouse_id: string | null
+  bin_count: number | null
+  estimated_weight: number | null
+  arrived_at: string | null
   created_at: string
+}
+
+// ── Commercial Pickup — Phase G.5 audit + photo layer ───────────────────────
+
+export type CommercialPickupPriority = 'low' | 'normal' | 'high' | 'emergency'
+
+export type CommercialPickupStatusG5 =
+  | 'draft' | 'submitted'
+  | 'requested' | 'assigned' | 'scheduled' | 'in_progress'
+  | 'in_review' | 'at_warehouse' | 'flagged' | 'processed'
+  | 'completed' | 'cancelled'
+
+export type CommercialPickupEventType =
+  | 'created' | 'submitted' | 'scheduled' | 'assigned' | 'unassigned'
+  | 'started' | 'arrived' | 'checked_in' | 'completed' | 'cancelled'
+  | 'flagged' | 'reassigned' | 'photo_uploaded' | 'priority_changed' | 'note'
+
+export type CommercialPickupPhotoStage =
+  | 'request' | 'arrival' | 'load' | 'completion' | 'other'
+
+export type CommercialPickupAssignmentStatus =
+  | 'active' | 'reassigned' | 'completed' | 'cancelled'
+
+export interface CommercialPickupAssignment {
+  id:              string
+  pickup_id:       string
+  driver_id:       string | null
+  assigned_by:     string | null
+  assigned_at:     string
+  unassigned_at:   string | null
+  status:          CommercialPickupAssignmentStatus
+  notes:           string | null
+  priority_level:  CommercialPickupPriority
+  scheduled_for:   string | null
+}
+
+export interface CommercialPickupEvent {
+  id:          string
+  pickup_id:   string
+  event_type:  CommercialPickupEventType
+  from_status: string | null
+  to_status:   string | null
+  actor_id:    string | null
+  actor_role:  string | null
+  payload:     Record<string, unknown>
+  created_at:  string
+}
+
+export interface CommercialPickupPhoto {
+  id:           string
+  pickup_id:    string
+  uploaded_by:  string | null
+  stage:        CommercialPickupPhotoStage
+  storage_path: string
+  caption:      string | null
+  created_at:   string
 }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
 export interface Profile {
   id: string
+  email: string | null
   full_name: string
   role: Role
   approval_status: ApprovalStatus
   driver_service_type: DriverServiceType | null
   account_type: string | null
+  city: string | null
   created_at: string
+  // Consumer onboarding — added 2026-05-23. Other roles ignore these.
+  onboarding_completed?: boolean
+  onboarding_step?: number
+  avatar_key?: string | null
+  // Unified avatar source — emoji string ('🦊') OR uploaded image URL
+  // ('https://…'). Added 2026-05-26. See 20260526 migration.
+  avatar_url?: string | null
 }
 
 export type BagStatus =
@@ -161,6 +401,11 @@ export interface Bag {
   status: BagStatus
   owner_id: string | null
   partner_id: string | null
+  // Location fields — written when a consumer claims a bag
+  city: string | null
+  state: string | null
+  pickup_address: string | null
+  zip: string | null
   created_at: string
   updated_at: string
 }
@@ -338,4 +583,90 @@ export interface PartnerStats {
   failedInspections: number
   pendingReview: number
   weeklyActivity: Array<{ date: string; bags: number }>
+}
+
+// ── Driver Compliance Pack V1 ────────────────────────────────────────────────
+// Schema lives in supabase/migrations/20260605000002_driver_compliance.sql.
+// driver_1099 ≡ DriverServiceType 'consumer_only'
+// commercial_driver ≡ DriverServiceType 'hybrid' OR 'commercial_only'
+
+export type DriverComplianceStatus =
+  | 'pending_review'
+  | 'documents_submitted'
+  | 'approved_for_dispatch'
+  | 'rejected'
+  | 'more_info_required'
+
+export type DriverDocumentType =
+  | 'license_front'
+  | 'license_back'
+  | 'insurance'
+  | 'registration'
+
+export type DriverDocumentStatus = 'pending_review' | 'approved' | 'rejected'
+
+export type BackgroundCheckStatus = 'pending' | 'clear' | 'flagged' | 'failed'
+
+export type PayoutAccountStatus = 'pending' | 'onboarding' | 'complete' | 'rejected'
+
+export interface DriverProfile {
+  driver_id:              string
+  driver_type:            'driver_1099' | 'commercial_driver'
+  status:                 DriverComplianceStatus
+  approved_at:            string | null
+  approved_by:            string | null
+  rejected_at:            string | null
+  rejection_reason:       string | null
+  // W9 — w9_tin_encrypted is bytea, never exposed to the browser.
+  w9_legal_name:          string | null
+  w9_address:             string | null
+  w9_submitted_at:        string | null
+  // Vehicle
+  vehicle_make:           string | null
+  vehicle_model:          string | null
+  vehicle_year:           number | null
+  vehicle_color:          string | null
+  vehicle_plate:          string | null
+  // Driver agreement
+  agreement_signed_at:    string | null
+  agreement_signature:    string | null
+  // Training
+  training_completed_at:  string | null
+  created_at:             string
+  updated_at:             string
+}
+
+export interface DriverDocument {
+  id:            string
+  driver_id:     string
+  document_type: DriverDocumentType
+  file_path:     string
+  status:        DriverDocumentStatus
+  uploaded_at:   string
+  reviewed_at:   string | null
+  reviewed_by:   string | null
+  expires_at:    string | null
+  notes:         string | null
+}
+
+export interface DriverBackgroundCheck {
+  id:                 string
+  driver_id:          string
+  consent_timestamp:  string
+  consent_ip:         string | null
+  status:             BackgroundCheckStatus
+  provider:           string
+  provider_reference: string | null
+  requested_at:       string
+  completed_at:       string | null
+}
+
+export interface DriverPayoutAccount {
+  id:                string
+  driver_id:         string
+  stripe_account_id: string | null
+  status:            PayoutAccountStatus
+  onboarding_url:    string | null
+  created_at:        string
+  updated_at:        string
 }

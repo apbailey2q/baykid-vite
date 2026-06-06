@@ -1,28 +1,12 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { ENABLE_DEMO_ACCESS, DEV_BYPASS_AUTH, BYPASS_APPROVAL } from '../lib/appMode'
-import { isDemoMode } from '../lib/mode'
 import { getRoleDashboardPath } from '../lib/auth'
 import { canAccessRoute } from '../lib/routePermissions'
 import type { Role } from '../types'
 
-// Maps the baykid-demo-role localStorage key → real app Role value.
-// Must stay in sync with devBypass.ts ROLE_MAP.
-const DEMO_ROLE_MAP: Record<string, Role> = {
-  consumer:   'consumer',
-  commercial: 'commercial',
-  driver:     'driver',
-  warehouse:  'warehouse_employee',
-  partner:    'partner',
-  admin:      'admin',
-  fundraiser: 'fundraiser',
-}
-
 interface Props {
   children: React.ReactNode
   requireApproved?: boolean
-  /** Pass true ONLY on the consumer route — allows demo bypass without real login */
-  allowDemo?: boolean
 }
 
 function Spinner() {
@@ -61,22 +45,21 @@ function AccessDenied({ role }: { role: Role }) {
   )
 }
 
-// Paths under /dashboard/driver/ that require commercial service capability
+// Paths under /dashboard/ that require commercial service capability
+// (driver_service_type ∈ {commercial_only, hybrid}). driver_1099 (consumer_only)
+// is blocked at the client AND server (RLS) layers.
 const COMMERCIAL_DRIVER_PATHS = [
   '/dashboard/driver/commercial-routes',
   '/dashboard/driver/commercial-stop',
   '/dashboard/driver/commercial-scan',
   '/dashboard/driver/commercial-safety',
   '/dashboard/driver/commercial-inspection',
+  // Phase G.5 — commercial-driver landing alias
+  '/dashboard/commercial-driver',
 ]
 
-export function ProtectedRoute({ children, requireApproved = false, allowDemo = false }: Props) {
-  // Consumer demo: only bypasses when the route explicitly opts in
-  if (allowDemo && ENABLE_DEMO_ACCESS) return <>{children}</>
-  // Dev all-role bypass (requires VITE_DEV_BYPASS_AUTH=true — never auto-enabled)
-  if (DEV_BYPASS_AUTH) return <>{children}</>
-
-  const { user, role, profile, approvalStatus, isLoading } = useAuthStore()
+export function ProtectedRoute({ children, requireApproved = false }: Props) {
+  const { user, role, profile, approvalStatus, driverComplianceStatus, isLoading } = useAuthStore()
   const { pathname } = useLocation()
 
   if (isLoading) return <Spinner />
@@ -85,38 +68,30 @@ export function ProtectedRoute({ children, requireApproved = false, allowDemo = 
   // User authenticated but profile not yet hydrated — wait for onAuthStateChange
   if (!role) return <Spinner />
 
-  if (!BYPASS_APPROVAL && requireApproved && approvalStatus !== 'approved') {
+  // Approval gate — real enforcement, no bypass
+  if (requireApproved && approvalStatus !== 'approved') {
     return <Navigate to="/pending-approval" replace />
   }
 
-  // ── Demo-mode role override ────────────────────────────────────────────────
-  // In demo mode the user chose a role on the login screen.  That selection is
-  // stored in localStorage ('baykid-demo-role') and is the authoritative role
-  // for route permission checks.  The authStore role may be stale or null here
-  // because mock users are set synchronously without a real Supabase round-trip.
-  // LIVE mode is completely unaffected — dbRole is always used when !isDemoMode().
-  const mode = isDemoMode() ? 'demo' : 'live'
-  const dbRole = role
-  const selectedDemoRole = isDemoMode() ? (localStorage.getItem('baykid-demo-role') ?? null) : null
-  const effectiveRole: Role | null =
-    isDemoMode() && selectedDemoRole && DEMO_ROLE_MAP[selectedDemoRole]
-      ? DEMO_ROLE_MAP[selectedDemoRole]
-      : dbRole
+  // Consumer onboarding gate — auto-approved consumers must complete onboarding
+  // before reaching any other dashboard. /onboarding itself is exempt so the
+  // wizard renders, and approvers/admins are never blocked.
+  if (
+    role === 'consumer' &&
+    profile &&
+    profile.onboarding_completed === false &&
+    pathname !== '/onboarding'
+  ) {
+    return <Navigate to="/onboarding" replace />
+  }
 
-  console.log('Mode:', mode)
-  console.log('DB Role:', dbRole)
-  console.log('Selected Demo Role:', selectedDemoRole)
-  console.log('Active Role:', effectiveRole)
-  console.log('Allowed Route:', canAccessRoute(effectiveRole, pathname) ? 'ALLOWED' : 'DENIED')
-
-  // Role-level check via routePermissions (uses effectiveRole — demo-aware)
-  if (!canAccessRoute(effectiveRole, pathname)) {
-    return <AccessDenied role={effectiveRole ?? role} />
+  // Role-level access check — DB role is always authoritative
+  if (!canAccessRoute(role, pathname)) {
+    return <AccessDenied role={role} />
   }
 
   // Driver service-type enforcement
-  // Admins bypass this check (they can see any driver route for support purposes)
-  if (effectiveRole === 'driver' && profile) {
+  if (role === 'driver' && profile) {
     const dst = profile.driver_service_type ?? 'hybrid'
 
     const isCommercialDriverPath = COMMERCIAL_DRIVER_PATHS.some(
@@ -124,15 +99,29 @@ export function ProtectedRoute({ children, requireApproved = false, allowDemo = 
     )
     const isConsumerDriverPath = pathname === '/dashboard/driver/consumer-routes'
 
-    // consumer_only drivers cannot access commercial driver routes
     if (isCommercialDriverPath && dst === 'consumer_only') {
-      return <AccessDenied role={effectiveRole ?? role} />
+      return <AccessDenied role={role} />
     }
 
-    // commercial_only drivers cannot access consumer driver routes
     if (isConsumerDriverPath && dst === 'commercial_only') {
-      return <AccessDenied role={effectiveRole ?? role} />
+      return <AccessDenied role={role} />
     }
+  }
+
+  // Driver Compliance Pack V1 gate — drivers entering any /dashboard/driver/*
+  // route must have driver_profiles.status='approved_for_dispatch'. Otherwise
+  // bounce them to the compliance wizard so they can finish (or restart)
+  // their application. The wizard itself lives at /driver/compliance and is
+  // excluded here so it can render. Admins are exempt — they reach driver
+  // surfaces in read-only contexts.
+  if (
+    role === 'driver' &&
+    pathname.startsWith('/dashboard/driver') &&
+    pathname !== '/driver/compliance' &&
+    !pathname.startsWith('/dashboard/driver/onboarding') &&
+    driverComplianceStatus !== 'approved_for_dispatch'
+  ) {
+    return <Navigate to="/driver/compliance" replace />
   }
 
   return <>{children}</>

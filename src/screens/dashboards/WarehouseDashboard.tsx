@@ -5,6 +5,7 @@ import { DashboardShell } from '../../components/DashboardShell'
 import { QrScanner } from '../../components/QrScanner'
 import { lookupOrCreateBag } from '../../lib/bags'
 import { markBagAtWarehouse, getInspectionQueue, getMyStatsToday } from '../../lib/warehouse'
+import { loadCommercialIntakeQueue } from '../../lib/commercialWarehouseIntake'
 import { useAuthStore } from '../../store/authStore'
 import { Spinner } from '../../components/ui'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -44,6 +45,42 @@ interface ScanEntry {
 
 // ── Queue Tab — real inspection queue ────────────────────────────────────────
 
+// Phase G.6 — banner linking to the commercial intake queue with a live count
+// of arrived / expected / intake_started commercial loads. Pulls from the
+// v_warehouse_commercial_intake_queue view so it auto-respects warehouse RLS.
+function CommercialIntakeCard() {
+  const { data: loads = [] } = useQuery({
+    queryKey:        ['commercial-intake-queue-count'],
+    queryFn:         () => loadCommercialIntakeQueue(),
+    refetchInterval: 30_000,
+  })
+  const active = loads.filter((l) => ['expected', 'arrived', 'intake_started'].includes(l.load_status))
+  const arrived = loads.filter((l) => l.load_status === 'arrived').length
+
+  return (
+    <Link
+      to="/dashboard/warehouse/commercial-expected-loads"
+      className="block rounded-2xl px-4 py-4 transition-opacity hover:opacity-90 active:opacity-75"
+      style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.3)', textDecoration: 'none' }}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 800, color: '#00c8ff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            🏢 Commercial Intake
+          </p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 4 }}>
+            {active.length} active load{active.length === 1 ? '' : 's'}
+          </p>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+            {arrived > 0 ? `${arrived} arrived · ready for G/Y/R inspection` : 'No commercial loads waiting'}
+          </p>
+        </div>
+        <span style={{ fontSize: 24, color: 'rgba(0,200,255,0.8)' }}>→</span>
+      </div>
+    </Link>
+  )
+}
+
 function QueueTab({
   queue,
   queueLoading,
@@ -53,21 +90,30 @@ function QueueTab({
 }) {
 
   if (queueLoading) {
-    return <div className="flex justify-center py-10"><Spinner size="md" /></div>
+    return (
+      <div className="space-y-3">
+        <CommercialIntakeCard />
+        <div className="flex justify-center py-10"><Spinner size="md" /></div>
+      </div>
+    )
   }
 
   if (queue.length === 0) {
     return (
-      <EmptyState
-        icon="📋"
-        title="No bags in inspection queue"
-        description="Bags checked in will appear here for inspection."
-      />
+      <div className="space-y-3">
+        <CommercialIntakeCard />
+        <EmptyState
+          icon="📋"
+          title="No bags in inspection queue"
+          description="Bags checked in will appear here for inspection."
+        />
+      </div>
     )
   }
 
   return (
     <div className="space-y-3">
+      <CommercialIntakeCard />
       <div className="flex items-center justify-between">
         <SectionLabel title="Inspection Queue" accent={ACCENT} />
         <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(255,214,0,0.12)', color: '#FFD600', border: '1px solid rgba(255,214,0,0.3)' }}>

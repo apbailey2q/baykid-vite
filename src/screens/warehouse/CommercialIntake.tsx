@@ -9,6 +9,9 @@ import { useNetworkStatus } from '../../hooks/useNetworkStatus'
 import { useOfflineSync } from '../../hooks/useOfflineSync'
 import { OfflineBanner } from '../../components/offline/OfflineBanner'
 import { addDraft } from '../../lib/offlineQueue'
+import { useAuthStore } from '../../store/authStore'
+import { applyWarehouseInspection } from '../../lib/commercialWarehouseIntake'
+import { uploadPickupPhoto } from '../../lib/commercialPickupPhotos'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +27,8 @@ interface LoadDetail {
   bin_count: number | null
   estimated_weight: number | null
   status: string
+  source: string | null
+  arrived_at: string | null
 }
 
 type IntakePhase = 'scan' | 'confirm' | 'success'
@@ -66,6 +71,13 @@ export default function CommercialIntake() {
   const [submitting, setSubmitting]     = useState(false)
   const [flagged, setFlagged]           = useState(false)
   const [toast, setToast]               = useState<string | null>(null)
+  // Phase G.6 — extended inspection fields
+  const [contaminationNotes, setContaminationNotes] = useState('')
+  const [quantityReceived, setQuantityReceived]     = useState('')
+  const [supervisorRequired, setSupervisorRequired] = useState(false)
+  const [stagedPhotos, setStagedPhotos]             = useState<File[]>([])
+  const [uploadingPhotos, setUploadingPhotos]       = useState(false)
+  const user = useAuthStore((s) => s.user)
 
   // ── Load expected load when arriving from expected loads screen ──────────
 
@@ -75,7 +87,7 @@ export default function CommercialIntake() {
       setLoadState('loading')
       const { data, error } = await supabase
         .from('expected_warehouse_loads')
-        .select('id, pickup_id, account_id, business_name, material_type, warehouse_id, driver_id, bin_count, estimated_weight, status')
+        .select('id, pickup_id, account_id, business_name, material_type, warehouse_id, driver_id, bin_count, estimated_weight, status, source, arrived_at')
         .eq('id', loadId!)
         .maybeSingle()
 
@@ -113,6 +125,12 @@ export default function CommercialIntake() {
   }
 
   // ── Confirm Intake ────────────────────────────────────────────────────────
+  // Phase G.6: drive everything through public.apply_warehouse_inspection().
+  // The RPC writes commercial_inspections (inspection_source='warehouse'),
+  // updates expected_warehouse_loads + commercial_pickups, conditionally
+  // inserts material_batches (Green only), and fires the customer
+  // notification on Yellow/Red. Yellow correctly lands the pickup at
+  // status='in_review' (not 'processed').
 
   async function handleConfirmIntake() {
     if (!inspection) { showToast('Select an inspection result before confirming'); return }
@@ -124,19 +142,23 @@ export default function CommercialIntake() {
     // ── Offline path ──────────────────────────────────────────────────────────
     if (!isOnline) {
       addDraft({
-        user_id:     'warehouse',   // warehouse staff — auth user not available here without useAuthStore
+        user_id:     user?.id ?? 'warehouse',
         action_type: 'warehouse_intake',
         payload: {
-          load_id:      effectiveLoadId,
-          pickup_id:    effectivePickupId,
+          load_id:              effectiveLoadId,
+          pickup_id:            effectivePickupId,
           inspection,
-          actual_weight: Number(actualWeight),
+          actual_weight:        Number(actualWeight),
           line,
-          notes:        intakeNotes || null,
-          warehouse_id: loadDetail?.warehouse_id ?? null,
-          account_id:   loadDetail?.account_id   ?? null,
-          material_type:loadDetail?.material_type ?? 'Unknown',
-          batch_exists: false,
+          notes:                intakeNotes || null,
+          warehouse_id:         loadDetail?.warehouse_id ?? null,
+          account_id:           loadDetail?.account_id   ?? null,
+          material_type:        loadDetail?.material_type ?? 'Unknown',
+          batch_exists:         false,
+          // G.6 extension — replayed by the (existing) syncWarehouseIntake
+          contamination_notes:  contaminationNotes || null,
+          quantity_received:    quantityReceived ? Number(quantityReceived) : null,
+          supervisor_required:  supervisorRequired || inspection === 'red',
         },
       })
       setPhase('success')
@@ -144,86 +166,44 @@ export default function CommercialIntake() {
       return
     }
 
-    if (inspection === 'red') {
-      // Red inspection → flag, not receive
-      setSubmitting(true)
-      try {
-        if (effectiveLoadId) {
-          await supabase
-            .from('expected_warehouse_loads')
-            .update({ status: 'flagged', intake_result: 'red', warehouse_notes: intakeNotes || null })
-            .eq('id', effectiveLoadId)
-        }
-        if (effectivePickupId) {
-          await supabase
-            .from('commercial_pickups')
-            .update({ status: 'flagged' })
-            .eq('id', effectivePickupId)
-        }
-        setFlagged(true)
-        showToast('Load flagged — supervisor notified')
-        setTimeout(() => navigate(-1), 1800)
-      } catch (err: unknown) {
-        showToast(err instanceof Error ? err.message : 'Update failed')
-      } finally {
-        setSubmitting(false)
-      }
+    if (!effectivePickupId) {
+      showToast('This load is not linked to a commercial pickup — cannot inspect via G.6 flow')
       return
     }
 
-    // Green or yellow → mark received
     setSubmitting(true)
     try {
-      if (effectiveLoadId) {
-        const { error: loadErr } = await supabase
-          .from('expected_warehouse_loads')
-          .update({
-            status:          'received',
-            intake_result:   inspection,
-            actual_weight:   Number(actualWeight),
-            processing_line: line,
-            warehouse_notes: intakeNotes || null,
-          })
-          .eq('id', effectiveLoadId)
-        if (loadErr) throw loadErr
+      const r = await applyWarehouseInspection({
+        pickupId:            effectivePickupId,
+        result:              inspection,
+        contaminationNotes:  contaminationNotes.trim() || undefined,
+        quantityReceived:    quantityReceived ? Number(quantityReceived) : null,
+        supervisorRequired:  supervisorRequired || inspection === 'red',
+        actualWeight:        Number(actualWeight),
+        processingLine:      line,
+        notes:               intakeNotes.trim() || undefined,
+      })
+
+      if (!r.ok) throw new Error(r.error ?? 'Inspection failed')
+
+      // Upload any staged photos to the commercial-pickup-photos bucket with
+      // stage='completion'. Best-effort: don't block on individual failures.
+      if (stagedPhotos.length > 0 && user?.id) {
+        setUploadingPhotos(true)
+        await Promise.all(stagedPhotos.map((file) =>
+          uploadPickupPhoto(effectivePickupId, user.id, file, 'completion')
+            .catch(() => undefined),
+        ))
+        setUploadingPhotos(false)
       }
 
-      if (effectivePickupId) {
-        await supabase
-          .from('commercial_pickups')
-          .update({ status: 'processed' })
-          .eq('id', effectivePickupId)
+      if (inspection === 'red') {
+        setFlagged(true)
+        showToast('Load flagged — supervisor notified')
+        setTimeout(() => navigate(-1), 1800)
+      } else {
+        setPhase('success')
       }
-
-      // Best-effort batch creation with duplicate prevention
-      try {
-        let hasBatch = false
-        if (effectivePickupId) {
-          const { data: existingBatch } = await supabase
-            .from('material_batches')
-            .select('id')
-            .eq('commercial_pickup_id', effectivePickupId)
-            .maybeSingle()
-          hasBatch = !!existingBatch
-        }
-        if (!hasBatch) {
-          await supabase.from('material_batches').insert({
-            commercial_pickup_id:  effectivePickupId ?? null,
-            expected_load_id:      effectiveLoadId   ?? null,
-            warehouse_id:          loadDetail?.warehouse_id ?? null,
-            commercial_account_id: loadDetail?.account_id  ?? null,
-            material_type:         loadDetail?.material_type ?? 'Unknown',
-            actual_weight:         Number(actualWeight),
-            contamination_status:  inspection === 'yellow' ? 'flagged' : 'clean',
-            processing_line:       line,
-            status:                'received',
-          })
-        }
-      } catch (err) {
-        console.warn('Batch creation failed:', err)
-      }
-
-      setPhase('success')
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Update failed')
     } finally {
@@ -522,6 +502,24 @@ export default function CommercialIntake() {
                   <p style={{ fontSize: 20, fontWeight: 900, color: '#00c8ff', marginTop: 3 }}>
                     {loadDetail?.business_name ?? 'Unknown Business'}
                   </p>
+                  {/* Phase G.6 — Commercial Source badge + pickup ID chip */}
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {loadDetail?.source === 'commercial_request' && (
+                      <span style={{ fontSize: 9, fontWeight: 800, color: '#00c8ff', background: 'rgba(0,200,255,0.12)', border: '1px solid rgba(0,200,255,0.3)', borderRadius: 20, padding: '2px 8px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        Commercial Source
+                      </span>
+                    )}
+                    {(pickupId || loadDetail?.pickup_id) && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px', fontFamily: 'monospace' }}>
+                        #{(pickupId || loadDetail?.pickup_id || '').slice(0, 8)}
+                      </span>
+                    )}
+                    {loadDetail?.arrived_at && (
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                        Arrived {new Date(loadDetail.arrived_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {flagged && <StatusBadge variant="red" label="Flagged" size="sm" />}
               </div>
@@ -642,6 +640,135 @@ export default function CommercialIntake() {
                 ))}
               </div>
             </GlassCard>
+
+            {/* Phase G.6 — contamination + quantity + supervisor */}
+            {inspection && (
+              <>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+                  Quantity Received (optional)
+                </p>
+                <GlassCard padding="md" className="mb-4">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={quantityReceived}
+                      onChange={(e) => setQuantityReceived(e.target.value.replace(/[^0-9.]/g, ''))}
+                      placeholder="e.g. 4 (bins / containers)"
+                      style={{
+                        flex: 1, padding: '10px 12px', borderRadius: 12,
+                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,200,255,0.2)',
+                        color: '#fff', fontSize: 14, outline: 'none',
+                      }}
+                    />
+                  </div>
+                </GlassCard>
+
+                {inspection !== 'green' && (
+                  <>
+                    <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+                      Contamination Notes
+                    </p>
+                    <GlassCard padding="md" className="mb-4">
+                      <textarea
+                        value={contaminationNotes}
+                        onChange={(e) => setContaminationNotes(e.target.value)}
+                        placeholder={
+                          inspection === 'yellow'
+                            ? 'Mixed contamination, damaged containers, quantity mismatch…'
+                            : 'Hazardous material, unsafe load, major contamination…'
+                        }
+                        rows={3}
+                        style={{
+                          width: '100%', padding: '6px 0', borderRadius: 0,
+                          background: 'transparent', border: 'none',
+                          color: '#fff', fontSize: 13, outline: 'none', resize: 'none',
+                          lineHeight: 1.55,
+                        }}
+                      />
+                    </GlassCard>
+
+                    <GlassCard padding="md" className="mb-4">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={supervisorRequired || inspection === 'red'}
+                          disabled={inspection === 'red'}
+                          onChange={(e) => setSupervisorRequired(e.target.checked)}
+                          style={{ width: 18, height: 18, accentColor: '#fbbf24', cursor: inspection === 'red' ? 'not-allowed' : 'pointer' }}
+                        />
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Requires supervisor review</p>
+                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                            {inspection === 'red'
+                              ? 'Automatically required for Red inspections'
+                              : 'Routes this load to a supervisor before processing'}
+                          </p>
+                        </div>
+                      </label>
+                    </GlassCard>
+                  </>
+                )}
+
+                {/* Photo capture */}
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+                  Intake Photos (optional)
+                </p>
+                <GlassCard padding="md" className="mb-5">
+                  <label
+                    className="w-full rounded-xl flex flex-col items-center gap-2 py-4 transition-all hover:brightness-110"
+                    style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1.5px dashed rgba(0,200,255,0.25)',
+                      cursor: uploadingPhotos ? 'wait' : 'pointer',
+                      opacity: uploadingPhotos ? 0.6 : 1,
+                    }}
+                  >
+                    <span style={{ fontSize: 24 }}>📷</span>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>
+                      {stagedPhotos.length === 0 ? 'Tap to add intake photos' : `${stagedPhotos.length} photo${stagedPhotos.length === 1 ? '' : 's'} ready to upload`}
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                      multiple
+                      disabled={uploadingPhotos}
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const incoming = Array.from(e.target.files ?? [])
+                        if (incoming.length > 0) setStagedPhotos((prev) => [...prev, ...incoming])
+                        e.currentTarget.value = ''
+                      }}
+                    />
+                  </label>
+                  {stagedPhotos.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                      {stagedPhotos.map((file, i) => {
+                        const url = URL.createObjectURL(file)
+                        return (
+                          <div key={`${file.name}-${i}`} style={{ position: 'relative' }}>
+                            <img
+                              src={url}
+                              alt=""
+                              style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+                              onLoad={() => URL.revokeObjectURL(url)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setStagedPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                              style={{ position: 'absolute', top: -6, right: -6, background: '#f87171', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontWeight: 900, fontSize: 10 }}
+                              title="Remove"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </GlassCard>
+              </>
+            )}
 
             {/* Action buttons */}
             <div className="flex flex-col gap-2.5">

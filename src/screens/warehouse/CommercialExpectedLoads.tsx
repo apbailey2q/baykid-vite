@@ -56,6 +56,9 @@ interface WarehouseLoad {
   status: LoadStatus
   warehouse_notes: string | null
   created_at: string
+  // Phase G.5/G.6 — Commercial Source provenance
+  source: string | null
+  source_pickup_id: string | null
 }
 
 type FilterTab = 'all' | LoadStatus
@@ -128,7 +131,7 @@ export default function CommercialExpectedLoads() {
 
     const { data: loadsData, error } = await supabase
       .from('expected_warehouse_loads')
-      .select('id, pickup_id, account_id, business_name, material_type, estimated_volume, warehouse_id, driver_id, bin_count, estimated_weight, expected_arrival, arrived_at, status, warehouse_notes, created_at')
+      .select('id, pickup_id, account_id, business_name, material_type, estimated_volume, warehouse_id, driver_id, bin_count, estimated_weight, expected_arrival, arrived_at, status, warehouse_notes, created_at, source, source_pickup_id')
       .order('created_at', { ascending: false })
 
     if (error) { setPageState('error'); return }
@@ -522,9 +525,22 @@ export default function CommercialExpectedLoads() {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0 mr-2">
-                        <p style={{ fontSize: 14, fontWeight: 700, color: isDone ? 'rgba(255,255,255,0.4)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.business_name}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p style={{ fontSize: 14, fontWeight: 700, color: isDone ? 'rgba(255,255,255,0.4)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.business_name}
+                          </p>
+                          {/* Phase G.6 — Commercial Source provenance badge */}
+                          {item.source === 'commercial_request' && (
+                            <span style={{ fontSize: 8, fontWeight: 800, color: '#00c8ff', background: 'rgba(0,200,255,0.12)', border: '1px solid rgba(0,200,255,0.3)', borderRadius: 20, padding: '2px 7px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                              Commercial
+                            </span>
+                          )}
+                          {(item.source_pickup_id || item.pickup_id) && (
+                            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 7px', fontFamily: 'monospace' }}>
+                              #{(item.source_pickup_id || item.pickup_id || '').slice(0, 8)}
+                            </span>
+                          )}
+                        </div>
                         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
                           🚛 {item.driver_name ?? 'Unassigned'} · {item.warehouse_id ?? 'Warehouse TBD'}
                         </p>

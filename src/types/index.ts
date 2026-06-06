@@ -168,6 +168,9 @@ export interface CommercialRouteStop {
   created_at: string
 }
 
+export type CommercialInspectionResultColor = 'green' | 'yellow' | 'red'
+export type CommercialInspectionSource = 'driver' | 'warehouse'
+
 export interface CommercialInspection {
   id: string
   pickup_id: string
@@ -176,6 +179,102 @@ export interface CommercialInspection {
   overall_result: SafetyCheckResult
   notes: string | null
   created_at: string
+  // Phase G.6 — warehouse inspection layer (additive, opt-in)
+  result_color?: CommercialInspectionResultColor | null
+  contamination_notes?: string | null
+  quantity_received?: number | null
+  materials_verified?: Record<string, unknown>
+  supervisor_required?: boolean
+  warehouse_inspector_id?: string | null
+  inspection_started_at?: string | null
+  inspection_completed_at?: string | null
+  inspection_source?: CommercialInspectionSource
+}
+
+// ── Commercial Warehouse Processing — Phase G.6 view rows ───────────────────
+
+export interface CommercialIntakeQueueRow {
+  load_id:              string
+  pickup_id:            string
+  source_pickup_id:     string | null
+  source:               'route_stop' | 'commercial_request'
+  account_id:           string
+  business_name:        string
+  material_type:        string
+  estimated_volume:     string
+  bin_count:            number | null
+  estimated_weight:     number | null
+  actual_weight:        number | null
+  intake_result:        CommercialInspectionResultColor | null
+  load_status:          string
+  warehouse_id:         string | null
+  driver_id:            string | null
+  expected_arrival:     string | null
+  arrived_at:           string | null
+  intake_started_at:    string | null
+  processed_at:         string | null
+  intake_user_id:       string | null
+  warehouse_notes:      string | null
+  pickup_status:        string
+  contact_person:       string | null
+  special_instructions: string | null
+  priority_level:       'low' | 'normal' | 'high' | 'emergency' | null
+  pickup_type:          string | null
+  photo_count:          number
+  last_event_at:        string | null
+  driver_name:          string | null
+}
+
+export interface CommercialVolumeSummaryRow {
+  account_id:             string
+  business_name:          string
+  day:                    string
+  completed_count:        number
+  processed_count:        number
+  in_review_count:        number
+  flagged_count:          number
+  cancelled_count:        number
+  green_count:            number
+  yellow_count:           number
+  red_count:              number
+  clean_weight_lbs:       number
+  total_weight_lbs:       number
+  contamination_rate_pct: number
+}
+
+export interface CommercialGyrCountsRow {
+  warehouse_id:     string | null
+  day:              string
+  green_count:      number
+  yellow_count:     number
+  red_count:        number
+  total_loads:      number
+  total_weight_lbs: number
+}
+
+export interface CommercialDriverCompletionRow {
+  driver_id:         string
+  driver_name:       string | null
+  day:               string
+  completed_count:   number
+  flagged_count:     number
+  cancelled_count:   number
+  total_assignments: number
+}
+
+export interface CommercialBusinessActivityRow {
+  account_id:            string
+  user_id:               string | null
+  business_name:         string
+  total_pickups:         number
+  processed_count:       number
+  in_review_count:       number
+  flagged_count:         number
+  total_weight_lbs:      number
+  clean_weight_lbs:      number
+  co2_saved_tons_approx: number
+  diversion_pct:         number
+  last_completed_at:     string | null
 }
 
 export interface CommercialNotification {

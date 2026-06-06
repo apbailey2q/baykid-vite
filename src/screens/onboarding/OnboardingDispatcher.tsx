@@ -29,8 +29,18 @@ export default function OnboardingDispatcher() {
   const { role, driverComplianceStatus } = useAuthStore()
 
   // Drivers go through the Compliance Pack V1 wizard until they're approved
-  // for dispatch. Approved drivers go straight to their dashboard.
+  // for dispatch. Approved drivers go straight to their dashboard. Wipe any
+  // consumer-onboarding localStorage that may have leaked from a prior
+  // consumer session on the same device.
   if (role === 'driver') {
+    try {
+      const keys: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('baykid-onboarding:')) keys.push(k)
+      }
+      keys.forEach((k) => localStorage.removeItem(k))
+    } catch { /* non-fatal */ }
     if (driverComplianceStatus === 'approved_for_dispatch') {
       return <Navigate to="/dashboard/driver" replace />
     }

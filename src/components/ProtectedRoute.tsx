@@ -85,6 +85,26 @@ export function ProtectedRoute({ children, requireApproved = false }: Props) {
     return <Navigate to="/onboarding" replace />
   }
 
+  // Driver onboarding gate — drivers must NEVER enter any /onboarding/* route.
+  // They complete the Driver Compliance Pack V1 at /driver/compliance instead.
+  // This is defense-in-depth on top of canAccessRoute (which also denies
+  // 'driver' for /onboarding/* via routePermissions.ts). It catches edge cases
+  // such as manual URL entry or localStorage state from a prior consumer session
+  // on the same device before canAccessRoute was applied.
+  if (role === 'driver' && (pathname === '/onboarding' || pathname.startsWith('/onboarding/'))) {
+    // Wipe any consumer-onboarding state so the wizard cannot resume mid-flow
+    // the next time this driver signs into a real consumer device.
+    try {
+      const keys: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('baykid-onboarding:')) keys.push(k)
+      }
+      keys.forEach((k) => localStorage.removeItem(k))
+    } catch { /* non-fatal */ }
+    return <Navigate to="/driver/compliance" replace />
+  }
+
   // Role-level access check — DB role is always authoritative
   if (!canAccessRoute(role, pathname)) {
     return <AccessDenied role={role} />

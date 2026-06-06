@@ -26,7 +26,7 @@
 //     permission booleans in consumer_preferences stay false until real grants.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { logout } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
@@ -233,6 +233,26 @@ export default function ConsumerOnboarding() {
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm(prev => ({ ...prev, [key]: value }))
   }, [])
+
+  // ── Driver guard (defense-in-depth, Layer 3) ─────────────────────────────
+  // ProtectedRoute + routePermissions already block drivers from /onboarding,
+  // but localStorage may have restored a stepIdx from a prior consumer session
+  // on this device, causing Step 3+ to briefly render before any redirect fires.
+  // This synchronous check (all hooks called above) stops the render cold.
+  if (profile?.role === 'driver') {
+    // Spec item 5 — wipe any consumer-onboarding state that may have leaked
+    // from a prior session on the same device so the wizard cannot resume
+    // mid-flow on the driver's next sign-in.
+    try {
+      const keys: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith(ONBOARDING_KEY_PREFIX)) keys.push(k)
+      }
+      keys.forEach((k) => localStorage.removeItem(k))
+    } catch { /* non-fatal */ }
+    return <Navigate to="/driver/compliance" replace />
+  }
 
   function goNext() {
     // Per-step validation (in-memory only — no DB write).

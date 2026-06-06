@@ -64,7 +64,9 @@ export function DashboardShell({ title, children }: Props) {
   const showScanBtn = role ? SCAN_ROLES.has(role) : false
 
   const initials    = profile?.full_name ? getInitials(profile.full_name) : '??'
-  const onScan      = location.pathname === '/scan'
+  // Phase G.7 — Scan tab now targets /live-scan (the Supabase-backed scan
+  // screen). The legacy mock /scan route was archived to src/screens/dev/.
+  const onScan      = location.pathname === '/live-scan'
   const notifRole   = toNotifRole(role)
 
   return (
@@ -154,7 +156,7 @@ export function DashboardShell({ title, children }: Props) {
             <p className="mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Coming soon in a future phase</p>
             {showScanBtn && (
               <Link
-                to="/scan"
+                to="/live-scan"
                 className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 style={{
                   background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
@@ -206,7 +208,7 @@ export function DashboardShell({ title, children }: Props) {
         {/* Scan — only for eligible roles (unchanged showScanBtn logic) */}
         {showScanBtn && (
           <Link
-            to="/scan"
+            to="/live-scan"
             className="flex flex-col items-center gap-1 px-4 py-2 transition-opacity hover:opacity-80"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={onScan ? '#00c8ff' : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

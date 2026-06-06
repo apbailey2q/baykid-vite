@@ -6,15 +6,26 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
 import type { Role, ApprovalStatus, UserRecord } from '../../types'
 
+// Phase G.7 — assignment dropdown now exposes every Role the Role union
+// defines. Previously this was a hand-maintained 8-role subset and admins
+// couldn't assign 22 of the 30 valid roles (e.g. all G.3 fundraiser sub-roles
+// and G.4 commercial sub-roles). Grouped by domain for UX scan-ability.
 const ROLES: Role[] = [
-  'consumer',
-  'commercial',
-  'driver',
-  'warehouse_employee',
-  'warehouse_supervisor',
-  'partner',
-  'fundraiser',
-  'admin',
+  // Core operations
+  'consumer', 'commercial', 'driver',
+  'warehouse_employee', 'warehouse_supervisor',
+  'partner', 'admin',
+  // Fundraiser family (Phase G.3)
+  'fundraiser', 'fundraiser_admin',
+  'school_partner', 'nonprofit_partner', 'church_partner', 'sports_team_partner',
+  // Commercial customer family (Phase G.4)
+  'commercial_customer', 'business_customer',
+  'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+  'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+  // Municipal
+  'municipal_viewer', 'municipal_manager', 'city_admin',
+  // Executive / investor / regional
+  'executive', 'investor_viewer', 'regional_admin', 'city_manager',
 ]
 
 const ROLE_LABELS: Record<Role, string> = {

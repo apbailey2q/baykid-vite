@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import LiveImpactCounter from '../components/LiveImpactCounter'
-import CitySelector from '../components/CitySelector'
+import LiveImpactCounter from '../../components/LiveImpactCounter'
+import CitySelector from '../../components/CitySelector'
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 

@@ -67,10 +67,10 @@ const LiveWarehouseDashboard   = lazy(() => import('./screens/live/LiveWarehouse
 const LiveWarehouseReviewPage  = lazy(() => import('./screens/live/LiveWarehouseReviewPage'))
 
 // ─ Consumer ───────────────────────────────────────────────────────────────────
-const ScannerScreen            = lazy(() => import('./screens/ScannerScreen'))
+// Phase G.7 — ScannerScreen + WalletPage archived to src/screens/dev/; the
+// /scan and /wallet routes now redirect to /live-scan and /live-wallet.
 const BagDetailScreen          = lazy(() => import('./screens/BagDetailScreen'))
 const InspectionScreen         = lazy(() => import('./screens/InspectionScreen'))
-const WalletPage               = lazy(() => import('./screens/WalletPage'))
 const NotificationsPage        = lazy(() => import('./screens/NotificationsPage'))
 const ConsumerOnboarding       = lazy(() => import('./screens/onboarding/ConsumerOnboarding'))
 const OnboardingDispatcher     = lazy(() => import('./screens/onboarding/OnboardingDispatcher'))
@@ -137,7 +137,7 @@ const CommercialOnboarding        = lazy(() => import('./screens/commercial/Comm
 const CommercialBillingDashboard  = lazy(() => import('./screens/commercial/CommercialBillingDashboard'))
 
 // ─ Admin ──────────────────────────────────────────────────────────────────────
-const AdminDashboardPage             = lazy(() => import('./screens/AdminDashboardPage'))
+// Phase G.7 — AdminDashboardPage archived to src/screens/dev/; /admin-dashboard redirects to /dashboard/admin.
 const AIMarketingCenter              = lazy(() => import('./screens/admin/AIMarketingCenter'))
 const AdminCommercialDashboard       = lazy(() => import('./screens/admin/AdminCommercialDashboard'))
 const AdminCommercialAccounts        = lazy(() => import('./screens/admin/AdminCommercialAccounts'))
@@ -164,7 +164,7 @@ const ReleaseNotesPage               = lazy(() => import('./screens/admin/Releas
 const LaunchCenter                   = lazy(() => import('./screens/admin/launch/LaunchCenter'))
 const FraudDetectionPage             = lazy(() => import('./screens/FraudDetectionPage'))
 const AIRecommendationsPage          = lazy(() => import('./screens/AIRecommendationsPage'))
-const FundraiserAdminPage            = lazy(() => import('./screens/FundraiserAdminPage'))
+// Phase G.7 — FundraiserAdminPage archived to src/screens/dev/; /fundraiser-admin redirects to /live-fundraiser-dashboard.
 const PartnerDashboardPage           = lazy(() => import('./screens/PartnerDashboardPage'))
 const ReportsCenterPage              = lazy(() => import('./screens/ReportsCenterPage'))
 
@@ -202,7 +202,9 @@ const TermsOfService           = lazy(() => import('./screens/legal/TermsOfServi
 
 // ─ Beta / deploy / QA ─────────────────────────────────────────────────────────
 const BetaHome                 = lazy(() => import('./screens/beta/BetaHome'))
-const BetaFeedbackPage         = lazy(() => import('./screens/beta/BetaFeedbackPage'))
+// Phase G.7 — BetaFeedbackV2 is the canonical /beta/feedback screen.
+// The duplicate Route declaration that mounted BetaFeedbackPage was dead
+// (React Router matches the first match); it has been removed.
 const BetaFeedbackV2           = lazy(() => import('./screens/beta/BetaFeedbackV2'))
 const BetaChecklist            = lazy(() => import('./screens/beta/BetaChecklist'))
 const ProductionChecklist      = lazy(() => import('./screens/deploy/ProductionChecklist'))
@@ -228,7 +230,9 @@ const ROLE_HOME: Record<string, string> = {
   municipal_manager:    '/dashboard/municipal',
   city_admin:           '/dashboard/municipal',
   executive:            '/dashboard/executive',
-  investor_viewer:      '/dashboard/executive',
+  // Phase G.7 — was '/dashboard/executive' which mismatched lib/auth.ts getRoleDashboardPath.
+  // InvestorDashboard at /dashboard/admin/investor is the screen built for this role.
+  investor_viewer:      '/dashboard/admin/investor',
   regional_admin:       '/dashboard/admin/regions',
   city_manager:         '/dashboard/admin/regions',
 }
@@ -451,7 +455,8 @@ function App() {
               <Route path="/dashboard/driver/earnings"              element={<ProtectedRoute requireApproved><DriverEarnings /></ProtectedRoute>} />
 
               {/* Bag lifecycle */}
-              <Route path="/scan"              element={<ProtectedRoute requireApproved><ScannerScreen /></ProtectedRoute>} />
+              {/* Phase G.7 — /scan was a mock preview screen; redirect to the Supabase-backed /live-scan */}
+              <Route path="/scan"              element={<Navigate to="/live-scan" replace />} />
               <Route path="/bag/:bagId"        element={<ProtectedRoute requireApproved><BagDetailScreen /></ProtectedRoute>} />
               <Route path="/bag/:bagId/inspect" element={<ProtectedRoute requireApproved><InspectionScreen /></ProtectedRoute>} />
 
@@ -483,13 +488,16 @@ function App() {
               <Route path="/reports"           element={<RequireAuth><RequireRole roles={['admin','partner']}><ReportsCenterPage /></RequireRole></RequireAuth>} />
 
               {/* Consumer only */}
-              <Route path="/wallet" element={<RequireAuth><RequireRole roles={['consumer','admin']}><WalletPage /></RequireRole></RequireAuth>} />
+              {/* Phase G.7 — /wallet was a mock screen; redirect to the Supabase-backed /live-wallet */}
+              <Route path="/wallet" element={<Navigate to="/live-wallet" replace />} />
 
               {/* Admin only */}
-              <Route path="/admin-dashboard"    element={<RequireAuth><RequireRole roles={['admin']}><AdminDashboardPage /></RequireRole></RequireAuth>} />
+              {/* Phase G.7 — /admin-dashboard mounted a hardcoded "City Impact" mock; redirect to the live /dashboard/admin */}
+              <Route path="/admin-dashboard"    element={<Navigate to="/dashboard/admin" replace />} />
               <Route path="/fraud-detection"    element={<RequireAuth><RequireRole roles={['admin']}><FraudDetectionPage /></RequireRole></RequireAuth>} />
               <Route path="/ai-recommendations" element={<RequireAuth><RequireRole roles={['admin']}><AIRecommendationsPage /></RequireRole></RequireAuth>} />
-              <Route path="/fundraiser-admin"   element={<RequireAuth><RequireRole roles={['admin','fundraiser']}><FundraiserAdminPage /></RequireRole></RequireAuth>} />
+              {/* Phase G.7 — /fundraiser-admin was a mock; redirect to the live per-campaign dashboard */}
+              <Route path="/fundraiser-admin"   element={<Navigate to="/live-fundraiser-dashboard" replace />} />
 
               {/* Legacy demo shortcuts → redirect to canonical dashboard routes */}
               <Route path="/consumer"   element={<Navigate to="/dashboard/consumer"   replace />} />
@@ -534,7 +542,7 @@ function App() {
 
               {/* ── Internal ops — admin only ── */}
               <Route path="/beta"             element={<RequireRole roles={['admin']}><BetaHome /></RequireRole>} />
-              <Route path="/beta/feedback"    element={<RequireRole roles={['admin']}><BetaFeedbackPage /></RequireRole>} />
+              {/* Phase G.7 — /beta/feedback already declared at the top of this Routes block (BetaFeedbackV2); duplicate removed */}
               <Route path="/beta/checklist"   element={<RequireRole roles={['admin']}><BetaChecklist /></RequireRole>} />
               <Route path="/deploy/checklist" element={<RequireRole roles={['admin']}><ProductionChecklist /></RequireRole>} />
               <Route path="/presentation-mode"   element={<RequireRole roles={['admin']}><PresentationModePage /></RequireRole>} />

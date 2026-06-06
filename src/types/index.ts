@@ -12,6 +12,16 @@ export type Role =
   | 'nonprofit_partner'
   | 'church_partner'
   | 'sports_team_partner'
+  | 'commercial_customer'   // Phase G.4 — all 10 below route to /onboarding/commercial
+  | 'business_customer'
+  | 'restaurant_partner'
+  | 'bar_partner'
+  | 'hospital_partner'
+  | 'hotel_partner'
+  | 'school_business'
+  | 'apartment_partner'
+  | 'office_partner'
+  | 'manufacturing_partner'
   | 'municipal_viewer'
   | 'municipal_manager'
   | 'city_admin'
@@ -39,6 +49,38 @@ export const FUNDRAISER_ROLES: readonly Role[] = [
 
 export function isFundraiserRole(role: string | null | undefined): boolean {
   return !!role && (FUNDRAISER_ROLES as readonly string[]).includes(role)
+}
+
+// ── Commercial Customer Onboarding (Phase G.4) ───────────────────────────────
+
+export type CommercialBusinessType =
+  | 'bar' | 'restaurant' | 'hospital' | 'hotel' | 'school' | 'office_building'
+  | 'apartment_complex' | 'event_venue' | 'retail_store' | 'grocery_store'
+  | 'manufacturing_facility' | 'warehouse' | 'church' | 'nonprofit' | 'other'
+
+export type CommercialAccountStatus =
+  | 'draft' | 'pending_review' | 'approved' | 'rejected' | 'active' | 'suspended' | 'pending'
+
+export type CommercialVolumeTier = 'small' | 'medium' | 'large' | 'enterprise'
+
+export type CommercialPickupFrequency =
+  | 'one_time' | 'weekly' | 'twice_weekly' | 'three_times_weekly' | 'daily' | 'on_demand'
+
+export type CommercialMaterial =
+  | 'cardboard' | 'plastic' | 'aluminum' | 'glass' | 'paper' | 'mixed_recycling'
+  | 'food_packaging' | 'pallets' | 'e_waste' | 'other'
+
+/** 10 sub-roles that go through the new /onboarding/commercial wizard. The
+ *  legacy 'commercial' role keeps its existing /dashboard/commercial/onboarding
+ *  flow. */
+export const COMMERCIAL_CUSTOMER_ROLES: readonly Role[] = [
+  'commercial_customer', 'business_customer',
+  'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+  'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+] as const
+
+export function isCommercialCustomerRole(role: string | null | undefined): boolean {
+  return !!role && (COMMERCIAL_CUSTOMER_ROLES as readonly string[]).includes(role)
 }
 
 // ── Commercial ───────────────────────────────────────────────────────────────

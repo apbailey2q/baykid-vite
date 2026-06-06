@@ -76,6 +76,7 @@ const ConsumerOnboarding       = lazy(() => import('./screens/onboarding/Consume
 const OnboardingDispatcher     = lazy(() => import('./screens/onboarding/OnboardingDispatcher'))
 const WaitlistScreen           = lazy(() => import('./screens/onboarding/WaitlistScreen'))
 const FundraiserOnboarding     = lazy(() => import('./screens/onboarding/FundraiserOnboarding'))
+const CommercialOnboardingG4   = lazy(() => import('./screens/onboarding/CommercialOnboarding'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 const ScanResultPage           = lazy(() => import('./screens/fundraisers/ScanResultPage'))
@@ -388,6 +389,7 @@ function App() {
               <Route path="/onboarding"                      element={<ProtectedRoute><OnboardingDispatcher /></ProtectedRoute>} />
               <Route path="/onboarding/consumer"             element={<ProtectedRoute><ConsumerOnboarding /></ProtectedRoute>} />
               <Route path="/onboarding/fundraiser"           element={<ProtectedRoute><FundraiserOnboarding /></ProtectedRoute>} />
+              <Route path="/onboarding/commercial"           element={<ProtectedRoute><CommercialOnboardingG4 /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

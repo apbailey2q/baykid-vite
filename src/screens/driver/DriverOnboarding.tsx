@@ -340,7 +340,7 @@ export default function DriverOnboarding() {
           </p>
           {([
             ['trainingWatchedSafety', 'Module 1 – Driver Safety & Defensive Driving'],
-            ['trainingWatchedApp', 'Module 2 – Using the BayKid Driver App'],
+            ['trainingWatchedApp', 'Module 2 – Using the Cyan&#39;s Brooklynn Driver App'],
             ['trainingWatchedInspection', 'Module 3 – AI Load Inspection & Scanning'],
             ['trainingWatchedLoading', 'Module 4 – Safe Loading & Unloading Procedures'],
             ['trainingWatchedRoutes', 'Module 5 – Route Completion & Warehouse Check-in'],

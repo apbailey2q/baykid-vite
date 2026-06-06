@@ -200,7 +200,7 @@ export default function LaunchChecklistPage() {
         style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(20px)', zIndex: 10 }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan&#39;s Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Launch Checklist</span>
         </div>

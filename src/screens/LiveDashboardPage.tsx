@@ -119,7 +119,7 @@ export default function LiveDashboardPage() {
         style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan&#39;s Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 6px rgba(74,222,128,0.8)' }} />

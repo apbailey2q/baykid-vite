@@ -120,7 +120,7 @@ export default function CommercialSupport() {
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
-          setAccountError('No commercial account found. Contact BayKid to set up your account.')
+          setAccountError('No commercial account found. Contact Cyan&#39;s Brooklynn to set up your account.')
         } else {
           setAccountId(data.id)
         }

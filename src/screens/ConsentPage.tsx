@@ -7,7 +7,7 @@ const ITEMS: ConsentItem[] = [
   {
     icon:   '🔍',
     title:  'Scan Verification',
-    detail: 'My bag scans will be reviewed by AI and may be subject to manual inspection by a BayKid administrator before earning wallet credit.',
+    detail: 'My bag scans will be reviewed by AI and may be subject to manual inspection by a Cyan&#39;s Brooklynn administrator before earning wallet credit.',
     color:  '#00c8ff',
     rgb:    '0,200,255',
   },
@@ -65,7 +65,7 @@ export default function ConsentPage() {
         style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan&#39;s Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>User Consent</span>
         </div>

@@ -152,7 +152,7 @@ export default function DemoOverview() {
       {/* ── Header ── */}
       <header className="relative flex items-center justify-between px-5 py-3.5" style={{ background: 'rgba(4,10,24,0.92)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan&#39;s Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest" style={{ background: 'rgba(94,234,212,0.12)', border: '1px solid rgba(94,234,212,0.3)', color: '#5eead4' }}>
             Investor Demo
@@ -305,7 +305,7 @@ export default function DemoOverview() {
               ))}
             </div>
             <p className="text-xs mt-4 leading-relaxed" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              The BayKid platform is built for multi-city scale. Each new market launches with pre-configured warehouse facilities, driver onboarding, and commercial account integration — no custom development required.
+              The Cyan&#39;s Brooklynn platform is built for multi-city scale. Each new market launches with pre-configured warehouse facilities, driver onboarding, and commercial account integration — no custom development required.
             </p>
           </div>
 
@@ -337,7 +337,7 @@ export default function DemoOverview() {
               We're onboarding pilot commercial accounts, municipal partners, and grant sponsors.
             </p>
             <a
-              href="mailto:hello@cyansbrooklynnrecycling.com?subject=BayKid Partnership Inquiry"
+              href="mailto:hello@cyansbrooklynnrecycling.com?subject=Cyan&#39;s Brooklynn Partnership Inquiry"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110"
               style={{ background: '#00c8ff', color: '#060e24', textDecoration: 'none' }}
             >

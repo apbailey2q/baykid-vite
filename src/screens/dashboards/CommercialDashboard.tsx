@@ -574,7 +574,7 @@ export default function CommercialDashboard() {
       {/* Header */}
       <header className="relative flex items-center justify-between px-4 py-3 shrink-0" style={{ background: 'rgba(4,10,24,0.94)', borderBottom: '1px solid rgba(0,200,255,0.12)', backdropFilter: 'blur(12px)', zIndex: 2 }}>
         <div className="flex items-center gap-2.5">
-          <span style={{ fontSize: 18, fontWeight: 900, color: ACCENT, letterSpacing: '-0.02em' }}>BayKid</span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: ACCENT, letterSpacing: '-0.02em' }}>Cyan&#39;s Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.25)' }}>|</span>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 5px rgba(74,222,128,0.8)' }} />

@@ -138,7 +138,7 @@ export default function ScannerScreen() {
         }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>BayKid</span>
+          <span className="text-xl font-extrabold" style={{ color: '#00c8ff' }}>Cyan&#39;s Brooklynn</span>
           <span style={{ color: 'rgba(0,200,255,0.3)' }}>|</span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Scan Bag</span>
         </div>

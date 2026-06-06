@@ -76,7 +76,7 @@ function ToolsPage() {
       <SectionLabel>Recycling Tools</SectionLabel>
       <Card>
         <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📱 Bag QR Scanner</p>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>Use your phone camera to scan any BayKid recycling bag QR code. Scanning logs your bag and alerts the nearest driver for pickup.</p>
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>Use your phone camera to scan any Cyan's Brooklynn recycling bag QR code. Scanning logs your bag and alerts the nearest driver for pickup.</p>
         <div style={{ marginTop: 10 }}><CTAButton label="Open Scanner" /></div>
       </Card>
       <Card>
@@ -92,7 +92,7 @@ function ToolsPage() {
       </Card>
       <Card>
         <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📦 Bag Prep Guide</p>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>Rinse containers, remove lids, and flatten cardboard before placing in your BayKid bag. Clean recyclables = faster processing = more points.</p>
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>Rinse containers, remove lids, and flatten cardboard before placing in your Cyan's Brooklynn bag. Clean recyclables = faster processing = more points.</p>
       </Card>
     </div>
   )
@@ -104,7 +104,7 @@ function EcoTipsPage() {
     { icon: '📦', title: 'Flatten Your Cardboard', body: 'Flattened boxes take up less space in your bag, letting you fit more. This directly increases your payout per pickup.' },
     { icon: '🚫', title: 'No Plastic Bags', body: 'Plastic film (grocery bags, wrap) cannot be processed in standard recycling. They jam machinery. Use dedicated plastic film drop-off bins instead.' },
     { icon: '🔢', title: 'Check the Number', body: 'Look for the resin code (1–7) on plastic items. Types 1 (PET) and 2 (HDPE) are universally accepted. Avoid types 3, 6, and 7 when possible.' },
-    { icon: '🍾', title: 'Glass Goes Separate', body: 'Glass is heavy and can break equipment. BayKid handles glass separately — request a glass-only pickup for bottles and jars.' },
+    { icon: '🍾', title: 'Glass Goes Separate', body: "Glass is heavy and can break equipment. Cyan's Brooklynn handles glass separately — request a glass-only pickup for bottles and jars." },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -126,7 +126,7 @@ function EcoTipsPage() {
 
 function JobsPage() {
   const jobs = [
-    { icon: '🚐', title: 'Pickup Driver', pay: '$18–24/hr', type: 'Part-time / Full-time', desc: 'Drive a designated route, collect BayKid bags, deliver to warehouse. Flexible hours, vehicle provided.' },
+    { icon: '🚐', title: 'Pickup Driver', pay: '$18–24/hr', type: 'Part-time / Full-time', desc: 'Drive a designated route, collect bags, deliver to warehouse. Flexible hours, vehicle provided.' },
     { icon: '🏭', title: 'Warehouse Associate', pay: '$16–20/hr', type: 'Full-time', desc: 'Sort, inspect, and process recycling materials at our Brooklyn facility. No experience required — training provided.' },
     { icon: '🌍', title: 'Community Coordinator', pay: '$20–26/hr', type: 'Full-time', desc: 'Onboard new neighborhoods, run events, manage local partner accounts. Great communication skills required.' },
     { icon: '📱', title: 'App Support Specialist', pay: '$17–22/hr', type: 'Part-time', desc: 'Help consumers, drivers, and partners resolve app issues. Remote-friendly role.' },
@@ -190,10 +190,10 @@ function CommunityPage() {
 
 function SuppliesPage() {
   const items = [
-    { icon: '🛍️', name: 'QR Recycling Bags (10-pack)', price: 'Free with 5 pickups', desc: 'Pre-coded BayKid bags. Each bag earns up to $5 when processed.' },
+    { icon: '🛍️', name: 'QR Recycling Bags (10-pack)', price: 'Free with 5 pickups', desc: 'Pre-coded recycling bags. Each bag earns up to $5 when processed.' },
     { icon: '🧤', name: 'Recycling Gloves', price: '$4.99', desc: 'Durable reusable gloves for safe sorting. Fits most adult hand sizes.' },
     { icon: '🏷️', name: 'Extra QR Labels (20-pack)', price: '$2.99', desc: 'Stick-on QR labels for unlabeled containers or replacement codes.' },
-    { icon: '🗑️', name: 'Pickup Bin (14-gal)', price: '$12.99', desc: 'Weather-resistant curbside bin. Holds 4–6 filled BayKid bags.' },
+    { icon: '🗑️', name: 'Pickup Bin (14-gal)', price: '$12.99', desc: 'Weather-resistant curbside bin. Holds 4–6 filled recycling bags.' },
     { icon: '🦺', name: 'Safety Vest (Hi-Vis)', price: '$8.99', desc: 'For high-visibility sorting. Required for warehouse volunteer events.' },
   ]
   return (
@@ -223,7 +223,7 @@ function RewardsPage() {
     { icon: '💳', name: 'Cash Transfer', rate: '$1 per 10 pts', desc: 'Transfer earnings directly to your bank or Cash App.' },
     { icon: '🎁', name: 'Gift Cards', rate: '$5 gift cards', desc: 'Amazon, Walmart, Target, and more. Instant delivery.' },
     { icon: '🌱', name: 'Plant a Tree', rate: '50 pts = 1 tree', desc: 'Donate your points to reforestation projects worldwide.' },
-    { icon: '🏷️', name: 'Supply Credits', rate: '20 pts = free bag', desc: 'Redeem for free BayKid bags, gloves, or labels.' },
+    { icon: '🏷️', name: 'Supply Credits', rate: '20 pts = free bag', desc: 'Redeem for free recycling bags, gloves, or labels.' },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -255,7 +255,7 @@ function MessagesPage() {
   const threads = [
     { avatar: '🏭', name: 'Warehouse Team', time: '2h ago', preview: 'Your bag BAG-2026-001 has been processed.', unread: true },
     { avatar: '🚐', name: 'Driver Marcus W.', time: '4h ago', preview: 'On my way — ETA 10 minutes.', unread: false },
-    { avatar: '📢', name: 'BayKid Updates', time: 'Yesterday', preview: 'New pickup zones now available in Crown Heights!', unread: false },
+    { avatar: '📢', name: "Cyan's Brooklynn Updates", time: 'Yesterday', preview: 'New pickup zones now available in Crown Heights!', unread: false },
   ]
   const [active, setActive] = useState<string | null>(null)
   return (

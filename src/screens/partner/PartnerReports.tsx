@@ -26,7 +26,7 @@ function buildReportRows(stats: PartnerStats, generatedAt: string): string[][] {
   const co2Saved = (stats.completedBags * LBS_PER_BAG * CO2_PER_LB).toFixed(1)
 
   return [
-    ['BayKid Recycling Partner Report'],
+    ['Cyan&#39;s Brooklynn Recycling Partner Report'],
     ['Generated', generatedAt],
     [],
     ['--- Volume Summary ---'],

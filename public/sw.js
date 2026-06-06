@@ -4,10 +4,10 @@
 self.addEventListener('push', event => {
   if (!event.data) return
 
-  let payload = { title: 'BayKid', body: '', data: {} }
+  let payload = { title: "Cyan's Brooklynn", body: '', data: {} }
   try { payload = event.data.json() } catch { /* use defaults */ }
 
-  const { title = 'BayKid', body = '', data = {} } = payload
+  const { title = "Cyan's Brooklynn", body = '', data = {} } = payload
 
   event.waitUntil(
     self.registration.showNotification(title, {

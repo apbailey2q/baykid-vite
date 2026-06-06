@@ -440,6 +440,8 @@ function App() {
               <Route path="/dashboard/driver/commercial-route"      element={<ProtectedRoute requireApproved><DriverRoutesPage /></ProtectedRoute>} />
               <Route path="/dashboard/driver/hybrid"                element={<ProtectedRoute requireApproved><DriverHybridDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/driver/commercial-routes"     element={<ProtectedRoute requireApproved><CommercialRoutes /></ProtectedRoute>} />
+              {/* Phase G.5 — /dashboard/commercial-driver spec alias. CommercialRoutes already covers the screen. */}
+              <Route path="/dashboard/commercial-driver"             element={<ProtectedRoute requireApproved><CommercialRoutes /></ProtectedRoute>} />
               <Route path="/dashboard/driver/commercial-safety"     element={<ProtectedRoute requireApproved><CommercialSafetyChecklist /></ProtectedRoute>} />
               <Route path="/dashboard/driver/commercial-stop/:stopId" element={<ProtectedRoute requireApproved><CommercialStopDetail /></ProtectedRoute>} />
               <Route path="/dashboard/driver/commercial-scan"       element={<ProtectedRoute requireApproved><CommercialScan /></ProtectedRoute>} />

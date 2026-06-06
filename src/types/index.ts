@@ -191,14 +191,78 @@ export interface CommercialNotification {
 export interface ExpectedWarehouseLoad {
   id: string
   pickup_id: string
+  source_pickup_id: string | null
+  source: 'route_stop' | 'commercial_request'
   account_id: string
   business_name: string
   material_type: string
   estimated_volume: string
   expected_arrival: string | null
-  status: 'expected' | 'received' | 'rejected'
+  // Expanded by 20260516000020 + Phase G.5 — includes the full lifecycle.
+  status: 'expected' | 'arrived' | 'intake_started' | 'received' | 'flagged' | 'processed' | 'cancelled' | 'rejected'
   warehouse_notes: string | null
+  driver_id: string | null
+  warehouse_id: string | null
+  bin_count: number | null
+  estimated_weight: number | null
+  arrived_at: string | null
   created_at: string
+}
+
+// ── Commercial Pickup — Phase G.5 audit + photo layer ───────────────────────
+
+export type CommercialPickupPriority = 'low' | 'normal' | 'high' | 'emergency'
+
+export type CommercialPickupStatusG5 =
+  | 'draft' | 'submitted'
+  | 'requested' | 'assigned' | 'scheduled' | 'in_progress'
+  | 'in_review' | 'at_warehouse' | 'flagged' | 'processed'
+  | 'completed' | 'cancelled'
+
+export type CommercialPickupEventType =
+  | 'created' | 'submitted' | 'scheduled' | 'assigned' | 'unassigned'
+  | 'started' | 'arrived' | 'checked_in' | 'completed' | 'cancelled'
+  | 'flagged' | 'reassigned' | 'photo_uploaded' | 'priority_changed' | 'note'
+
+export type CommercialPickupPhotoStage =
+  | 'request' | 'arrival' | 'load' | 'completion' | 'other'
+
+export type CommercialPickupAssignmentStatus =
+  | 'active' | 'reassigned' | 'completed' | 'cancelled'
+
+export interface CommercialPickupAssignment {
+  id:              string
+  pickup_id:       string
+  driver_id:       string | null
+  assigned_by:     string | null
+  assigned_at:     string
+  unassigned_at:   string | null
+  status:          CommercialPickupAssignmentStatus
+  notes:           string | null
+  priority_level:  CommercialPickupPriority
+  scheduled_for:   string | null
+}
+
+export interface CommercialPickupEvent {
+  id:          string
+  pickup_id:   string
+  event_type:  CommercialPickupEventType
+  from_status: string | null
+  to_status:   string | null
+  actor_id:    string | null
+  actor_role:  string | null
+  payload:     Record<string, unknown>
+  created_at:  string
+}
+
+export interface CommercialPickupPhoto {
+  id:           string
+  pickup_id:    string
+  uploaded_by:  string | null
+  stage:        CommercialPickupPhotoStage
+  storage_path: string
+  caption:      string | null
+  created_at:   string
 }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'

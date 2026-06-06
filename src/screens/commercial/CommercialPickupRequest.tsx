@@ -6,6 +6,9 @@ import { CommercialLayout } from './CommercialLayout'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { uploadPickupPhoto } from '../../lib/commercialPickupPhotos'
+import { PRIORITY_LABELS } from '../../lib/commercialPickupRequests'
+import type { CommercialPickupPriority } from '../../types'
 
 // ── Options ───────────────────────────────────────────────────────────────────
 
@@ -139,9 +142,13 @@ const INITIAL = {
   materialType:     '',
   estimatedVolume:  '',
   binCount:         '',
+  containerCount:   '',
+  preferredDate:    '',
   preferredWindow:  '',
   contactPerson:    '',
   safetyNotes:      '',
+  specialInstructions: '',
+  priorityLevel:    'normal' as CommercialPickupPriority,
 }
 
 type PageState = 'loading' | 'no_user' | 'no_account' | 'form' | 'success'
@@ -156,6 +163,10 @@ export default function CommercialPickupRequest() {
   const [form, setForm]           = useState(INITIAL)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]         = useState<string | null>(null)
+  // Phase G.5 — photos captured pre-submit go into a staged array; we upload
+  // them after the pickup row is created (because the storage RLS keys on
+  // pickup_id, which only exists after the insert).
+  const [stagedPhotos, setStagedPhotos] = useState<File[]>([])
 
   // ── Load commercial account on mount ──────────────────────────────────────
 
@@ -203,6 +214,13 @@ export default function CommercialPickupRequest() {
 
   const isEmergency = form.pickupType === 'Emergency Overflow'
 
+  // Auto-bump priority to 'emergency' when pickup type is Emergency Overflow.
+  useEffect(() => {
+    if (isEmergency && form.priorityLevel !== 'emergency') {
+      setForm((prev) => ({ ...prev, priorityLevel: 'emergency' }))
+    }
+  }, [isEmergency, form.priorityLevel])
+
   // ── Submit ────────────────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
@@ -227,15 +245,17 @@ export default function CommercialPickupRequest() {
     setSubmitting(true)
 
     try {
-      const { error: pickupError } = await supabase
+      const { data: pickupRow, error: pickupError } = await supabase
         .from('commercial_pickups')
         .insert({
           account_id:         accountId,
-          status:             'requested',
+          status:             'submitted',
           pickup_type:        form.pickupType,
           material_type:      form.materialType,
           estimated_volume:   form.estimatedVolume  || null,
           bin_count:          parseInt(form.binCount, 10) || 1,
+          container_count:    form.containerCount ? parseInt(form.containerCount, 10) : null,
+          preferred_date:     form.preferredDate    || null,
           preferred_window:   form.preferredWindow  || null,
           business_name:      form.businessName     || null,
           pickup_location:    form.pickupLocation,
@@ -244,9 +264,24 @@ export default function CommercialPickupRequest() {
           gate_notes:         form.gateNotes        || null,
           safety_notes:       form.safetyNotes      || null,
           contact_person:     form.contactPerson,
+          special_instructions: form.specialInstructions || null,
+          priority_level:     form.priorityLevel,
+          submitted_at:       new Date().toISOString(),
+          submitted_by:       user?.id ?? null,
         })
+        .select('id')
+        .single()
 
       if (pickupError) throw pickupError
+
+      // Phase G.5 — upload any staged photos against the new pickup row.
+      // Best-effort: don't fail the submission if a photo fails.
+      if (pickupRow?.id && stagedPhotos.length > 0 && user?.id) {
+        await Promise.all(stagedPhotos.map((file) =>
+          uploadPickupPhoto(pickupRow.id as string, user.id, file, 'request')
+            .catch(() => undefined),
+        ))
+      }
 
       // Insert notification — best-effort, don't fail the flow if it errors
       if (accountId) {
@@ -261,6 +296,7 @@ export default function CommercialPickupRequest() {
           })
       }
 
+      setStagedPhotos([])
       setPageState('success')
     } catch (err: unknown) {
       setError(
@@ -574,11 +610,43 @@ export default function CommercialPickupRequest() {
             </Field>
           </GlassCard>
 
-          {/* ── Photo Upload (placeholder — frontend only) ── */}
+          {/* ── Priority (Phase G.5) ── */}
+          <GlassCard padding="md" className="mb-5">
+            <SectionDivider label="Priority" />
+            <div className="flex gap-2 flex-wrap">
+              {(['low', 'normal', 'high', 'emergency'] as CommercialPickupPriority[]).map((p) => {
+                const meta = PRIORITY_LABELS[p]
+                const on = form.priorityLevel === p
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, priorityLevel: p }))}
+                    style={{
+                      flex: 1, minWidth: 70,
+                      background: on ? `${meta.color}22` : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${on ? meta.color : 'rgba(255,255,255,0.1)'}`,
+                      color: on ? meta.color : 'rgba(255,255,255,0.55)',
+                      borderRadius: 12, padding: '9px 10px', fontWeight: 700, fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {meta.label}
+                  </button>
+                )
+              })}
+            </div>
+            {isEmergency && (
+              <p style={{ fontSize: 11, color: '#f87171', marginTop: 8 }}>
+                Auto-set to Emergency for Emergency Overflow pickups.
+              </p>
+            )}
+          </GlassCard>
+
+          {/* ── Photo Upload (Phase G.5 — real, private bucket) ── */}
           <GlassCard padding="md" className="mb-5">
             <SectionDivider label="Photo Upload (Optional)" />
-            <button
-              type="button"
+            <label
               className="w-full rounded-2xl flex flex-col items-center gap-2 py-6 transition-all hover:brightness-110"
               style={{
                 background: 'rgba(255,255,255,0.03)',
@@ -593,7 +661,48 @@ export default function CommercialPickupRequest() {
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
                 Site conditions, bins, access points
               </p>
-            </button>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const incoming = Array.from(e.target.files ?? [])
+                  if (incoming.length > 0) {
+                    setStagedPhotos((prev) => [...prev, ...incoming])
+                  }
+                  e.currentTarget.value = ''
+                }}
+              />
+            </label>
+            {stagedPhotos.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                {stagedPhotos.map((file, i) => {
+                  const url = URL.createObjectURL(file)
+                  return (
+                    <div key={`${file.name}-${i}`} style={{ position: 'relative' }}>
+                      <img
+                        src={url}
+                        alt=""
+                        style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onLoad={() => URL.revokeObjectURL(url)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setStagedPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                        style={{ position: 'absolute', top: -6, right: -6, background: '#f87171', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontWeight: 900, fontSize: 11 }}
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )
+                })}
+                <p style={{ width: '100%', fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                  {stagedPhotos.length} photo{stagedPhotos.length === 1 ? '' : 's'} ready to upload on submit
+                </p>
+              </div>
+            )}
           </GlassCard>
 
           {/* Error */}

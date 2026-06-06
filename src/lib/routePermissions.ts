@@ -95,6 +95,13 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/driver/hybrid-routes':                 ['admin', 'driver'],
   '/dashboard/driver/onboarding':                    ['admin', 'driver'],
 
+  // ── Commercial Driver (Phase G.5 alias) ────────────────────────────────────
+  // Sits outside /dashboard/driver/* but ProtectedRoute.COMMERCIAL_DRIVER_PATHS
+  // enforces driver_service_type ∈ {commercial_only, hybrid} so driver_1099
+  // (consumer_only) is still blocked at the client. Server-side RLS on the
+  // backing tables uses public.is_commercial_capable_driver().
+  '/dashboard/commercial-driver':                    ['admin', 'driver'],
+
   // ── Warehouse ──────────────────────────────────────────────────────────────
   '/dashboard/warehouse-supervisor':                 ['admin', 'warehouse_supervisor'],
   '/dashboard/warehouse':                            ['admin', 'warehouse_employee', 'warehouse_supervisor'],

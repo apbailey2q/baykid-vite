@@ -45,13 +45,17 @@ function AccessDenied({ role }: { role: Role }) {
   )
 }
 
-// Paths under /dashboard/driver/ that require commercial service capability
+// Paths under /dashboard/ that require commercial service capability
+// (driver_service_type ∈ {commercial_only, hybrid}). driver_1099 (consumer_only)
+// is blocked at the client AND server (RLS) layers.
 const COMMERCIAL_DRIVER_PATHS = [
   '/dashboard/driver/commercial-routes',
   '/dashboard/driver/commercial-stop',
   '/dashboard/driver/commercial-scan',
   '/dashboard/driver/commercial-safety',
   '/dashboard/driver/commercial-inspection',
+  // Phase G.5 — commercial-driver landing alias
+  '/dashboard/commercial-driver',
 ]
 
 export function ProtectedRoute({ children, requireApproved = false }: Props) {

@@ -1096,81 +1096,49 @@ function StepFirstScan({
   onBack: () => void
   onContinue: () => void
 }) {
-  const [phase, setPhase] = useState<'idle' | 'scanning' | 'success' | 'saving'>('idle')
-  const [error, setError] = useState<string | null>(null)
-
-  async function startScan() {
-    if (!userId) return
-    setError(null)
-    setPhase('scanning')
-    // Demo flow — ScannerScreen is currently a UI preview. We simulate the
-    // scan client-side so the activation timestamp is real even though the
-    // camera/QR pipeline isn't wired yet. Replace this with a real scan
-    // callback once the scanner is live.
-    await new Promise(r => setTimeout(r, 1600))
-    setPhase('saving')
-    const { error: e } = await supabase
-      .from('profiles')
-      .update({ first_bag_scanned_at: new Date().toISOString() })
-      .eq('id', userId)
-    if (e) {
-      setPhase('idle')
-      setError(e.message)
-      return
-    }
-    setPhase('success')
-    try { playPop() } catch { /* */ }
-  }
+  // L.2 C2 — was a setTimeout(1600) demo that stamped first_bag_scanned_at
+  // without any QR validation. Now: send the user to the real Supabase-backed
+  // /live-scan flow (which inserts a bag_scans row), OR let them skip if their
+  // bag hasn't arrived yet. profiles.first_bag_scanned_at is left for a future
+  // server-side trigger to set when the first real bag_scans row lands.
+  const navigate = useNavigate()
+  const alreadyScanned = !!userId   // placeholder — UI gating only; no fake stamp
 
   return (
     <div>
       <StepHeader title="Scan your first QR bag" subtitle="Earn 50 bonus points for your first scan." />
 
-      {phase === 'idle' && (
-        <div style={{ textAlign: 'center', padding: '18px 0' }}>
-          <div style={{ fontSize: 56, marginBottom: 12 }}>📦</div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18, lineHeight: 1.5 }}>
-            Open the scanner and point it at the QR code on your first Cyan's Brooklynn bag. Once verified, you'll earn 50 bonus points and unlock pickup scheduling.
-          </p>
-          <button
-            onClick={startScan}
-            disabled={!userId}
-            style={{
-              background: 'linear-gradient(135deg,#0057e7,#00c8ff)', color: '#fff',
-              border: 'none', borderRadius: 14, padding: '14px 28px',
-              fontWeight: 800, fontSize: 14, cursor: 'pointer',
-            }}
-          >
-            📷 Open scanner
-          </button>
-        </div>
-      )}
-
-      {(phase === 'scanning' || phase === 'saving') && (
-        <div style={{ textAlign: 'center', padding: '36px 0', color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>
-          <div style={{ fontSize: 40, marginBottom: 12, animation: 'pulse 1.2s ease-in-out infinite' }}>📷</div>
-          {phase === 'scanning' ? 'Scanning…' : 'Saving your scan…'}
-        </div>
-      )}
-
-      {phase === 'success' && (
-        <div style={{ padding: 22, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 14, textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 52, marginBottom: 10 }}>♻️</div>
-          <p style={{ color: '#4ade80', fontWeight: 800, fontSize: 16, marginBottom: 4 }}>First bag scanned successfully.</p>
-          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>+ 50 bonus points</p>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ padding: 12, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 10, color: '#fca5a5', fontSize: 12, marginBottom: 14 }}>
-          {error}
-        </div>
-      )}
+      <div style={{ textAlign: 'center', padding: '18px 0' }}>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>📦</div>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18, lineHeight: 1.5 }}>
+          Open the scanner and point it at the QR code on your first Cyan's Brooklynn bag. Once verified, you'll earn 50 bonus points. No bag yet? Skip this step and come back to it later.
+        </p>
+        <button
+          onClick={() => navigate('/live-scan')}
+          disabled={!alreadyScanned}
+          style={{
+            background: 'linear-gradient(135deg,#0057e7,#00c8ff)', color: '#fff',
+            border: 'none', borderRadius: 14, padding: '14px 28px',
+            fontWeight: 800, fontSize: 14, cursor: 'pointer', marginRight: 10,
+          }}
+        >
+          📷 Open scanner
+        </button>
+        <button
+          onClick={onContinue}
+          style={{
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
+            padding: '14px 22px', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+          }}
+        >
+          I'll scan when my bag arrives →
+        </button>
+      </div>
 
       <NavRow
         onBack={onBack}
         onContinue={onContinue}
-        continueDisabled={phase !== 'success'}
         continueLabel="Continue"
       />
     </div>
@@ -1200,7 +1168,8 @@ function StepFirstPickup({
     const { error: pickupErr } = await supabase.from('consumer_pickups').insert({
       user_id:        userId,
       preferred_date: preferredDate,
-      time_window:    'flexible',
+      // L.2 C1 — must match CHECK constraint in 20260603000006 (em-dash, exact case)
+      time_window:    'Flexible / ASAP',
       address_line1:  [form.address, form.apartment_unit].filter(Boolean).join(' ').trim(),
       address_city:   form.city,
       address_state:  form.state,

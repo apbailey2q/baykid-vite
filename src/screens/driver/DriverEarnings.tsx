@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { is1099Driver } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { Spinner } from '../../components/ui/Spinner'
@@ -70,7 +71,10 @@ function weekStart() {
 
 export default function DriverEarnings() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { user, profile } = useAuthStore()
+  // L.2 C6 — driver_earnings only tracks commercial pickups; 1099 (consumer-only)
+  // drivers see $0 forever unless we tell them how residential payouts work.
+  const is1099 = is1099Driver(profile)
 
   const [earnings,   setEarnings]   = useState<EarningRow[]>([])
   const [loading,    setLoading]    = useState(true)
@@ -172,6 +176,27 @@ export default function DriverEarnings() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 max-w-xl mx-auto w-full">
+
+        {/* L.2 C6 — 1099 residential-only driver banner */}
+        {is1099 && (
+          <div
+            style={{
+              background: 'rgba(251,191,36,0.08)',
+              border: '1px solid rgba(251,191,36,0.3)',
+              borderRadius: 14,
+              padding: '12px 14px',
+              marginBottom: 16,
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.75)',
+              lineHeight: 1.5,
+            }}
+          >
+            <p style={{ fontWeight: 800, color: '#fbbf24', marginBottom: 4 }}>Residential payouts during the TN pilot</p>
+            <p>
+              This screen tracks commercial pickups. Residential earnings are paid out manually during the Tennessee pilot — contact <a href="mailto:dispatch@cbrecycling.org" style={{ color: '#00c8ff' }}>dispatch@cbrecycling.org</a> for your statement.
+            </p>
+          </div>
+        )}
 
         {/* ── Stat cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>

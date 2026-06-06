@@ -3,7 +3,17 @@ import type { Role, DriverServiceType } from '../types'
 import { deactivatePushToken } from './pushTokenService'
 import { useAuthStore } from '../store/authStore'
 
-export const AUTO_APPROVED_ROLES: Role[] = ['consumer']
+// L.2 C8 — auto-approve the 10 G.4 commercial customer sub-roles so they can
+// reach /onboarding/commercial after signup. The real approval gate for these
+// roles is commercial_accounts.account_status='pending_review' (managed by
+// AdminCommercialAccounts), not profiles.approval_status. Without this fix,
+// every TN business signup is bounced to /pending-approval forever.
+export const AUTO_APPROVED_ROLES: Role[] = [
+  'consumer',
+  'commercial_customer', 'business_customer',
+  'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+  'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+]
 
 // ── Driver subtype access helpers ────────────────────────────────────────────
 // Spec mapping (user terminology ↔ schema):

@@ -19,7 +19,7 @@
 // existing call sites keep working while this remains the single source of truth.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ENABLE_DEMO_ACCESS, DEV_BYPASS_AUTH } from './appMode'
+import { DEV_BYPASS_AUTH } from './appMode'
 import { useAuthStore } from '../store/authStore'
 
 export type AppMode = 'live' | 'demo'

@@ -124,6 +124,8 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/warehouse-supervisor':                 ['admin', 'warehouse_supervisor'],
   '/dashboard/warehouse':                            ['admin', 'warehouse_employee', 'warehouse_supervisor'],
   '/dashboard/warehouse/expected-loads':             ['admin', 'warehouse_employee', 'warehouse_supervisor'],
+  // L.2 C9 — alias for the misspelled path that several screens still use
+  '/dashboard/warehouse/commercial-expected-loads':  ['admin', 'warehouse_employee', 'warehouse_supervisor'],
   '/dashboard/warehouse/commercial-intake':          ['admin', 'warehouse_employee', 'warehouse_supervisor'],
   '/dashboard/warehouse/commercial-processing':      ['admin', 'warehouse_employee', 'warehouse_supervisor'],
   '/dashboard/warehouse/alerts':                     ['admin', 'warehouse_employee', 'warehouse_supervisor'],

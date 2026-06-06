@@ -49,11 +49,13 @@ const NAME_MAP: Record<BypassKey, string> = {
 export function getMockProfile(key: BypassKey): Profile {
   return {
     id:                  `dev-${key}-mock`,
+    email:               null,
     full_name:           NAME_MAP[key],
     role:                ROLE_MAP[key],
     approval_status:     'approved',
     driver_service_type: null,
     account_type:        null,
+    city:                null,
     created_at:          new Date().toISOString(),
   }
 }

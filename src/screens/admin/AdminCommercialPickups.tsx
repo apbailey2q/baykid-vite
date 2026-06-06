@@ -98,11 +98,9 @@ const WAREHOUSE_OPTIONS = [
   'BNA-01 · Airport Facility',
 ]
 
-const DEMO_DRIVERS: DriverOption[] = [
-  { id: 'demo-d1', full_name: 'Marcus J.' },
-  { id: 'demo-d2', full_name: 'Tasha R.'  },
-  { id: 'demo-d3', full_name: 'Andre W.'  },
-]
+// L.2 H4 — DEMO_DRIVERS removed. If the drivers query returns empty, the
+// dropdown now shows an empty state instead of falling back to fake UUIDs
+// that admin could assign to real commercial pickups.
 
 const SELECT_STYLE: React.CSSProperties = {
   width: '100%',
@@ -171,9 +169,8 @@ export default function AdminCommercialPickups() {
     }
 
     setPickups((pickupsRes.data ?? []) as unknown as PickupRow[])
-    // Fall back to demo drivers if none returned from DB
-    const dbDrivers = (driversRes.data ?? []) as DriverOption[]
-    setDrivers(dbDrivers.length > 0 ? dbDrivers : DEMO_DRIVERS)
+    // L.2 H4 — no demo fallback. Empty list renders an empty-state in the UI.
+    setDrivers((driversRes.data ?? []) as DriverOption[])
     setPageState('ready')
   }, [])
 

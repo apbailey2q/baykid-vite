@@ -119,6 +119,44 @@ export async function setCampaignStatus(
     .update(update)
     .eq('id', campaignId)
   if (error) return { ok: false, error: error.message }
+
+  // L.2 C3 — bridge: when a campaign goes live, mirror it into the legacy
+  // `fundraisers` table so it's discoverable by the consumer FundraisersPage,
+  // FundraiserDashboard, MyFundraiserPage, and LiveFundraiserDashboardPage —
+  // none of which know about fundraiser_campaigns. Best-effort: a failed
+  // mirror doesn't roll back the campaign launch.
+  if (status === 'active') {
+    try {
+      const { data: campaign } = await supabase
+        .from('fundraiser_campaigns')
+        .select('name, description, goal_amount, organization_id, created_by, start_date, end_date')
+        .eq('id', campaignId)
+        .maybeSingle()
+      if (campaign) {
+        const { data: org } = await supabase
+          .from('fundraiser_organizations')
+          .select('name, address_city')
+          .eq('id', campaign.organization_id as string)
+          .maybeSingle()
+        await supabase.from('fundraisers').insert({
+          name:               campaign.name,
+          description:        campaign.description ?? null,
+          organization:       org?.name ?? null,
+          goal_amount:        campaign.goal_amount,
+          raised_amount:      0,
+          percent_to_cause:   50,                  // default split
+          status:             'active',
+          start_date:         campaign.start_date ?? null,
+          end_date:           campaign.end_date ?? null,
+          city:               org?.address_city ?? null,
+          created_by:         campaign.created_by,
+        })
+      }
+    } catch {
+      /* best-effort — do not block campaign launch */
+    }
+  }
+
   return { ok: true }
 }
 

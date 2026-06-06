@@ -6,6 +6,10 @@ import type { Role } from '../types'
 
 const ROLE_OPTIONS: { value: Role; label: string; icon: string; desc: string }[] = [
   { value: 'consumer',             icon: '♻️', label: 'Consumer',            desc: 'Recycle bags & earn rewards'   },
+  // L.2 C7 — adds the Business Customer self-signup. Routes to /onboarding/commercial
+  // via ROLE_HOME + OnboardingDispatcher (G.9). G.4 wizard then collects the
+  // detailed organization profile.
+  { value: 'commercial_customer',  icon: '🏢', label: 'Business Customer',    desc: 'Restaurants, offices, hotels'  },
   { value: 'driver',               icon: '🚗', label: 'Driver',               desc: 'Pickup & deliver bags'         },
   { value: 'warehouse_employee',   icon: '📦', label: 'Warehouse Employee',   desc: 'Inspect & process bags'        },
   { value: 'warehouse_supervisor', icon: '🏭', label: 'Warehouse Supervisor', desc: 'Oversee warehouse operations'  },

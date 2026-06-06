@@ -15,6 +15,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { checkZipInServiceArea } from '../../lib/serviceArea'
 import { OnboardingEngine } from '../../components/onboarding/OnboardingEngine'
 import { MaterialSelector } from '../../components/material/MaterialSelector'
 import { GlassCard } from '../../components/ui/GlassCard'
@@ -135,6 +136,18 @@ export default function ConsumerPickupRequest() {
     if (!user) return
     setSaving(true)
     setError(null)
+
+    // L.2 H1 — gate on service-area before insert. Out-of-zone TN ZIPs
+    // (Memphis, Knoxville, etc.) silently succeeded before this check.
+    const trimmedZip = zip.trim()
+    if (trimmedZip) {
+      const area = await checkZipInServiceArea(trimmedZip)
+      if (!area.inService) {
+        setSaving(false)
+        setError(`We don't serve ZIP ${trimmedZip} yet. Join the waitlist from your dashboard to be notified when we expand.`)
+        return
+      }
+    }
 
     const { error: dbErr } = await supabase.from('consumer_pickups').insert({
       user_id:        user.id,

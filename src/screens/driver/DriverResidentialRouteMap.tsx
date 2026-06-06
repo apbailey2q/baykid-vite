@@ -67,11 +67,19 @@ export default function DriverResidentialRouteMap() {
 
   const pendingCount = activeRouteStops.filter((s) => s.status === 'pending').length
 
+  const [completingRoute, setCompletingRoute] = useState(false)
+
   async function handleCompleteStop(stopId: string) {
     try {
       await completeStop(stopId)
       updateStop(stopId, { status: 'completed', completed_at: new Date().toISOString() })
     } catch { /* silent */ }
+  }
+
+  function handleCompleteRoute() {
+    setCompletingRoute(true)
+    // Navigate to earnings / home after all stops done
+    navigate('/dashboard/driver/earnings')
   }
 
 
@@ -144,8 +152,9 @@ export default function DriverResidentialRouteMap() {
         ) : (
           <DriverRouteView
             stops={activeRouteStops}
-            routeId={activeRoute.id}
-            onComplete={handleCompleteStop}
+            onComplete={(id) => { void handleCompleteStop(id) }}
+            onCompleteRoute={handleCompleteRoute}
+            isCompletingRoute={completingRoute}
           />
         )}
       </main>

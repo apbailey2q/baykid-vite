@@ -80,7 +80,7 @@ const FundraiserOnboarding     = lazy(() => import('./screens/onboarding/Fundrai
 const CommercialOnboardingG4   = lazy(() => import('./screens/onboarding/CommercialOnboarding'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
-const ScanResultPage           = lazy(() => import('./screens/fundraisers/ScanResultPage'))
+// L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
 const MyFundraiserPage         = lazy(() => import('./screens/fundraisers/MyFundraiserPage'))
 
 // ─ Fundraisers (public + auth) ────────────────────────────────────────────────
@@ -108,7 +108,7 @@ const DriverEarnings           = lazy(() => import('./screens/driver/DriverEarni
 const DriverModeSelect         = lazy(() => import('./screens/driver/DriverModeSelect'))
 const DriverModeLanding        = lazy(() => import('./screens/driver/DriverModeLanding'))
 const DriverScanInspect        = lazy(() => import('./screens/driver/DriverScanInspect'))
-const DriverOnboarding         = lazy(() => import('./screens/driver/DriverOnboarding'))
+// L.2 H4 — legacy DriverOnboarding wizard archived. /dashboard/driver/onboarding redirects to /driver/compliance (the canonical Phase G.1 wizard).
 const DriverComplianceWizard   = lazy(() => import('./screens/driver/DriverComplianceWizard'))
 const EarningsDashboardPage    = lazy(() => import('./screens/EarningsDashboardPage'))
 const DriverRoutesPage         = lazy(() => import('./screens/DriverRoutesPage'))
@@ -144,7 +144,7 @@ const AdminCommercialDashboard       = lazy(() => import('./screens/admin/AdminC
 const AdminCommercialAccounts        = lazy(() => import('./screens/admin/AdminCommercialAccounts'))
 const AdminCommercialPickups         = lazy(() => import('./screens/admin/AdminCommercialPickups'))
 const AdminCommercialAlerts          = lazy(() => import('./screens/admin/AdminCommercialAlerts'))
-const AdminCommercialReports         = lazy(() => import('./screens/admin/AdminCommercialReports'))
+// L.2 C10 — AdminCommercialReports archived from production routing; /dashboard/admin/commercial/reports redirects to the Commercial Ops dashboard.
 const AdminCommercialInspectionReview= lazy(() => import('./screens/admin/AdminCommercialInspectionReview'))
 const AdminCommercialDispatch        = lazy(() => import('./screens/admin/AdminCommercialDispatch'))
 const AdminCommercialSupport         = lazy(() => import('./screens/admin/AdminCommercialSupport'))
@@ -405,7 +405,8 @@ function App() {
               <Route path="/dashboard/admin/commercial/accounts"      element={<ProtectedRoute requireApproved><AdminCommercialAccounts /></ProtectedRoute>} />
               <Route path="/dashboard/admin/commercial/pickups"       element={<ProtectedRoute requireApproved><AdminCommercialPickups /></ProtectedRoute>} />
               <Route path="/dashboard/admin/commercial/alerts"        element={<ProtectedRoute requireApproved><AdminCommercialAlerts /></ProtectedRoute>} />
-              <Route path="/dashboard/admin/commercial/reports"       element={<ProtectedRoute requireApproved><AdminCommercialReports /></ProtectedRoute>} />
+              {/* L.2 C10 — AdminCommercialReports was 100% hardcoded (SUMMARY_METRICS / SLA_ACCOUNTS / etc.); redirect to dashboard until real data is wired. */}
+              <Route path="/dashboard/admin/commercial/reports"       element={<Navigate to="/dashboard/admin/commercial" replace />} />
               <Route path="/dashboard/admin/commercial/inspections"   element={<ProtectedRoute requireApproved><AdminCommercialInspectionReview /></ProtectedRoute>} />
               <Route path="/dashboard/admin/commercial/dispatch"      element={<ProtectedRoute requireApproved><AdminCommercialDispatch /></ProtectedRoute>} />
               <Route path="/dashboard/admin/commercial/support"       element={<ProtectedRoute requireApproved><AdminCommercialSupport /></ProtectedRoute>} />
@@ -431,7 +432,8 @@ function App() {
               <Route path="/driver/compliance"             element={<ProtectedRoute requireApproved={false}><DriverComplianceWizard /></ProtectedRoute>} />
 
               {/* Onboarding — accessible before approval so new users can complete their application */}
-              <Route path="/dashboard/driver/onboarding"    element={<ProtectedRoute><DriverOnboarding /></ProtectedRoute>} />
+              {/* L.2 H4 — legacy wizard (writes onboarding_submissions only, never grants approval). Redirect to the canonical /driver/compliance path. */}
+              <Route path="/dashboard/driver/onboarding"    element={<Navigate to="/driver/compliance" replace />} />
               <Route path="/dashboard/warehouse/onboarding" element={<ProtectedRoute><WarehouseOnboarding /></ProtectedRoute>} />
               <Route path="/onboarding"                      element={<ProtectedRoute><OnboardingDispatcher /></ProtectedRoute>} />
               <Route path="/onboarding/consumer"             element={<ProtectedRoute><ConsumerOnboarding /></ProtectedRoute>} />
@@ -473,6 +475,8 @@ function App() {
 
               {/* Warehouse commercial */}
               <Route path="/dashboard/warehouse/expected-loads"       element={<ProtectedRoute requireApproved><CommercialExpectedLoads /></ProtectedRoute>} />
+              {/* L.2 C9 — WarehouseDashboard + CommercialIntake + CommercialProcessing all link to this misspelled path */}
+              <Route path="/dashboard/warehouse/commercial-expected-loads" element={<Navigate to="/dashboard/warehouse/expected-loads" replace />} />
               <Route path="/dashboard/warehouse/commercial-intake"    element={<ProtectedRoute requireApproved><CommercialIntake /></ProtectedRoute>} />
               <Route path="/dashboard/warehouse/commercial-processing" element={<ProtectedRoute requireApproved><CommercialProcessing /></ProtectedRoute>} />
               <Route path="/dashboard/warehouse/alerts"               element={<ProtectedRoute requireApproved><WarehouseAlertsPage /></ProtectedRoute>} />
@@ -513,7 +517,8 @@ function App() {
 
               {/* Auth-required: any approved user */}
               <Route path="/my-fundraiser" element={<RequireAuth><MyFundraiserPage /></RequireAuth>} />
-              <Route path="/scan-result"   element={<RequireAuth><ScanResultPage /></RequireAuth>} />
+              {/* L.2 C5 — ScanResultPage rendered hardcoded PREVIEW_SCAN constants; redirect to the live scanner. */}
+              <Route path="/scan-result"   element={<Navigate to="/live-scan" replace />} />
               <Route path="/qr-scan"       element={<RequireAuth><QRScanPage /></RequireAuth>} />
               {/* Phase G.9 — /notifications was a hardcoded mock; redirect to Supabase-backed /live-notifications. */}
               <Route path="/notifications" element={<Navigate to="/live-notifications" replace />} />

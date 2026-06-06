@@ -7,6 +7,20 @@ import type { Role } from '../types'
 // DEFAULT POLICY: deny. Any /dashboard/* path NOT listed here is blocked
 // for all roles (returns false). Add new routes explicitly.
 
+// Phase G.9 — shared role groups so the 10 commercial sub-roles and 5
+// fundraiser sub-roles can be added to the relevant permissions without
+// repeating long inline lists. Source for the union members: src/types/index.ts
+// COMMERCIAL_CUSTOMER_ROLES and FUNDRAISER_ROLES.
+const COMMERCIAL_CUSTOMER_ROLES: Role[] = [
+  'commercial_customer', 'business_customer',
+  'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+  'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+]
+const FUNDRAISER_SUB_ROLES: Role[] = [
+  'fundraiser_admin', 'school_partner', 'nonprofit_partner',
+  'church_partner', 'sports_team_partner',
+]
+
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Admin — top-level ──────────────────────────────────────────────────────
   '/dashboard/admin':                                ['admin'],
@@ -61,16 +75,20 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   ],
 
   // ── Commercial ─────────────────────────────────────────────────────────────
-  '/dashboard/commercial':                           ['admin', 'commercial'],
-  '/dashboard/commercial/pickup':                    ['admin', 'commercial'],
-  '/dashboard/commercial/schedule':                  ['admin', 'commercial'],
-  '/dashboard/commercial/bins':                      ['admin', 'commercial'],
-  '/dashboard/commercial/reports':                   ['admin', 'commercial'],
-  '/dashboard/commercial/invoices':                  ['admin', 'commercial'],
-  '/dashboard/commercial/history':                   ['admin', 'commercial'],
-  '/dashboard/commercial/profile':                   ['admin', 'commercial'],
-  '/dashboard/commercial/onboarding':                ['admin', 'commercial'],
-  '/dashboard/commercial/support':                   ['admin', 'commercial'],
+  // Phase G.9 — the 10 commercial customer sub-roles share the commercial
+  // dashboard family with the legacy 'commercial' role.
+  '/dashboard/commercial':                           ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/pickup':                    ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/schedule':                  ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/bins':                      ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/reports':                   ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/invoices':                  ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/history':                   ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/profile':                   ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/onboarding':                ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/dashboard/commercial/support':                   ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  // Phase G.9 — the new /onboarding/commercial wizard (CommercialOnboardingG4).
+  '/onboarding/commercial':                          ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
 
   // ── Consumer ───────────────────────────────────────────────────────────────
   '/dashboard/consumer':                             ['admin', 'consumer'],
@@ -116,7 +134,10 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/partner':                              ['admin', 'partner'],
 
   // ── Fundraiser ─────────────────────────────────────────────────────────────
-  '/dashboard/fundraiser':                           ['admin', 'fundraiser'],
+  // Phase G.9 — fundraiser sub-roles share the fundraiser dashboard.
+  // fundraiser_admin has its own /live-fundraiser-dashboard landing (gated
+  // by RequireRole at App.tsx, not routePermissions).
+  '/dashboard/fundraiser':                           ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
 
   // ── Municipal ──────────────────────────────────────────────────────────────
   '/dashboard/municipal':                            ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
@@ -129,13 +150,17 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/ai-marketing':                   ['admin'],
 
   // ── Commercial — missing sub-routes ───────────────────────────────────────
-  '/dashboard/commercial/billing':                   ['admin', 'commercial'],
+  '/dashboard/commercial/billing':                   ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
 
   // ── Executive / Investor ───────────────────────────────────────────────────
   '/dashboard/executive':                            ['admin', 'executive', 'investor_viewer'],
 
-  // ── Consumer onboarding (open to consumers before completion) ─────────────
-  '/onboarding':                                     ['admin', 'consumer'],
+  // ── Onboarding dispatcher (consumer + Phase G.3/G.4 sub-roles) ────────────
+  // Phase G.9 — OnboardingDispatcher reads the role and forwards to
+  // /onboarding/consumer, /onboarding/fundraiser, or /onboarding/commercial.
+  // All sub-roles that could land here from ROLE_HOME need permission to
+  // render the dispatcher.
+  '/onboarding':                                     ['admin', 'consumer', 'commercial', 'fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', 'warehouse_employee', 'warehouse_supervisor', 'partner', 'fundraiser'],

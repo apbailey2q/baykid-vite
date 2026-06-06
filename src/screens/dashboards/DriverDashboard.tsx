@@ -19,6 +19,7 @@ import {
   getDriverWeeklyEarnings,
   getDriverWalletBalance,
 } from '../../lib/driver'
+import { mirrorDriverOnlineLocal } from '../../lib/driverOnlineSync'
 import { getBroadcastsForRole } from '../../lib/points'
 import { getDriverRates } from '../../lib/systemConfig'
 import { PickupsNearYou } from '../driver/PickupsNearYou'
@@ -207,6 +208,9 @@ export default function DriverDashboard() {
     try {
       const updated = await setDriverOnline(user.id, !goingOffline)
       setDriverStatus(updated)
+      // Phase G.9 — mirror Supabase state into localStorage so CommercialRoutes
+      // and DriverModeLanding see the same online flag.
+      mirrorDriverOnlineLocal(!goingOffline)
     } finally {
       setToggling(false)
     }
@@ -218,6 +222,7 @@ export default function DriverDashboard() {
     try {
       const updated = await setDriverOnline(user.id, true)
       setDriverStatus(updated)
+      mirrorDriverOnlineLocal(true)
     } finally {
       setToggling(false)
     }
@@ -230,6 +235,7 @@ export default function DriverDashboard() {
       await pauseRoute(activeRoute.id, user.id)
       setActiveRoute({ ...activeRoute, status: 'paused' })
       setDriverStatus(driverStatus ? { ...driverStatus, active_route_id: null, is_online: false } : null)
+      mirrorDriverOnlineLocal(false)
     } finally {
       setToggling(false)
       setLocalOfflineWarning(false)
@@ -245,6 +251,7 @@ export default function DriverDashboard() {
       setDriverStatus({ ...updated, is_online: true })
       setActiveRoute({ ...activeRoute, status: 'active' })
       recordActivity()
+      mirrorDriverOnlineLocal(true)
     } finally {
       setToggling(false)
     }
@@ -280,6 +287,7 @@ export default function DriverDashboard() {
       setDriverStatus({ ...updated, is_online: true, active_route_id: activeRoute.id })
       setActiveRoute({ ...activeRoute, status: 'active' })
       recordActivity()
+      mirrorDriverOnlineLocal(true)
     } finally {
       setToggling(false)
     }

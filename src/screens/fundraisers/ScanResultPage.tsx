@@ -280,16 +280,7 @@ export default function ScanResultPage() {
 
           {/* CTAs */}
           <div className="flex flex-col gap-3" style={fade(340)}>
-            <Link
-              to="/bag-lifecycle"
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all"
-              style={{ background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff' }}
-            >
-              View Bag Lifecycle
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </Link>
+            {/* Phase G.9 — removed "View Bag Lifecycle" CTA (admin-gated mock; consumers were 403'd) */}
             <Link
               to="/my-fundraiser"
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all"

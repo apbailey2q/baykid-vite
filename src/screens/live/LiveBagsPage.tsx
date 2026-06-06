@@ -283,15 +283,8 @@ export default function LiveBagsPage() {
             </div>
           )}
 
-          {/* Back links */}
+          {/* Back links — Phase G.9 removed "View Bag Lifecycle Demo" CTA (mock screen archived) */}
           <div className="flex flex-col gap-2 mt-6">
-            <Link
-              to="/bag-lifecycle"
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all hover:brightness-110"
-              style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.22)', color: '#00c8ff' }}
-            >
-              📦 View Bag Lifecycle Demo
-            </Link>
             <Link
               to="/live-dashboard"
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all hover:brightness-110"

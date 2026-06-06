@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { usePushToken } from './hooks/usePushToken'
+import { bootSyncDriverOnline } from './lib/driverOnlineSync'
 import { normalizeRole } from './lib/auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -71,7 +72,7 @@ const LiveWarehouseReviewPage  = lazy(() => import('./screens/live/LiveWarehouse
 // /scan and /wallet routes now redirect to /live-scan and /live-wallet.
 const BagDetailScreen          = lazy(() => import('./screens/BagDetailScreen'))
 const InspectionScreen         = lazy(() => import('./screens/InspectionScreen'))
-const NotificationsPage        = lazy(() => import('./screens/NotificationsPage'))
+// Phase G.9 — NotificationsPage archived to src/screens/dev/; /notifications redirects to /live-notifications.
 const ConsumerOnboarding       = lazy(() => import('./screens/onboarding/ConsumerOnboarding'))
 const OnboardingDispatcher     = lazy(() => import('./screens/onboarding/OnboardingDispatcher'))
 const WaitlistScreen           = lazy(() => import('./screens/onboarding/WaitlistScreen'))
@@ -119,8 +120,8 @@ const CommercialExpectedLoads  = lazy(() => import('./screens/warehouse/Commerci
 const CommercialIntake         = lazy(() => import('./screens/warehouse/CommercialIntake'))
 const CommercialProcessing     = lazy(() => import('./screens/warehouse/CommercialProcessing'))
 const WarehouseOnboarding      = lazy(() => import('./screens/warehouse/WarehouseOnboarding'))
-const BagInspectionPage        = lazy(() => import('./screens/BagInspectionPage'))
-const BagLifecyclePage         = lazy(() => import('./screens/BagLifecyclePage'))
+// Phase G.9 — BagInspectionPage + BagLifecyclePage archived to src/screens/dev/.
+// /bag-inspection and /bag-lifecycle now redirect to /live-inspection.
 const ContaminationAlertsPage  = lazy(() => import('./screens/ContaminationAlertsPage'))
 
 // ─ Commercial (customer-facing) ───────────────────────────────────────────────
@@ -235,6 +236,30 @@ const ROLE_HOME: Record<string, string> = {
   investor_viewer:      '/dashboard/admin/investor',
   regional_admin:       '/dashboard/admin/regions',
   city_manager:         '/dashboard/admin/regions',
+  // Phase G.9 — fundraiser sub-roles. fundraiser_admin lands on the live
+  // per-campaign dashboard (already gated by RequireRole at /live-fundraiser-dashboard).
+  // The other 4 sub-roles route through /onboarding so OnboardingDispatcher
+  // (isFundraiserRole) can send them to the wizard or their dashboard
+  // depending on completion.
+  fundraiser_admin:     '/live-fundraiser-dashboard',
+  school_partner:       '/onboarding',
+  nonprofit_partner:    '/onboarding',
+  church_partner:       '/onboarding',
+  sports_team_partner:  '/onboarding',
+  // Phase G.9 — 10 commercial customer sub-roles route through /onboarding
+  // so OnboardingDispatcher (isCommercialCustomerRole) sends them to
+  // /onboarding/commercial (CommercialOnboardingG4). After onboarding the
+  // dispatcher and dashboard guards send them to /dashboard/commercial.
+  commercial_customer:    '/onboarding',
+  business_customer:      '/onboarding',
+  restaurant_partner:     '/onboarding',
+  bar_partner:            '/onboarding',
+  hospital_partner:       '/onboarding',
+  hotel_partner:          '/onboarding',
+  school_business:        '/onboarding',
+  apartment_partner:      '/onboarding',
+  office_partner:         '/onboarding',
+  manufacturing_partner:  '/onboarding',
 }
 
 function HomeRedirect() {
@@ -277,6 +302,23 @@ function PushTokenManager() {
   return null
 }
 
+// Phase G.9 — Driver online state boot sync. On driver login, read
+// driver_status.is_online from Supabase and write it back into
+// localStorage['driverOnline'] so any server-side flip (e.g. admin set the
+// driver offline) is reflected in the app on next launch. Per
+// [[feedback_driver_online_state]], localStorage remains the source of
+// truth for driver-side UI; this is the read-back, not a takeover.
+function DriverOnlineBootSync() {
+  const userId = useAuthStore(s => s.user?.id)
+  const role = useAuthStore(s => s.profile?.role)
+  useEffect(() => {
+    if (!userId) return
+    if (role !== 'driver') return
+    void bootSyncDriverOnline(userId)
+  }, [userId, role])
+  return null
+}
+
 function ServiceWorkerManager() {
   const navigate = useNavigate()
 
@@ -303,6 +345,7 @@ function App() {
       <ToastProvider>
         <BrowserRouter>
           <PushTokenManager />
+          <DriverOnlineBootSync />
           <ServiceWorkerManager />
           <PWAInstallPrompt />
           {/* Suspense catches any lazy chunk that is still loading */}
@@ -472,15 +515,17 @@ function App() {
               <Route path="/my-fundraiser" element={<RequireAuth><MyFundraiserPage /></RequireAuth>} />
               <Route path="/scan-result"   element={<RequireAuth><ScanResultPage /></RequireAuth>} />
               <Route path="/qr-scan"       element={<RequireAuth><QRScanPage /></RequireAuth>} />
-              <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
+              {/* Phase G.9 — /notifications was a hardcoded mock; redirect to Supabase-backed /live-notifications. */}
+              <Route path="/notifications" element={<Navigate to="/live-notifications" replace />} />
 
               {/* Driver / Admin only */}
               <Route path="/earnings"      element={<RequireAuth><RequireRole roles={['driver','admin']}><EarningsDashboardPage /></RequireRole></RequireAuth>} />
               <Route path="/driver-routes" element={<RequireAuth><RequireRole roles={['driver','admin']}><DriverRoutesPage /></RequireRole></RequireAuth>} />
 
               {/* Warehouse / Admin only */}
-              <Route path="/bag-inspection"       element={<RequireAuth><RequireRole roles={['admin','warehouse_employee','warehouse_supervisor']}><BagInspectionPage /></RequireRole></RequireAuth>} />
-              <Route path="/bag-lifecycle"        element={<RequireAuth><RequireRole roles={['admin','warehouse_employee','warehouse_supervisor']}><BagLifecyclePage /></RequireRole></RequireAuth>} />
+              {/* Phase G.9 — mock screens archived; redirect to live /live-inspection. */}
+              <Route path="/bag-inspection"       element={<Navigate to="/live-inspection" replace />} />
+              <Route path="/bag-lifecycle"        element={<Navigate to="/live-inspection" replace />} />
               <Route path="/contamination-alerts" element={<RequireAuth><RequireRole roles={['admin','warehouse_employee','warehouse_supervisor']}><ContaminationAlertsPage /></RequireRole></RequireAuth>} />
 
               {/* Partner / Admin only */}

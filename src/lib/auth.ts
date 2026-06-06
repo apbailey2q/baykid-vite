@@ -50,6 +50,14 @@ export function normalizeRole(role: string | null | undefined): Role | null {
     'warehouse_supervisor', 'partner', 'fundraiser', 'admin',
     'municipal_viewer', 'municipal_manager', 'city_admin',
     'executive', 'investor_viewer', 'regional_admin', 'city_manager',
+    // Phase G.9 — fundraiser sub-roles (G.3) + 10 commercial sub-roles (G.4).
+    // Without these, normalizeRole rejected the DB role, HomeRedirect fell
+    // through to /real-login, and the user was stuck in a login loop.
+    'fundraiser_admin', 'school_partner', 'nonprofit_partner',
+    'church_partner', 'sports_team_partner',
+    'commercial_customer', 'business_customer',
+    'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
+    'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
   ]
   return VALID.includes(r) ? r : null
 }
@@ -75,9 +83,10 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
   }
 
   if (role === 'driver') {
-    if (driverServiceType === 'consumer_only') return '/dashboard/driver/consumer-routes'
+    if (driverServiceType === 'consumer_only')   return '/dashboard/driver/consumer-routes'
     if (driverServiceType === 'commercial_only') return '/dashboard/driver/commercial-routes'
-    return '/dashboard/driver'
+    // hybrid — approved for both consumer + commercial routes → show mode-select screen
+    return '/driver/mode'
   }
 
   switch (role) {
@@ -95,6 +104,24 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
     case 'investor_viewer':     return '/dashboard/admin/investor'
     case 'regional_admin':
     case 'city_manager':        return '/dashboard/admin/regions'
+    // Phase G.9 — fundraiser sub-roles share the fundraiser dashboard;
+    // fundraiser_admin gets the live per-campaign dashboard.
+    case 'fundraiser_admin':    return '/live-fundraiser-dashboard'
+    case 'school_partner':
+    case 'nonprofit_partner':
+    case 'church_partner':
+    case 'sports_team_partner': return '/dashboard/fundraiser'
+    // Phase G.9 — 10 commercial customer sub-roles share the commercial dashboard.
+    case 'commercial_customer':
+    case 'business_customer':
+    case 'restaurant_partner':
+    case 'bar_partner':
+    case 'hospital_partner':
+    case 'hotel_partner':
+    case 'school_business':
+    case 'apartment_partner':
+    case 'office_partner':
+    case 'manufacturing_partner': return '/dashboard/commercial'
     default:                    return '/real-login'
   }
 }

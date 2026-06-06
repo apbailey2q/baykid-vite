@@ -8,6 +8,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { setDriverMode, type DriverMode } from './DriverModeSelect'
+import { setDriverOnlineSync } from '../../lib/driverOnlineSync'
 
 interface Action {
   icon:  string
@@ -51,7 +52,7 @@ const COPY: Record<DriverMode, { title: string; subtitle: string; actions: Actio
 
 export default function DriverModeLanding({ mode }: { mode: DriverMode }) {
   const navigate = useNavigate()
-  const { profile } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const firstName = (profile?.full_name ?? '').split(' ')[0] || 'Driver'
   const copy = COPY[mode]
 
@@ -63,14 +64,16 @@ export default function DriverModeLanding({ mode }: { mode: DriverMode }) {
   }
 
   function goOnlineToggle() {
-    // Reuses the existing driverOnline localStorage flag (shared with the
-    // legacy DriverDashboard). No backend writes here per the user's spec.
+    // Phase G.9 — setDriverOnlineSync writes localStorage (preserving the
+    // existing 'driver-online-toggle' event) AND mirrors into driver_status
+    // so admin dispatch sees the change. Fire-and-forget — the local write
+    // is synchronous before the await so the reload below still reflects
+    // the new value.
     try {
       const cur = localStorage.getItem('driverOnline') === 'true'
       const next = !cur
-      localStorage.setItem('driverOnline', String(next))
+      void setDriverOnlineSync(user?.id, next)
       console.log('[driver] online state:', next)
-      window.dispatchEvent(new Event('driver-online-toggle'))
       // Visible feedback via reload of the landing (cheap, predictable).
       // Reload preserves URL so user stays on this landing.
       window.location.reload()

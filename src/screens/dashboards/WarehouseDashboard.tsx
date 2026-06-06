@@ -694,9 +694,9 @@ export default function WarehouseDashboard() {
       {/* ── Queue tab ── */}
       {tab === 'queue' && (
         <div style={{ animation: 'fadeSlideUp 0.25s ease both' }}>
-          {/* AI Bag Inspection card */}
+          {/* AI Bag Inspection card — Phase G.9: live screen at /live-inspection */}
           <Link
-            to="/bag-inspection"
+            to="/live-inspection"
             className="flex items-center gap-3 rounded-2xl px-4 py-4 mb-5 transition-all hover:brightness-110 active:scale-[0.98]"
             style={{ background: 'rgba(0,188,212,0.08)', border: '1px solid rgba(0,188,212,0.3)', boxShadow: '0 0 20px rgba(0,188,212,0.08)', textDecoration: 'none' }}
           >

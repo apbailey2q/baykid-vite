@@ -324,8 +324,9 @@ export default function RecyclingDestinationPage() {
 
           {/* ── Action Buttons ────────────────────────────────────────────────── */}
           <div className="flex flex-col gap-3" style={fade(700)}>
+            {/* Phase G.9 — removed "View Bag Lifecycle" CTA (admin-gated mock; consumer would 403) */}
             <Link
-              to="/bag-lifecycle"
+              to="/live-bags"
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm"
               style={{
                 background: 'linear-gradient(135deg, #0057e7, #00c8ff)',
@@ -336,7 +337,7 @@ export default function RecyclingDestinationPage() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
               </svg>
-              View Bag Lifecycle
+              View Live Bags
             </Link>
 
             <div className="grid grid-cols-2 gap-3">

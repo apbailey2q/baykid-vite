@@ -736,7 +736,7 @@ export default function QRScanPage() {
               {/* CTAs */}
               <div className="flex flex-col gap-3">
                 <Link
-                  to="/bag-inspection"
+                  to="/live-inspection"
                   className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm"
                   style={{ background: 'linear-gradient(135deg, #0057e7, #00c8ff)', color: '#ffffff' }}
                 >

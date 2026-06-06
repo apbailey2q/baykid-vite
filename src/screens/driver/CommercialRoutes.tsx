@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { is1099Driver } from '../../lib/auth'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -509,7 +510,7 @@ function RouteMapPanel({ stops, expandedId, driverCoords, gpsError, permState, o
 
 export default function CommercialRoutes() {
   const navigate    = useNavigate()
-  const { user }    = useAuthStore()
+  const { user, profile }    = useAuthStore()
   const { coords: driverCoords, permState, gpsError, lastCoordAt } = useRouteGps()
   const { isOnline }  = useNetworkStatus()
   const offlineSync   = useOfflineSync()
@@ -532,6 +533,15 @@ export default function CommercialRoutes() {
 
   const { messages: dispatchMsgs, loadMessages: loadDispatchMsgs, addLocal: addLocalMsg } = useDispatchMessageStore()
   const unreadMsgCount = user ? dispatchMsgs.filter(m => m.recipient_id === user.id && !m.read).length : 0
+
+  // ── Route guard — consumer-only (1099) drivers must not reach this screen ──
+  // Admin is exempt. Redirect happens before any data fetch so no commercial
+  // data is ever requested for a consumer-only driver.
+  useEffect(() => {
+    if (profile && is1099Driver(profile)) {
+      navigate('/dashboard/driver/consumer-routes', { replace: true })
+    }
+  }, [profile, navigate])
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -1653,6 +1663,48 @@ export default function CommercialRoutes() {
               </p>
             </div>
           </GlassCard>
+        )}
+
+        {/* ── Apply to Drive Consumer Routes ── */}
+        {/* Shown only to commercial-only drivers who haven't been approved for consumer routes yet. */}
+        {profile?.driver_service_type === 'commercial_only' && (
+          <div style={{ marginTop: 24, marginBottom: 4 }}>
+            <div style={{
+              borderRadius: 16,
+              border: '1px solid rgba(0,200,255,0.20)',
+              background: 'rgba(0,200,255,0.05)',
+              padding: '18px 18px 16px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{
+                  fontSize: 22, width: 40, height: 40, borderRadius: 10,
+                  background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>🏠</span>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
+                  Want to Drive Consumer Routes?
+                </p>
+              </div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, marginBottom: 14 }}>
+                You can apply to also drive residential consumer pickup routes. After completing
+                the driver application and receiving approval, both route types will be available
+                from your driver home screen.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/driver/onboarding')}
+                style={{
+                  width: '100%', padding: '11px 0', borderRadius: 10,
+                  background: 'rgba(0,200,255,0.12)',
+                  border: '1px solid rgba(0,200,255,0.35)',
+                  color: '#00c8ff', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', letterSpacing: '0.02em',
+                }}
+              >
+                Apply to Drive Consumer Routes →
+              </button>
+            </div>
+          </div>
         )}
 
         {/* ── Privacy message ── */}

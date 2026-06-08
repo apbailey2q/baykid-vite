@@ -8,6 +8,7 @@ import { AdminAlerts } from '../admin/AdminAlerts'
 import { EmergencyAlerts } from '../admin/EmergencyAlerts'
 import { RouteDispatch } from '../admin/RouteDispatch'
 import { getAllUsers, getAllAlerts } from '../../lib/admin'
+import { supabase } from '../../lib/supabaseClient'
 
 type Tab = 'overview' | 'users' | 'broadcasts' | 'emergencies' | 'dispatch'
 
@@ -28,6 +29,44 @@ export default function AdminDashboard() {
 
   const pendingCount = users.filter((u) => u.approval_status === 'pending').length
   const openAlerts   = alerts.filter((a) => a.status === 'open').length
+
+  // Phase MG.5 — compliance document status counts for Document Review tile
+  const { data: complianceCounts } = useQuery({
+    queryKey: ['admin-compliance-doc-counts'],
+    queryFn: async () => {
+      try {
+        const now = new Date().toISOString()
+        const { data, error } = await supabase
+          .from('compliance_documents')
+          .select('status, deactivation_countdown_started_at, temporary_deactivation_at, reactivated_at')
+          .eq('owner_type', 'management')
+
+        if (error || !data) return { pending: 0, countdowns: 0, deactivated: 0 }
+
+        const pending    = data.filter(d => ['pending', 'missing', 'rejected'].includes(d.status)).length
+        const countdowns = data.filter(d =>
+          d.deactivation_countdown_started_at &&
+          !d.reactivated_at &&
+          (!d.temporary_deactivation_at || new Date(d.temporary_deactivation_at).toISOString() > now)
+        ).length
+        const deactivated = data.filter(d =>
+          d.temporary_deactivation_at &&
+          new Date(d.temporary_deactivation_at).toISOString() <= now &&
+          !d.reactivated_at
+        ).length
+
+        return { pending, countdowns, deactivated }
+      } catch {
+        return { pending: 0, countdowns: 0, deactivated: 0 }
+      }
+    },
+    refetchInterval: 5 * 60 * 1000,
+    staleTime:       60_000,
+  })
+
+  const docReviewTotal = (complianceCounts?.pending ?? 0)
+    + (complianceCounts?.countdowns ?? 0)
+    + (complianceCounts?.deactivated ?? 0)
 
   const tabs: { value: Tab; label: string; urgent?: boolean; muted?: boolean }[] = [
     { value: 'overview',    label: 'Overview' },
@@ -83,10 +122,31 @@ export default function AdminDashboard() {
         <Link
           to="/admin/document-review"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
-          style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.28)', color: '#f97316', textDecoration: 'none' }}
+          style={{
+            background: docReviewTotal > 0 ? 'rgba(249,115,22,0.13)' : 'rgba(249,115,22,0.08)',
+            border: `1px solid ${docReviewTotal > 0 ? 'rgba(249,115,22,0.45)' : 'rgba(249,115,22,0.28)'}`,
+            color: '#f97316',
+            textDecoration: 'none',
+          }}
           title="Review uploaded documents, expiration alerts, missing requirements, and temporary deactivation countdowns."
         >
           📋 Document Review
+          {/* Phase MG.5 — status count badges */}
+          {(complianceCounts?.deactivated ?? 0) > 0 && (
+            <span style={{ background: '#f87171', color: '#fff', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              {complianceCounts!.deactivated} deactivated
+            </span>
+          )}
+          {(complianceCounts?.countdowns ?? 0) > 0 && (
+            <span style={{ background: '#f97316', color: '#fff', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              {complianceCounts!.countdowns} countdown
+            </span>
+          )}
+          {(complianceCounts?.pending ?? 0) > 0 && (
+            <span style={{ background: '#fbbf24', color: '#000', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              {complianceCounts!.pending} pending
+            </span>
+          )}
         </Link>
         <Link
           to="/dashboard/admin/account-deletion-requests"
@@ -101,6 +161,14 @@ export default function AdminDashboard() {
           style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.32)', color: '#fbbf24', textDecoration: 'none' }}
         >
           ⚠️ Route & Driver Alerts
+        </Link>
+        <Link
+          to="/dashboard/admin/moderation-center"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.32)', color: '#a855f7', textDecoration: 'none' }}
+          title="Review content reports, blocked users, compliance alerts, audit logs, and Apple safety requirements."
+        >
+          🛡️ Moderation & Compliance
         </Link>
       </div>
       <div

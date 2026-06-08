@@ -472,6 +472,40 @@ export default function LiveSettingsPage() {
                 <span style={{ fontSize: 13, color: 'rgba(0,200,255,0.6)' }}>→</span>
               </Link>
               <Link
+                to="/compliance/notifications"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 0', textDecoration: 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  color: 'inherit',
+                }}
+              >
+                <span>
+                  <span style={{ fontSize: 13, color: '#fff' }}>🔔 Compliance notifications</span>
+                  <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                    Expiring documents, account status, route alerts.
+                  </span>
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(0,200,255,0.6)' }}>→</span>
+              </Link>
+              <Link
+                to="/settings/blocked-users"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 0', textDecoration: 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  color: 'inherit',
+                }}
+              >
+                <span>
+                  <span style={{ fontSize: 13, color: '#fff' }}>🚫 Blocked users</span>
+                  <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                    Review and unblock people you&rsquo;ve blocked.
+                  </span>
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(0,200,255,0.6)' }}>→</span>
+              </Link>
+              <Link
                 to="/legal/data-deletion"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',

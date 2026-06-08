@@ -95,6 +95,10 @@ const ManagementDocuments             = lazy(() => import('./screens/management/
 // Apple Sprint B — user-facing Document Center + admin route/driver-need alerts
 const DocumentCenter                  = lazy(() => import('./screens/compliance/DocumentCenter'))
 const AdminRouteAlertsCenter          = lazy(() => import('./screens/admin/AdminRouteAlertsCenter'))
+// Apple Sprint C — moderation, blocking, compliance notifications center
+const ComplianceNotificationsCenter   = lazy(() => import('./screens/compliance/ComplianceNotificationsCenter'))
+const BlockedUsersScreen              = lazy(() => import('./screens/settings/BlockedUsersScreen'))
+const AdminModerationCenter           = lazy(() => import('./screens/admin/AdminModerationCenter'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -483,6 +487,10 @@ function App() {
               {/* Apple Sprint B — user-facing Document Center for non-management roles */}
               <Route path="/compliance/documents"             element={<ProtectedRoute><DocumentCenter /></ProtectedRoute>} />
               <Route path="/dashboard/admin/route-alerts"     element={<ProtectedRoute requireApproved><AdminRouteAlertsCenter /></ProtectedRoute>} />
+              {/* Apple Sprint C — moderation + blocking + compliance notifications */}
+              <Route path="/compliance/notifications"         element={<ProtectedRoute><ComplianceNotificationsCenter /></ProtectedRoute>} />
+              <Route path="/settings/blocked-users"           element={<ProtectedRoute><BlockedUsersScreen /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/moderation-center" element={<ProtectedRoute requireApproved><AdminModerationCenter /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

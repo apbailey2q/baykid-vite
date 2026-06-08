@@ -202,6 +202,22 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   ],
   // Apple Sprint B — admin route + driver-need alerts center
   '/dashboard/admin/route-alerts':                   ['admin', 'operations_manager', 'compliance_manager'],
+  // Apple Sprint C — moderation + blocked users + per-user compliance notifications
+  '/dashboard/admin/moderation-center':              ['admin', 'compliance_manager'],
+  '/settings/blocked-users': [
+    'admin','consumer','commercial','driver',
+    ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES,
+    'partner','fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES,
+    'municipal_viewer','municipal_manager','city_admin',
+    'investor_viewer','regional_admin','city_manager',
+  ],
+  '/compliance/notifications': [
+    'admin','consumer','commercial','driver',
+    ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES,
+    'partner','fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES,
+    'municipal_viewer','municipal_manager','city_admin',
+    'investor_viewer','regional_admin','city_manager',
+  ],
 
   // ── Management Onboarding System — Phase MG.1 ────────────────────────────
   // These three paths are the primary entry points for management personnel.

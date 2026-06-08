@@ -11,11 +11,13 @@
 // Route: /management/documents
 // Access: management roles + admin
 
+// Phase MG.5 update: adds reactivation section, gate status banner, and
+// "Request Reactivation Review" button with admin notification.
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../store/authStore'
-import type { ManagementProfile, ComplianceDocument } from '../../types'
+import type { ManagementProfile, ComplianceDocument, ComplianceDeactivationEvent } from '../../types'
 import {
   MANAGEMENT_AGREEMENT_VERSION,
   REQUIRED_AGREEMENT_CODES,
@@ -27,6 +29,8 @@ import {
   getCountdownLabel,
   shouldTemporarilyDeactivate,
 } from '../../lib/documentExpiration'
+import { computeGateStatus } from '../../lib/complianceGate'
+import { createAdminReviewRequiredNotification } from '../../lib/complianceNotifications'
 import ComplianceNotificationCenter from '../../components/notifications/ComplianceNotificationCenter'
 
 const BRAND   = '#00c8ff'
@@ -154,10 +158,14 @@ export default function ManagementDocuments() {
   const { user, role } = useAuthStore()
   const navigate = useNavigate()
 
-  const [profile,    setProfile]    = useState<ManagementProfile | null>(null)
-  const [docs,       setDocs]       = useState<MergedDoc[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [globalError, setGlobalError] = useState<string | null>(null)
+  const [profile,          setProfile]          = useState<ManagementProfile | null>(null)
+  const [docs,             setDocs]             = useState<MergedDoc[]>([])
+  const [complianceDocs,   setComplianceDocs]   = useState<ComplianceDocument[]>([])
+  const [deactivationEvent,setDeactivationEvent]= useState<ComplianceDeactivationEvent | null>(null)
+  const [loading,          setLoading]          = useState(true)
+  const [globalError,      setGlobalError]      = useState<string | null>(null)
+  const [reactivating,     setReactivating]     = useState(false)
+  const [reactivationFlash,setReactivationFlash]= useState<{ text: string; ok: boolean } | null>(null)
 
   const loadAll = useCallback(async () => {
     if (!user) return
@@ -179,8 +187,8 @@ export default function ManagementDocuments() {
       const mp = profileData as ManagementProfile
       setProfile(mp)
 
-      // 2. Parallel: compliance_documents + agreement_acceptances
-      const [compResult, acceptResult] = await Promise.all([
+      // 2. Parallel: compliance_documents + agreement_acceptances + deactivation events
+      const [compResult, acceptResult, deactResult] = await Promise.all([
         supabase
           .from('compliance_documents')
           .select('*')
@@ -193,10 +201,23 @@ export default function ManagementDocuments() {
           .eq('management_profile_id', mp.id)
           .eq('agreement_version', MANAGEMENT_AGREEMENT_VERSION)
           .eq('accepted', true),
+
+        supabase
+          .from('compliance_deactivation_events')
+          .select('*')
+          .eq('owner_user_id', user.id)
+          .eq('owner_type', 'management')
+          .in('status', ['active', 'reactivation_pending'])
+          .order('created_at', { ascending: false })
+          .limit(1),
       ])
 
-      const compDocs  = (compResult.data  ?? []) as ComplianceDocument[]
+      const compDocs   = (compResult.data  ?? []) as ComplianceDocument[]
       const acceptRows = acceptResult.data ?? []
+
+      setComplianceDocs(compDocs)
+      const latestEvent = (deactResult.data ?? [])[0] as ComplianceDeactivationEvent | undefined
+      setDeactivationEvent(latestEvent ?? null)
 
       // Build merged doc list
       const merged: MergedDoc[] = REQUIRED_MANAGEMENT_DOCUMENTS.map(def => {
@@ -452,6 +473,178 @@ export default function ManagementDocuments() {
             })}
           </div>
         </section>
+
+        {/* ── Phase MG.5 — Reactivation Section ── */}
+        {(() => {
+          const gate = computeGateStatus(complianceDocs)
+          const showReactivation =
+            gate.status === 'temporarily_deactivated' ||
+            gate.status === 'reactivation_pending'    ||
+            gate.status === 'countdown'
+          if (!showReactivation) return null
+
+          const isDeactivated = gate.status === 'temporarily_deactivated'
+          const isPending     = gate.status === 'reactivation_pending'
+
+          const accentColor = isDeactivated || isPending ? DANGER : ORANGE
+          const accentBg    = isDeactivated || isPending
+            ? 'rgba(248,113,113,0.07)'
+            : 'rgba(249,115,22,0.07)'
+          const accentBorder = isDeactivated || isPending
+            ? 'rgba(248,113,113,0.28)'
+            : 'rgba(249,115,22,0.28)'
+
+          const handleRequestReactivation = async () => {
+            if (!user) return
+            setReactivating(true)
+            setReactivationFlash(null)
+            try {
+              // 1. Update deactivation event to reactivation_pending
+              if (deactivationEvent) {
+                await supabase
+                  .from('compliance_deactivation_events')
+                  .update({ status: 'reactivation_pending' })
+                  .eq('id', deactivationEvent.id)
+              }
+
+              // 2. Notify all admins
+              const { data: adminProfiles } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('role', 'admin')
+
+              const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
+              const notifPromises = adminIds.map((adminId: string) =>
+                createAdminReviewRequiredNotification({
+                  adminUserId:    adminId,
+                  ownerType:      'management',
+                  documentTitle:  'Management Account Reactivation Request',
+                  submitterName:  user.email ?? undefined,
+                  actionUrl:      '/admin/document-review',
+                })
+              )
+              await Promise.all(notifPromises)
+
+              setReactivationFlash({
+                text: 'Reactivation request submitted. An administrator will review your documents and notify you of their decision.',
+                ok:   true,
+              })
+              await loadAll()
+            } catch {
+              setReactivationFlash({
+                text: 'Unable to submit reactivation request. Please try again or contact support.',
+                ok:   false,
+              })
+            } finally {
+              setReactivating(false)
+            }
+          }
+
+          return (
+            <section>
+              <div
+                className="rounded-2xl p-5 space-y-4"
+                style={{ background: accentBg, border: `1px solid ${accentBorder}` }}
+              >
+                {/* Header */}
+                <div className="flex items-start gap-3">
+                  <span style={{ fontSize: 22 }}>
+                    {isDeactivated ? '🚫' : isPending ? '🔄' : '⏱️'}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: accentColor }}>
+                      {isDeactivated
+                        ? 'Access Restricted — Account Temporarily Deactivated'
+                        : isPending
+                          ? 'Reactivation Request Submitted — Awaiting Review'
+                          : 'Deactivation Countdown Active'}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                      {isDeactivated
+                        ? "Your management access has been temporarily suspended due to missing or expired required documents."
+                        : isPending
+                          ? "Your reactivation request is under admin review. You will be notified when a decision is made."
+                          : `Your account will be temporarily deactivated if the required documents are not resolved in time.`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Why restricted */}
+                {(gate.missingDocuments?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      Documents Requiring Action
+                    </p>
+                    <ul className="space-y-1">
+                      {gate.missingDocuments!.map(doc => (
+                        <li key={doc} className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                          <span style={{ color: accentColor }}>❌</span> {doc}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* What to do */}
+                <div className="p-3 rounded-xl" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>HOW TO RESOLVE</p>
+                  <ol className="space-y-1">
+                    <li className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                      1. Upload or renew the required documents listed above.
+                    </li>
+                    <li className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                      2. Click &ldquo;Request Reactivation Review&rdquo; below.
+                    </li>
+                    <li className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                      3. An administrator will review your documents and approve or deny reactivation.
+                    </li>
+                  </ol>
+                  <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                    After your documents are updated, an administrator must approve reactivation.
+                  </p>
+                </div>
+
+                {/* Flash message */}
+                {reactivationFlash && (
+                  <div
+                    className="p-3 rounded-xl flex items-start justify-between gap-3"
+                    style={{
+                      background: reactivationFlash.ok ? 'rgba(74,222,128,0.08)' : 'rgba(248,113,113,0.08)',
+                      border: `1px solid ${reactivationFlash.ok ? 'rgba(74,222,128,0.28)' : 'rgba(248,113,113,0.28)'}`,
+                    }}
+                  >
+                    <p className="text-xs" style={{ color: reactivationFlash.ok ? SUCCESS : DANGER, margin: 0 }}>
+                      {reactivationFlash.ok ? '✅ ' : '❌ '}{reactivationFlash.text}
+                    </p>
+                    <button
+                      onClick={() => setReactivationFlash(null)}
+                      style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                    >✕</button>
+                  </div>
+                )}
+
+                {/* Reactivation request button */}
+                {!isPending && (
+                  <button
+                    onClick={handleRequestReactivation}
+                    disabled={reactivating}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all hover:brightness-110 disabled:opacity-40"
+                    style={{ background: accentColor, color: '#fff', border: 'none', cursor: reactivating ? 'not-allowed' : 'pointer' }}
+                  >
+                    {reactivating ? '⏳ Submitting…' : '🔄 Request Reactivation Review'}
+                  </button>
+                )}
+
+                {isPending && (
+                  <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                    <span>🔄</span>
+                    <span>Reactivation request submitted and pending admin review.</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )
+        })()}
 
         {/* Agreement shortcut */}
         <div className="p-4 rounded-2xl"

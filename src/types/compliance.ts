@@ -278,3 +278,159 @@ export const OPTIONAL_DOCUMENTS_BY_ROLE: Partial<Record<Role, ComplianceDocument
   commercial:           ['business_insurance', 'w9_tax_form'],
   commercial_customer:  ['business_insurance', 'w9_tax_form'],
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Sprint C — Moderation + Audit + Permission Disclosure
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Content reports ────────────────────────────────────────────────────────
+
+export type ReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'hate_speech'
+  | 'dangerous_content'
+  | 'scam_fraud'
+  | 'illegal_activity'
+  | 'impersonation'
+  | 'other'
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  spam:             'Spam',
+  harassment:       'Harassment',
+  hate_speech:      'Hate Speech',
+  dangerous_content:'Dangerous Content',
+  scam_fraud:       'Scam or Fraud',
+  illegal_activity: 'Illegal Activity',
+  impersonation:    'Impersonation',
+  other:            'Other',
+}
+
+export type ReportStatus =
+  | 'pending'
+  | 'reviewing'
+  | 'resolved'
+  | 'dismissed'
+  | 'removed'
+  | 'escalated'
+
+export interface ContentReport {
+  id:                  string
+  reporter_id:         string | null
+  reported_user_id:    string | null
+  reported_content_id: string | null
+  content_type:        string
+  reason:              ReportReason
+  details:             string | null
+  status:              ReportStatus
+  reviewed_by:         string | null
+  reviewed_at:         string | null
+  admin_notes:         string | null
+  created_at:          string
+  updated_at:          string
+}
+
+// ── Blocked users ──────────────────────────────────────────────────────────
+
+export interface BlockedUser {
+  id:         string
+  blocker_id: string
+  blocked_id: string
+  reason:     string | null
+  created_at: string
+}
+
+// ── Compliance audit log ───────────────────────────────────────────────────
+
+export type ComplianceAuditAction =
+  | 'CONTENT_REPORT_CREATED'
+  | 'CONTENT_REPORT_REVIEWED'
+  | 'CONTENT_REMOVED'
+  | 'USER_BLOCKED'
+  | 'USER_UNBLOCKED'
+  | 'ACCOUNT_DELETION_APPROVED'
+  | 'ACCOUNT_DELETION_COMPLETED'
+  | 'DOCUMENT_EXPIRING'
+  | 'ACCOUNT_TEMP_DEACTIVATION_WARNING'
+  | 'ROUTE_INCOMPLETE_ALERT'
+  | 'DRIVER_SHORTAGE_ALERT'
+  | 'PERMISSION_DISCLOSURE_ACCEPTED'
+
+export interface ComplianceAuditLog {
+  id:             string
+  actor_id:       string | null
+  target_user_id: string | null
+  action:         ComplianceAuditAction | string
+  entity_type:    string | null
+  entity_id:      string | null
+  metadata:       Record<string, unknown>
+  created_at:     string
+}
+
+// ── Permission disclosure ──────────────────────────────────────────────────
+
+export type PermissionType =
+  | 'camera'
+  | 'photos'
+  | 'location_consumer'
+  | 'location_driver'
+  | 'notifications'
+
+export const PERMISSION_DISCLOSURE_TEXT: Record<PermissionType, { title: string; message: string }> = {
+  camera: {
+    title:   'Camera Access',
+    message: 'Camera access is required to scan recycling bag QR codes and verify bag condition.',
+  },
+  photos: {
+    title:   'Photo Library Access',
+    message: 'Photo access is used to upload recycling verification images.',
+  },
+  location_consumer: {
+    title:   'Location Access',
+    message: 'Location helps determine pickup eligibility and available recycling services during active app use.',
+  },
+  location_driver: {
+    title:   'Location Access (Driver)',
+    message: 'Location is used during active pickup work for route navigation, pickup verification, and service completion records.',
+  },
+  notifications: {
+    title:   'Notification Access',
+    message: 'Notifications are used for pickup updates, compliance reminders, expiring documents, account status alerts, and important service messages.',
+  },
+}
+
+export interface PermissionDisclosureAcknowledgment {
+  id:               string
+  user_id:          string
+  permission_type:  PermissionType
+  disclosure_text:  string
+  accepted_at:      string
+}
+
+// ── Notification severity (Sprint C re-export — already defined above) ─────
+
+export type ComplianceSeverity = NotificationSeverity   // re-export with the Sprint C name
+
+// ── Sprint C notification types are a superset of MG.4's. Both lib layers
+//    write to the same compliance_notifications table; the union below is
+//    what the canonical table's CHECK constraint accepts after the Sprint C
+//    migration runs.
+export type SprintCNotificationType =
+  | 'document_missing'
+  | 'document_expiring'
+  | 'document_expired'
+  | 'document_rejected'
+  | 'countdown_started'
+  | 'temporary_deactivation'
+  | 'temporary_deactivation_warning'
+  | 'reactivation'
+  | 'account_deactivated'
+  | 'route_not_completed'
+  | 'route_incomplete'
+  | 'drivers_needed'
+  | 'admin_review_required'
+  | 'commercial_pickup_overflow'
+  | 'warehouse_certification_expiring'
+  | 'insurance_expiring'
+  | 'vehicle_inspection_expiring'
+  | 'training_expiring'

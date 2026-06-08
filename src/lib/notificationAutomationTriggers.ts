@@ -452,7 +452,8 @@ export async function runWarehouseStaffingNotificationCheck(): Promise<TriggerRe
 // ── Phase 6 — Commercial Pickup Issue Trigger ─────────────────────────────────
 //
 // Tables: commercial_pickups (id, status, priority_level, driver_id, account_id,
-//                             scheduled_at, contamination_status, created_at)
+//                             scheduled_at, created_at)
+//         commercial_inspections (id, pickup_id, overall_result) — for contamination
 //
 // Detects:
 //   - emergency priority pickups not yet completed  → emergency_pickup_requested

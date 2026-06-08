@@ -239,7 +239,10 @@ export default function ConsumerOnboarding() {
   // but localStorage may have restored a stepIdx from a prior consumer session
   // on this device, causing Step 3+ to briefly render before any redirect fires.
   // This synchronous check (all hooks called above) stops the render cold.
-  if (profile?.role === 'driver') {
+  // Checks both profile.role AND driver_service_type: accounts whose DB role
+  // column is 'consumer' but were provisioned as drivers must also be caught.
+  const isDriverByProfile = profile?.role === 'driver' || !!profile?.driver_service_type
+  if (isDriverByProfile) {
     // Spec item 5 — wipe any consumer-onboarding state that may have leaked
     // from a prior session on the same device so the wizard cannot resume
     // mid-flow on the driver's next sign-in.

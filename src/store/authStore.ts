@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@supabase/supabase-js'
-import type { Role, ApprovalStatus, Profile, DriverComplianceStatus } from '../types'
+import type { Role, ApprovalStatus, Profile, DriverComplianceStatus, DriverPlatformStatus } from '../types'
 
 interface AuthState {
   user: User | null
@@ -15,10 +15,18 @@ interface AuthState {
    * created a driver_profiles row.
    */
   driverComplianceStatus: DriverComplianceStatus | null
+  /**
+   * Driver platform conduct status — governs access to both commercial and
+   * consumer driver dispatch surfaces. 'terminated' shows a notice and blocks
+   * all driver workflows. 'suspended' blocks pickup acceptance but allows
+   * viewing account. Null means not a driver account or no row yet.
+   */
+  driverPlatformStatus: DriverPlatformStatus | null
   isLoading: boolean
   setUser: (user: User | null) => void
   setProfile: (profile: Profile | null) => void
   setDriverComplianceStatus: (status: DriverComplianceStatus | null) => void
+  setDriverPlatformStatus: (status: DriverPlatformStatus | null) => void
   clearAuth: () => void
   setLoading: (loading: boolean) => void
 }
@@ -31,6 +39,7 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       approvalStatus: null,
       driverComplianceStatus: null,
+      driverPlatformStatus: null,
       isLoading: true,
       setUser: (user) => set({ user }),
       setProfile: (profile) =>
@@ -40,8 +49,10 @@ export const useAuthStore = create<AuthState>()(
           approvalStatus: profile?.approval_status ?? null,
         }),
       setDriverComplianceStatus: (driverComplianceStatus) => set({ driverComplianceStatus }),
+      setDriverPlatformStatus: (driverPlatformStatus) => set({ driverPlatformStatus }),
       clearAuth: () => {
-        set({ user: null, profile: null, role: null, approvalStatus: null, driverComplianceStatus: null })
+        set({ user: null, profile: null, role: null, approvalStatus: null,
+              driverComplianceStatus: null, driverPlatformStatus: null })
       },
       setLoading: (isLoading) => set({ isLoading }),
     }),
@@ -55,6 +66,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         profile: state.profile,
         driverComplianceStatus: state.driverComplianceStatus,
+        driverPlatformStatus: state.driverPlatformStatus,
       }),
     },
   ),

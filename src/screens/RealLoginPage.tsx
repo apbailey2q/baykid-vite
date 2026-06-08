@@ -7,7 +7,7 @@ import { GlassCard } from '../components/ui/GlassCard'
 import { PrimaryButton } from '../components/ui/PrimaryButton'
 import { BYPASS_APPROVAL } from '../lib/appMode'
 import { logMode, getAppMode } from '../lib/mode'
-import { normalizeRole, getRoleDashboardPath } from '../lib/auth'
+import { normalizeRole, getRoleDashboardPath, logout } from '../lib/auth'
 
 const ACCESS_ROLES: { value: AccessRole; label: string }[] = [
   { value: 'consumer',   label: 'Consumer' },
@@ -68,28 +68,24 @@ export default function RealLoginPage() {
   // avoids a redundant getSession() call that conflicts with the Web Lock.
   const { user: storeUser, role: storeRole, profile: storeProfile, approvalStatus, isLoading: authLoading } = useAuthStore()
 
-  useEffect(() => {
-    if (authLoading || !storeUser) return
-    // Never pre-empt an in-flight sign-in — handleSubmit owns that redirect,
-    // including the selected-vs-DB-role mismatch error. This is the resume-an-
-    // existing-session path only.
-    if (loading) return
+  // Derive the dashboard path for the "Continue to dashboard" button.
+  // This is computed reactively — no auto-navigate. The user must click
+  // explicitly so they can always reach /real-login to sign out.
+  const [signingOut, setSigningOut] = useState(false)
 
-    if (!BYPASS_APPROVAL && approvalStatus !== 'approved') {
-      navigate('/pending-approval', { replace: true })
-      return
-    }
-
-    // /real-login is live-only. DB role is always authoritative here.
-    // Admins may use the dropdown to preview a role's dashboard.
+  const existingSessionPath = (() => {
+    if (!storeUser || authLoading) return null
+    if (!BYPASS_APPROVAL && approvalStatus !== 'approved') return '/pending-approval'
     const realRole = normalizeRole(storeRole)
     const targetRole = realRole === 'admin' ? selectedRole : realRole
     const path = getRoleDashboardPath({ ...storeProfile, role: targetRole })
-    console.log('Auth user id:', storeUser?.id)
-    console.log('DB Role:', realRole)
-    console.log('Redirect destination:', path)
-    if (path && path !== '/real-login') navigate(path, { replace: true })
-  }, [authLoading, loading, storeUser, storeRole, storeProfile, approvalStatus, selectedRole, navigate])
+    return path && path !== '/real-login' ? path : null
+  })()
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try { await logout() } finally { setSigningOut(false) }
+  }
 
   const fade = (delay = 0): CSSProperties => ({
     opacity: animate ? 1 : 0,
@@ -307,6 +303,51 @@ export default function RealLoginPage() {
       />
 
       <div className="relative w-full max-w-md mx-auto" style={{ zIndex: 1 }}>
+
+        {/* ── Active session banner ─────────────────────────────────────────── */}
+        {storeUser && !authLoading && (
+          <div
+            className="mb-4 rounded-2xl px-4 py-4"
+            style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.25)' }}
+          >
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
+              Currently signed in as
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 12, wordBreak: 'break-all' }}>
+              {storeUser.email}
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {existingSessionPath && (
+                <button
+                  type="button"
+                  onClick={() => navigate(existingSessionPath)}
+                  style={{
+                    flex: 1, padding: '9px 12px', borderRadius: 12, fontSize: 12,
+                    fontWeight: 700, cursor: 'pointer',
+                    background: 'rgba(0,200,255,0.12)', border: '1px solid rgba(0,200,255,0.35)',
+                    color: '#00c8ff',
+                  }}
+                >
+                  Go to Dashboard
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { void handleSignOut() }}
+                disabled={signingOut}
+                style={{
+                  flex: 1, padding: '9px 12px', borderRadius: 12, fontSize: 12,
+                  fontWeight: 700, cursor: signingOut ? 'default' : 'pointer',
+                  background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.3)',
+                  color: '#FF1744', opacity: signingOut ? 0.6 : 1,
+                }}
+              >
+                {signingOut ? 'Signing out…' : '🔒 Sign Out'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Logo */}
         <img
           src="/logo.png"

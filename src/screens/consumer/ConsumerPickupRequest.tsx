@@ -16,6 +16,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { checkZipInServiceArea } from '../../lib/serviceArea'
+import { useOperationsSettings } from '../../hooks/useOperationsSettings'
+import { isInFreePickupWindow, formatWindowTime } from '../../lib/operationsSettings'
 import { OnboardingEngine } from '../../components/onboarding/OnboardingEngine'
 import { MaterialSelector } from '../../components/material/MaterialSelector'
 import { GlassCard } from '../../components/ui/GlassCard'
@@ -90,6 +92,22 @@ export default function ConsumerPickupRequest() {
   const navigate = useNavigate()
   const { user }  = useAuthStore()
 
+  // ── Operations settings (pickup window + fees) ────────────────────────────
+  const { settings } = useOperationsSettings()
+
+  // Determine pickup category at render time based on current clock vs admin window.
+  // This is recalculated on each render; the actual category is passed to DB on submit.
+  const inFreeWindow = isInFreePickupWindow(settings)
+
+  // 'gate' mode: show the outside-window interstitial before the wizard begins.
+  // 'free' | 'convenience' | 'scheduled': the chosen pickup category.
+  type WindowChoice = 'gate' | 'free' | 'convenience' | 'scheduled'
+  const [windowChoice, setWindowChoice] = useState<WindowChoice>(inFreeWindow ? 'free' : 'gate')
+
+  // Derived: what pickup_category do we write to DB?
+  const pickupCategory = windowChoice === 'convenience' ? 'convenience' : 'free'
+  const convenienceFee = windowChoice === 'convenience' ? settings.consumer_convenience_fee : null
+
   const [step,          setStep]          = useState(0)
   const [materialCodes, setMaterialCodes] = useState<string[]>([])
   const [preferredDate, setPreferredDate] = useState('')
@@ -150,15 +168,17 @@ export default function ConsumerPickupRequest() {
     }
 
     const { error: dbErr } = await supabase.from('consumer_pickups').insert({
-      user_id:        user.id,
-      preferred_date: preferredDate,
-      time_window:    timeWindow,
-      address_line1:  address1.trim(),
-      address_city:   city.trim(),
-      address_state:  state,
-      address_zip:    zip.trim(),
-      material_codes: materialCodes,
-      notes:          notes.trim() || null,
+      user_id:          user.id,
+      preferred_date:   preferredDate,
+      time_window:      timeWindow,
+      address_line1:    address1.trim(),
+      address_city:     city.trim(),
+      address_state:    state,
+      address_zip:      zip.trim(),
+      material_codes:   materialCodes,
+      notes:            notes.trim() || null,
+      pickup_category:  pickupCategory,
+      convenience_fee:  convenienceFee,
     })
 
     setSaving(false)
@@ -341,6 +361,132 @@ export default function ConsumerPickupRequest() {
         return null
     }
   }
+
+  // ── Outside-window gate ───────────────────────────────────────────────────
+  // Shown when the consumer tries to request a pickup outside the admin-set
+  // free window. They can choose: convenience pickup (fee) or schedule later.
+
+  if (windowChoice === 'gate') {
+    const windowStr = `${formatWindowTime(settings.consumer_free_window_start)} – ${formatWindowTime(settings.consumer_free_window_end)}`
+
+    return (
+      <div
+        style={{
+          minHeight:      '100dvh',
+          background:     'linear-gradient(180deg, #060e24 0%, #040a1a 100%)',
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          justifyContent: 'center',
+          padding:        '24px 20px',
+        }}
+      >
+        <div style={{ maxWidth: 380, width: '100%' }}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <span style={{ fontSize: 48 }}>🕐</span>
+            <h2 style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginTop: 12, marginBottom: 8 }}>
+              Free Pickups Are Currently Closed
+            </h2>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+              Free pickup requests are open daily from{' '}
+              <strong style={{ color: '#00c8ff' }}>{windowStr}</strong>.
+              Outside that window, you have two options:
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            {/* Convenience pickup option */}
+            {settings.consumer_convenience_enabled && (
+              <button
+                type="button"
+                onClick={() => setWindowChoice('convenience')}
+                style={{
+                  background:   'rgba(0,200,255,0.07)',
+                  border:       '1px solid rgba(0,200,255,0.3)',
+                  borderRadius: 16,
+                  padding:      '16px 18px',
+                  cursor:       'pointer',
+                  textAlign:    'left',
+                  transition:   'all 0.15s',
+                }}
+              >
+                <p style={{ fontSize: 15, fontWeight: 800, color: '#00c8ff', marginBottom: 4 }}>
+                  🚀 Convenience Pickup — ${settings.consumer_convenience_fee.toFixed(2)}
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+                  Request a pickup right now. A convenience fee will be recorded for your account.
+                  The platform does not charge your card — fees are collected manually.
+                </p>
+              </button>
+            )}
+
+            {/* Schedule for next free window */}
+            {settings.consumer_next_free_visible && (
+              <button
+                type="button"
+                onClick={() => setWindowChoice('scheduled')}
+                style={{
+                  background:   'rgba(255,255,255,0.04)',
+                  border:       '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 16,
+                  padding:      '16px 18px',
+                  cursor:       'pointer',
+                  textAlign:    'left',
+                  transition:   'all 0.15s',
+                }}
+              >
+                <p style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+                  📅 Schedule for Next Free Window
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+                  Choose a date and set your bags out during the free {windowStr} window. No fee.
+                </p>
+              </button>
+            )}
+
+            {/* If both options hidden, let them through anyway */}
+            {!settings.consumer_convenience_enabled && !settings.consumer_next_free_visible && (
+              <button
+                type="button"
+                onClick={() => setWindowChoice('free')}
+                style={{
+                  background:   'rgba(0,200,255,0.07)',
+                  border:       '1px solid rgba(0,200,255,0.3)',
+                  borderRadius: 16,
+                  padding:      '16px 18px',
+                  cursor:       'pointer',
+                  transition:   'all 0.15s',
+                }}
+              >
+                <p style={{ fontSize: 15, fontWeight: 800, color: '#00c8ff' }}>
+                  Continue Anyway
+                </p>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              style={{
+                background: 'none',
+                border:     'none',
+                color:      'rgba(255,255,255,0.3)',
+                fontSize:   13,
+                cursor:     'pointer',
+                padding:    '8px 0',
+                textAlign:  'center',
+              }}
+            >
+              ← Go back
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Wizard ────────────────────────────────────────────────────────────────
 
   return (
     <OnboardingEngine

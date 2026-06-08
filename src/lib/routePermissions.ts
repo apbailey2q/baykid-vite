@@ -150,6 +150,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/analytics':                      ['admin'],
   '/dashboard/admin/dispatch-map':                   ['admin'],
   '/dashboard/admin/ai-marketing':                   ['admin'],
+  '/dashboard/admin/operations':                     ['admin'],
 
   // ── Commercial — missing sub-routes ───────────────────────────────────────
   '/dashboard/commercial/billing':                   ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
@@ -162,7 +163,15 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // /onboarding/consumer, /onboarding/fundraiser, or /onboarding/commercial.
   // All sub-roles that could land here from ROLE_HOME need permission to
   // render the dispatcher.
+  // NOTE: 'driver' is intentionally ABSENT from all /onboarding/* entries.
+  // Drivers complete Driver Compliance Pack V1 at /driver/compliance.
+  // ProtectedRoute adds an explicit gate on top as defense-in-depth.
   '/onboarding':                                     ['admin', 'consumer', 'commercial', 'fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES],
+  // Explicit sub-route entries tighten cross-role access beyond the dispatcher.
+  // Without these, prefix matching on '/onboarding' would allow commercial roles
+  // to reach /onboarding/consumer and fundraiser roles to reach /onboarding/commercial.
+  '/onboarding/consumer':                            ['admin', 'consumer'],
+  '/onboarding/fundraiser':                          ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', 'warehouse_employee', 'warehouse_supervisor', 'partner', 'fundraiser'],

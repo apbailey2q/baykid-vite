@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { logMode } from '../../lib/mode'
+import { useOperationsSettings } from '../../hooks/useOperationsSettings'
 import { CommercialLayout } from './CommercialLayout'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { PrimaryButton } from '../../components/ui/PrimaryButton'
@@ -152,6 +153,10 @@ type PageState = 'loading' | 'no_user' | 'no_account' | 'form' | 'success'
 export default function CommercialPickupRequest() {
   const navigate   = useNavigate()
   const { user }   = useAuthStore()
+
+  // ── Admin-controlled settings (emergency fee, priority dispatch) ──────────
+  const { settings } = useOperationsSettings()
+
   const [pageState, setPageState] = useState<PageState>('loading')
   const [accountId, setAccountId] = useState<string | null>(null)
   const [form, setForm]           = useState(INITIAL)
@@ -203,7 +208,11 @@ export default function CommercialPickupRequest() {
       setForm(prev => ({ ...prev, [field]: e.target.value }))
   }
 
-  const isEmergency = form.pickupType === 'Emergency Overflow'
+  const isEmergency  = form.pickupType === 'Emergency Overflow'
+  // is_priority: true when admin has priority dispatch enabled AND this is an emergency
+  const isPriority   = isEmergency && settings.commercial_priority_dispatch
+  // Which fee to show in the banner (after-hours vs standard — simplified: show standard for now)
+  const emergencyFee = settings.commercial_emergency_fee
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -246,6 +255,7 @@ export default function CommercialPickupRequest() {
           gate_notes:         form.gateNotes        || null,
           safety_notes:       form.safetyNotes      || null,
           contact_person:     form.contactPerson,
+          is_priority:        isPriority,
         })
 
       if (pickupError) throw pickupError
@@ -428,17 +438,37 @@ export default function CommercialPickupRequest() {
           </p>
         </div>
 
-        {/* Emergency overflow banner */}
-        {isEmergency && (
+        {/* Emergency overflow banner — fee from admin settings, not hardcoded */}
+        {isEmergency && settings.commercial_emergency_enabled && (
           <div
             className="rounded-2xl px-4 py-3 mb-4"
             style={{ background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.3)' }}
           >
             <p style={{ fontSize: 12, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>
-              🚨 Emergency Overflow Selected
+              🚨 Emergency Overflow Selected — ${emergencyFee.toFixed(2)} fee
             </p>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
               Safety notes and estimated volume are required. Our team will respond within 2 hours.
+              {isPriority && (
+                <> This request will be <strong style={{ color: '#f87171' }}>prioritized at the top of the dispatch queue</strong>.</>
+              )}
+              {' '}The emergency fee is recorded for manual billing — the platform does not charge your card.
+            </p>
+          </div>
+        )}
+
+        {/* Emergency disabled banner */}
+        {isEmergency && !settings.commercial_emergency_enabled && (
+          <div
+            className="rounded-2xl px-4 py-3 mb-4"
+            style={{ background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(251,191,36,0.3)' }}
+          >
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>
+              ⚠️ Emergency Pickups Temporarily Unavailable
+            </p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+              Emergency overflow pickups are currently disabled by your account manager.
+              Please select a different pickup type or contact dispatch directly.
             </p>
           </div>
         )}

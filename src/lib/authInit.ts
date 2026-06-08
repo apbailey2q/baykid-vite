@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient'
 import { useAuthStore } from '../store/authStore'
-import type { DriverComplianceStatus } from '../types'
+import type { DriverComplianceStatus, DriverPlatformStatus } from '../types'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -28,13 +28,16 @@ async function fetchProfileDirect(userId: string, accessToken: string) {
   return Array.isArray(rows) ? (rows[0] ?? null) : null
 }
 
-// Fetch the driver_profiles.status (Driver Compliance Pack V1) for the given
-// driver. Returns null for non-drivers or when no driver_profile exists yet.
-// Failure is silently swallowed so a missing row never blocks login.
-async function fetchDriverComplianceStatus(userId: string, accessToken: string): Promise<string | null> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null
+// Fetch driver_profiles.status + platform_status for the given driver.
+// Returns null fields when no row exists yet. Swallows errors so a missing
+// row never blocks login.
+async function fetchDriverProfileStatuses(
+  userId: string,
+  accessToken: string,
+): Promise<{ complianceStatus: string | null; platformStatus: string | null }> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return { complianceStatus: null, platformStatus: null }
   try {
-    const url = `${SUPABASE_URL}/rest/v1/driver_profiles?driver_id=eq.${encodeURIComponent(userId)}&select=status`
+    const url = `${SUPABASE_URL}/rest/v1/driver_profiles?driver_id=eq.${encodeURIComponent(userId)}&select=status,platform_status`
     const res = await fetch(url, {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -42,11 +45,15 @@ async function fetchDriverComplianceStatus(userId: string, accessToken: string):
         Accept: 'application/json',
       },
     })
-    if (!res.ok) return null
+    if (!res.ok) return { complianceStatus: null, platformStatus: null }
     const rows = await res.json()
-    return Array.isArray(rows) && rows[0]?.status ? String(rows[0].status) : null
+    const row = Array.isArray(rows) ? rows[0] : null
+    return {
+      complianceStatus: row?.status        ? String(row.status)          : null,
+      platformStatus:   row?.platform_status ? String(row.platform_status) : null,
+    }
   } catch {
-    return null
+    return { complianceStatus: null, platformStatus: null }
   }
 }
 
@@ -65,10 +72,31 @@ function coerceDriverComplianceStatus(v: string | null): DriverComplianceStatus 
     : null
 }
 
+const DRIVER_PLATFORM_STATUSES: ReadonlySet<DriverPlatformStatus> = new Set([
+  'active', 'warned', 'suspended', 'terminated',
+])
+
+function coerceDriverPlatformStatus(v: string | null): DriverPlatformStatus | null {
+  if (!v) return null
+  return DRIVER_PLATFORM_STATUSES.has(v as DriverPlatformStatus)
+    ? (v as DriverPlatformStatus)
+    : null
+}
+
+// Returns true if the profile belongs to a driver account — either by role or
+// by having driver_service_type set (mirrors the isDriverAccount pattern used
+// in ProtectedRoute). Both fields are fetched via fetchProfileDirect.
+function isDriverProfile(profile: Record<string, unknown> | null): boolean {
+  if (!profile) return false
+  if (profile.role === 'driver') return true
+  const dst = profile.driver_service_type
+  return dst != null && dst !== ''
+}
+
 // Read the Supabase session from localStorage WITHOUT acquiring the Web Lock.
 // This avoids the StrictMode double-invoke deadlock on the Web Lock.
 async function bootstrapFromStorage(): Promise<void> {
-  const { setUser, setProfile, setDriverComplianceStatus, setLoading } = useAuthStore.getState()
+  const { setUser, setProfile, setDriverComplianceStatus, setDriverPlatformStatus, setLoading } = useAuthStore.getState()
   try {
     const raw = localStorage.getItem(getStorageKey())
     if (raw) {
@@ -79,15 +107,19 @@ async function bootstrapFromStorage(): Promise<void> {
         try {
           const profile = await fetchProfileDirect(session.user.id, session.access_token)
           profile ? setProfile(profile) : setProfile(null)
-          if (profile?.role === 'driver') {
-            const status = await fetchDriverComplianceStatus(session.user.id, session.access_token)
-            setDriverComplianceStatus(coerceDriverComplianceStatus(status))
+          if (isDriverProfile(profile)) {
+            const { complianceStatus, platformStatus } =
+              await fetchDriverProfileStatuses(session.user.id, session.access_token)
+            setDriverComplianceStatus(coerceDriverComplianceStatus(complianceStatus))
+            setDriverPlatformStatus(coerceDriverPlatformStatus(platformStatus))
           } else {
             setDriverComplianceStatus(null)
+            setDriverPlatformStatus(null)
           }
         } catch {
           setProfile(null)
           setDriverComplianceStatus(null)
+          setDriverPlatformStatus(null)
         }
         return
       }
@@ -109,7 +141,7 @@ export function initAuth(): () => void {
   // and may fire after bootstrapFromStorage completes — that's fine; it is
   // always authoritative and will override any stale bootstrap state.
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    const { setUser, setProfile, setDriverComplianceStatus, clearAuth, setLoading } = useAuthStore.getState()
+    const { setUser, setProfile, setDriverComplianceStatus, setDriverPlatformStatus, clearAuth, setLoading } = useAuthStore.getState()
 
     if (session?.user) {
       setUser(session.user)
@@ -118,15 +150,19 @@ export function initAuth(): () => void {
         // the onAuthStateChange callback (which itself holds the lock).
         const profile = await fetchProfileDirect(session.user.id, session.access_token)
         profile ? setProfile(profile) : setProfile(null)
-        if (profile?.role === 'driver') {
-          const status = await fetchDriverComplianceStatus(session.user.id, session.access_token)
-          setDriverComplianceStatus(coerceDriverComplianceStatus(status))
+        if (isDriverProfile(profile)) {
+          const { complianceStatus, platformStatus } =
+            await fetchDriverProfileStatuses(session.user.id, session.access_token)
+          setDriverComplianceStatus(coerceDriverComplianceStatus(complianceStatus))
+          setDriverPlatformStatus(coerceDriverPlatformStatus(platformStatus))
         } else {
           setDriverComplianceStatus(null)
+          setDriverPlatformStatus(null)
         }
       } catch {
         setProfile(null)
         setDriverComplianceStatus(null)
+        setDriverPlatformStatus(null)
       }
     } else {
       clearAuth()

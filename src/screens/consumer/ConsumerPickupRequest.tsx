@@ -93,18 +93,26 @@ export default function ConsumerPickupRequest() {
   const { user }  = useAuthStore()
 
   // ── Operations settings (pickup window + fees) ────────────────────────────
-  const { settings } = useOperationsSettings()
+  const { settings, isLoading: settingsLoading } = useOperationsSettings()
 
-  // Determine pickup category at render time based on current clock vs admin window.
-  // This is recalculated on each render; the actual category is passed to DB on submit.
+  // Recalculated on every render so it always reflects the live admin window.
   const inFreeWindow = isInFreePickupWindow(settings)
 
-  // 'gate' mode: show the outside-window interstitial before the wizard begins.
-  // 'free' | 'convenience' | 'scheduled': the chosen pickup category.
+  // 'gate'         — outside free window, no explicit choice yet
+  // 'free'         — within free window (auto or user clicked "proceed free")
+  // 'convenience'  — user chose the convenience (fee) option
+  // 'scheduled'    — user chose to schedule for the next free window
   type WindowChoice = 'gate' | 'free' | 'convenience' | 'scheduled'
-  const [windowChoice, setWindowChoice] = useState<WindowChoice>(inFreeWindow ? 'free' : 'gate')
 
-  // Derived: what pickup_category do we write to DB?
+  // Store only the user's explicit override. null means "derive from settings."
+  // This prevents stale state: if settings are still loading (hook returns
+  // DEFAULT_OPERATIONS_SETTINGS), we keep showing 'gate'; once real settings
+  // arrive and inFreeWindow recalculates, the derived value updates automatically.
+  const [userChoice, setUserChoice] = useState<'convenience' | 'scheduled' | 'free' | null>(null)
+  const windowChoice: WindowChoice =
+    userChoice ?? ((!settingsLoading && inFreeWindow) ? 'free' : 'gate')
+
+  // Derived: what pickup_category / fee do we write to DB on submit?
   const pickupCategory = windowChoice === 'convenience' ? 'convenience' : 'free'
   const convenienceFee = windowChoice === 'convenience' ? settings.consumer_convenience_fee : null
 
@@ -155,40 +163,46 @@ export default function ConsumerPickupRequest() {
     setSaving(true)
     setError(null)
 
-    // L.2 H1 — gate on service-area before insert. Out-of-zone TN ZIPs
-    // (Memphis, Knoxville, etc.) silently succeeded before this check.
-    const trimmedZip = zip.trim()
-    if (trimmedZip) {
-      const area = await checkZipInServiceArea(trimmedZip)
-      if (!area.inService) {
-        setSaving(false)
-        setError(`We don't serve ZIP ${trimmedZip} yet. Join the waitlist from your dashboard to be notified when we expand.`)
+    try {
+      // L.2 H1 — gate on service-area before insert. Out-of-zone TN ZIPs
+      // (Memphis, Knoxville, etc.) silently succeeded before this check.
+      // Wrapped in try/catch so a network failure surfaces a clean message
+      // rather than leaving the spinner running indefinitely.
+      const trimmedZip = zip.trim()
+      if (trimmedZip) {
+        const area = await checkZipInServiceArea(trimmedZip)
+        if (!area.inService) {
+          setError(`We don't serve ZIP ${trimmedZip} yet. Join the waitlist from your dashboard to be notified when we expand.`)
+          return
+        }
+      }
+
+      const { error: dbErr } = await supabase.from('consumer_pickups').insert({
+        user_id:          user.id,
+        preferred_date:   preferredDate,
+        time_window:      timeWindow,
+        address_line1:    address1.trim(),
+        address_city:     city.trim(),
+        address_state:    state,
+        address_zip:      zip.trim(),
+        material_codes:   materialCodes,
+        notes:            notes.trim() || null,
+        pickup_category:  pickupCategory,
+        convenience_fee:  convenienceFee,
+      })
+
+      if (dbErr) {
+        setError(dbErr.message)
         return
       }
+
+      navigate('/dashboard/consumer?pickupRequested=1')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Pickup request failed. Please try again.')
+    } finally {
+      // Always clear the loading spinner regardless of success or error path.
+      setSaving(false)
     }
-
-    const { error: dbErr } = await supabase.from('consumer_pickups').insert({
-      user_id:          user.id,
-      preferred_date:   preferredDate,
-      time_window:      timeWindow,
-      address_line1:    address1.trim(),
-      address_city:     city.trim(),
-      address_state:    state,
-      address_zip:      zip.trim(),
-      material_codes:   materialCodes,
-      notes:            notes.trim() || null,
-      pickup_category:  pickupCategory,
-      convenience_fee:  convenienceFee,
-    })
-
-    setSaving(false)
-
-    if (dbErr) {
-      setError(dbErr.message)
-      return
-    }
-
-    navigate('/dashboard/consumer?pickupRequested=1')
   }
 
   // ── Step content ──────────────────────────────────────────────────────────
@@ -400,7 +414,7 @@ export default function ConsumerPickupRequest() {
             {settings.consumer_convenience_enabled && (
               <button
                 type="button"
-                onClick={() => setWindowChoice('convenience')}
+                onClick={() => setUserChoice('convenience')}
                 style={{
                   background:   'rgba(0,200,255,0.07)',
                   border:       '1px solid rgba(0,200,255,0.3)',
@@ -425,7 +439,7 @@ export default function ConsumerPickupRequest() {
             {settings.consumer_next_free_visible && (
               <button
                 type="button"
-                onClick={() => setWindowChoice('scheduled')}
+                onClick={() => setUserChoice('scheduled')}
                 style={{
                   background:   'rgba(255,255,255,0.04)',
                   border:       '1px solid rgba(255,255,255,0.12)',
@@ -449,7 +463,7 @@ export default function ConsumerPickupRequest() {
             {!settings.consumer_convenience_enabled && !settings.consumer_next_free_visible && (
               <button
                 type="button"
-                onClick={() => setWindowChoice('free')}
+                onClick={() => setUserChoice('free')}
                 style={{
                   background:   'rgba(0,200,255,0.07)',
                   border:       '1px solid rgba(0,200,255,0.3)',

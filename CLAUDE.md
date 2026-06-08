@@ -6,6 +6,77 @@ Read it before making any changes to auth, routing, payments, or user roles.
 ---
 
 ## ════════════════════════════════════════════════════════
+## MANAGEMENT ONBOARDING SYSTEM (Phase MG.1 — 2026-06-08)
+## ════════════════════════════════════════════════════════
+
+### Four New Management Roles
+
+| Role | Department | Routes |
+|------|-----------|--------|
+| `operations_manager` | Operations | `/management/dashboard`, driver/dispatch oversight |
+| `compliance_manager` | Compliance | `/management/dashboard`, approvals + audits |
+| `community_fundraising_manager` | Fundraising | `/management/dashboard`, fundraiser + nonprofit |
+| `municipal_relations_manager` | Municipal | `/management/dashboard`, city contracts + gov partnerships |
+
+`warehouse_manager` and `executive` (pre-existing) are also treated as management personnel — they go through the management wizard then route to their existing dashboards post-onboarding.
+
+### Management Routes
+
+| Path | Screen | Notes |
+|------|--------|-------|
+| `/management/onboarding` | `ManagementOnboardingWizard` | 20-step wizard; required before dashboard access |
+| `/management/dashboard` | `ManagementDashboard` | Snapshot hub; redirects to wizard if not completed |
+| `/management/training` | `ManagementTrainingCenter` | 10-module re-certification; requires onboarding complete |
+
+All three routes are in `routePermissions.ts` under `MANAGEMENT_ROLES` group.
+
+### Management Onboarding Wizard — 20 Steps
+
+Personal Info → Emergency Contact → Position Assignment → Management Expectations → Company Mission → Leadership Standards → Code of Conduct → Anti-Harassment → Data Privacy → Confidentiality Agreement → System Access Agreement → Operations Overview → Incident Response → Compliance Overview → Reporting Procedures → **Certification Exam (20 Q, 80% pass)** → Digital Signature → Final Review → Manager Acknowledgment → Awaiting Executive Approval
+
+### OnboardingDispatcher Routing
+
+`MANAGEMENT_ONBOARDING_ROLES` set in `OnboardingDispatcher.tsx` is checked **before** warehouse roles so `warehouse_manager` goes through the management wizard, not the frontline warehouse wizard.
+
+### Management Training Modules (10 modules, `mgmt_` prefix)
+
+`mgmt_company_overview` | `mgmt_leadership` | `mgmt_osha_safety` | `mgmt_epa_compliance` | `mgmt_driver_ops` | `mgmt_warehouse_ops` | `mgmt_data_security` | `mgmt_financial_controls` | `mgmt_incident_investigations` | `mgmt_ethics`
+
+Version constant: `MANAGEMENT_TRAINING_VERSION = 'management-v1-2026'`
+
+### Database Migration: `20260703000001_management_onboarding.sql`
+
+Four new tables with RLS (`public.is_admin()` pattern, same as warehouse):
+
+| Table | Purpose |
+|-------|---------|
+| `management_profiles` | Identity + classification + certification status |
+| `management_permissions` | Granular capability flags (admin-controlled) |
+| `management_onboarding_progress` | Wizard state + assessment results + digital signature |
+| `management_training_completions` | Per-module training quiz records (`onConflict: profile_id,module_id`) |
+
+Migration also extends `profiles.role` CHECK constraint to include the four new management roles. **Not yet applied to remote** — apply with `supabase db query --linked --file supabase/migrations/20260703000001_management_onboarding.sql`.
+
+### TypeScript Types Added (src/types/index.ts)
+
+`ManagementType` | `ManagementDepartment` | `ManagementStatus` | `ManagementProfile` | `ManagementPermissions`
+
+### Key Files — Management Onboarding System
+
+| File | Purpose |
+|------|---------|
+| `src/screens/management/ManagementOnboardingWizard.tsx` | 20-step onboarding wizard |
+| `src/screens/management/ManagementDashboard.tsx` | Management hub (snapshot cards, placeholder data) |
+| `src/screens/management/ManagementTrainingCenter.tsx` | 10-module re-certification training |
+| `src/screens/management/managementTrainingData.ts` | Training module definitions + quiz questions |
+| `src/lib/auth.ts` | `getRoleDashboardPath` + `normalizeRole` updated for 4 new roles |
+| `src/screens/admin/UserManagement.tsx` | `ROLE_LABELS` updated for 4 new roles |
+| `src/screens/onboarding/OnboardingDispatcher.tsx` | `MANAGEMENT_ONBOARDING_ROLES` set, checked before warehouse |
+| `supabase/migrations/20260703000001_management_onboarding.sql` | 4 new tables + role CHECK extension |
+
+---
+
+## ════════════════════════════════════════════════════════
 ## COMMERCIAL DRIVER ACCESS MODEL (Directive v1 — 2026-07-01)
 ## ════════════════════════════════════════════════════════
 

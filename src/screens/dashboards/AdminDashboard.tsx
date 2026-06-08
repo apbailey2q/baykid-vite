@@ -199,7 +199,7 @@ export default function AdminDashboard() {
             color:           opUrgent > 0 ? '#f97316' : opOpen > 0 ? '#fbbf24' : '#4ade80',
             textDecoration:  'none',
           }}
-          title="Review route issues, driver coverage needs, document issues, warehouse staffing, and commercial pickup alerts."
+          title="Review route issues, driver coverage needs, document issues, warehouse staffing, and commercial pickup alerts. Manual notification checks available inside."
         >
           🔔 Operational Notifications
           {opUrgent > 0 && (
@@ -212,6 +212,9 @@ export default function AdminDashboard() {
               {opOpen} open
             </span>
           )}
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: 'rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '1px 5px' }}>
+            ⚙ checks
+          </span>
         </Link>
         <Link
           to="/dashboard/admin/moderation-center"

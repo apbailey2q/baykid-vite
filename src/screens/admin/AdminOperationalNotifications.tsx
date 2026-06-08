@@ -21,6 +21,17 @@ import {
   resolveOperationalNotification,
   dismissOperationalNotification,
 } from '../../lib/operationalNotifications'
+import {
+  runAllNotificationAutomationChecks,
+  runOverdueRouteNotificationCheck,
+  runDriversNeededNotificationCheck,
+  runDocumentIssueNotificationCheck,
+  runWarehouseStaffingNotificationCheck,
+  runCommercialPickupIssueNotificationCheck,
+  runAdminReviewRequiredNotificationCheck,
+  type TriggerResult,
+  type AllTriggersResult,
+} from '../../lib/notificationAutomationTriggers'
 
 // ── Color palette (matches MG.5 / ComplianceGateBanner) ──────────────────────
 
@@ -120,12 +131,78 @@ const TABS: TabDef[] = [
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+// ── Per-trigger run state ─────────────────────────────────────────────────────
+
+interface TriggerMeta {
+  key:    string
+  label:  string
+  icon:   string
+  run:    () => Promise<TriggerResult>
+}
+
+const TRIGGERS: TriggerMeta[] = [
+  { key: 'overdueRoutes',          label: 'Overdue Routes',          icon: '🗺️', run: runOverdueRouteNotificationCheck },
+  { key: 'driversNeeded',          label: 'Drivers Needed',          icon: '🚗', run: runDriversNeededNotificationCheck },
+  { key: 'documentIssues',         label: 'Document Issues',         icon: '📄', run: runDocumentIssueNotificationCheck },
+  { key: 'warehouseStaffing',      label: 'Warehouse Staffing',      icon: '🏭', run: runWarehouseStaffingNotificationCheck },
+  { key: 'commercialPickupIssues', label: 'Commercial Pickup Issues', icon: '🏢', run: runCommercialPickupIssueNotificationCheck },
+  { key: 'adminReviewRequired',    label: 'Admin Review Required',   icon: '🔍', run: runAdminReviewRequiredNotificationCheck },
+]
+
 export default function AdminOperationalNotifications() {
   const [tab,      setTab]      = useState<TabId>('open')
   const [events,   setEvents]   = useState<OperationalNotificationEvent[]>([])
   const [loading,  setLoading]  = useState(false)
   const [flash,    setFlash]    = useState<{ text: string; ok: boolean } | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
+
+  // ── Manual check run state ────────────────────────────────────────────────
+  const [showChecks,   setShowChecks]   = useState(false)
+  const [runningAll,   setRunningAll]   = useState(false)
+  const [runningKey,   setRunningKey]   = useState<string | null>(null)
+  const [allResult,    setAllResult]    = useState<AllTriggersResult | null>(null)
+  const [singleResults, setSingleResults] = useState<Record<string, TriggerResult>>({})
+
+  async function handleRunAll() {
+    setRunningAll(true)
+    setAllResult(null)
+    setSingleResults({})
+    try {
+      const result = await runAllNotificationAutomationChecks()
+      setAllResult(result)
+      showFlash(
+        result.ok
+          ? `✅ All checks complete — ${result.totalCreated} new notification${result.totalCreated === 1 ? '' : 's'} created`
+          : '⚠️ Some checks encountered errors — see details below',
+        result.ok
+      )
+      await load()
+    } finally {
+      setRunningAll(false)
+    }
+  }
+
+  async function handleRunSingle(trigger: TriggerMeta) {
+    setRunningKey(trigger.key)
+    setSingleResults(prev => {
+      const next = { ...prev }
+      delete next[trigger.key]
+      return next
+    })
+    try {
+      const result = await trigger.run()
+      setSingleResults(prev => ({ ...prev, [trigger.key]: result }))
+      showFlash(
+        result.ok
+          ? `${trigger.icon} ${trigger.label}: ${result.createdCount ?? 0} created`
+          : `${trigger.icon} ${trigger.label}: error — ${result.error ?? 'unknown'}`,
+        result.ok
+      )
+      await load()
+    } finally {
+      setRunningKey(null)
+    }
+  }
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
@@ -256,6 +333,94 @@ export default function AdminOperationalNotifications() {
             {flash.text}
           </div>
         )}
+
+        {/* ── Run Notification Checks section ─────────────────────────────── */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,200,255,0.12)' }}>
+          {/* Collapsible header */}
+          <button
+            onClick={() => setShowChecks(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3 text-left transition-all"
+            style={{ color: '#00c8ff' }}
+          >
+            <span className="text-sm font-bold tracking-wide">⚙️ Run Notification Checks</span>
+            <span className="text-xs font-semibold" style={{ color: 'rgba(0,200,255,0.55)' }}>
+              {showChecks ? '▲ hide' : '▼ show'}
+            </span>
+          </button>
+
+          {showChecks && (
+            <div className="px-5 pb-5 space-y-4">
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                Manually trigger operational checks against the live database.
+                Dedup is enforced — running again will not create duplicate notifications.
+              </p>
+
+              {/* Run All button */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRunAll}
+                  disabled={runningAll || runningKey !== null}
+                  className="px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-40"
+                  style={{ background: 'rgba(0,200,255,0.13)', border: '1px solid rgba(0,200,255,0.32)', color: '#00c8ff' }}
+                >
+                  {runningAll ? '⟳ Running all…' : '▶ Run All Checks'}
+                </button>
+                {allResult && (
+                  <span className="text-xs font-semibold"
+                    style={{ color: allResult.ok ? '#4ade80' : '#f87171' }}>
+                    {allResult.ok
+                      ? `${allResult.totalCreated} created`
+                      : `partial error`}
+                  </span>
+                )}
+              </div>
+
+              {/* Per-trigger buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {TRIGGERS.map(trigger => {
+                  const res      = singleResults[trigger.key]
+                  const allRes   = allResult ? (allResult as unknown as Record<string, TriggerResult>)[trigger.key] : undefined
+                  const displayed = res ?? allRes
+                  const isRunning = runningKey === trigger.key
+                  return (
+                    <div key={trigger.key}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    >
+                      <span className="text-base">{trigger.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-white truncate">{trigger.label}</p>
+                        {displayed && (
+                          <p className="text-xs mt-0.5"
+                            style={{ color: displayed.ok ? '#4ade80' : '#f87171' }}>
+                            {displayed.ok
+                              ? `${displayed.createdCount ?? 0} created${displayed.skippedCount ? ` · ${displayed.skippedCount} skipped` : ''}`
+                              : displayed.error ?? 'error'}
+                          </p>
+                        )}
+                        {displayed?.notes && (
+                          <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.3)' }}
+                            title={displayed.notes}>
+                            {displayed.notes}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleRunSingle(trigger)}
+                        disabled={isRunning || runningAll || runningKey !== null}
+                        className="shrink-0 px-2 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+                        style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.2)', color: '#00c8ff' }}
+                      >
+                        {isRunning ? '⟳' : '▶'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Tabs */}
         <div className="flex overflow-x-auto gap-1 pb-1" style={{ scrollbarWidth: 'none' }}>

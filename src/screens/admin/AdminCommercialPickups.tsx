@@ -34,7 +34,7 @@ interface PickupRow {
   pickup_location: string | null
   safety_notes: string | null
   contact_person: string
-  priority: boolean
+  priority_level: string | null
   assigned_warehouse: string | null
   created_at: string
   commercial_accounts: {
@@ -153,7 +153,7 @@ export default function AdminCommercialPickups() {
     const [pickupsRes, driversRes] = await Promise.all([
       supabase
         .from('commercial_pickups')
-        .select('id, account_id, driver_id, status, pickup_type, material_type, estimated_volume, bin_count, preferred_window, business_name, pickup_location, safety_notes, contact_person, priority, assigned_warehouse, created_at, commercial_accounts ( business_name, contact_name, contact_phone )')
+        .select('id, account_id, driver_id, status, pickup_type, material_type, estimated_volume, bin_count, preferred_window, business_name, pickup_location, safety_notes, contact_person, priority_level, assigned_warehouse, created_at, commercial_accounts ( business_name, contact_name, contact_phone )')
         .order('created_at', { ascending: false }),
       supabase
         .from('profiles')
@@ -291,19 +291,21 @@ export default function AdminCommercialPickups() {
     }
   }
 
-  async function togglePriority(pickupId: string, current: boolean) {
+  async function togglePriority(pickupId: string, currentLevel: string | null) {
     setWorking(pickupId)
+    const isHigh = currentLevel === 'high' || currentLevel === 'emergency'
+    const next   = isHigh ? 'normal' : 'high'
     try {
       const { error } = await supabase
         .from('commercial_pickups')
-        .update({ priority: !current })
+        .update({ priority_level: next })
         .eq('id', pickupId)
       if (error) throw error
 
       setPickups(prev => prev.map(p =>
-        p.id === pickupId ? { ...p, priority: !current } : p
+        p.id === pickupId ? { ...p, priority_level: next } : p
       ))
-      showToast(current ? 'Priority removed' : 'Marked as priority ✓')
+      showToast(isHigh ? 'Priority removed' : 'Marked as priority ✓')
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Failed to update priority')
     } finally {
@@ -512,7 +514,7 @@ export default function AdminCommercialPickups() {
                   className="rounded-2xl overflow-hidden"
                   style={{
                     background: 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${pickup.priority && !isDone ? 'rgba(251,191,36,0.3)' : CARD_BORDER[pickup.status]}`,
+                    border: `1px solid ${(pickup.priority_level === 'high' || pickup.priority_level === 'emergency') && !isDone ? 'rgba(251,191,36,0.3)' : CARD_BORDER[pickup.status]}`,
                   }}
                 >
                   {/* ── Card header (tap to expand) ── */}
@@ -531,7 +533,7 @@ export default function AdminCommercialPickups() {
                           <p style={{ fontSize: 14, fontWeight: 700, color: isDone ? 'rgba(255,255,255,0.4)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {name}
                           </p>
-                          {pickup.priority && !isDone && (
+                          {(pickup.priority_level === 'high' || pickup.priority_level === 'emergency') && !isDone && (
                             <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
                               PRIORITY
                             </span>
@@ -586,7 +588,7 @@ export default function AdminCommercialPickups() {
                           { label: 'Contact',    value: pickup.contact_person                     },
                           { label: 'Driver',     value: driverName ?? 'Unassigned'               },
                           { label: 'Warehouse',  value: pickup.assigned_warehouse ?? 'Not assigned' },
-                          { label: 'Priority',   value: pickup.priority ? 'Yes' : 'No'           },
+                          { label: 'Priority',   value: pickup.priority_level ?? 'normal'         },
                           { label: 'Submitted',  value: formatDate(pickup.created_at)             },
                         ].map(row => (
                           <div key={row.label}>
@@ -725,9 +727,9 @@ export default function AdminCommercialPickups() {
                                 size="sm"
                                 variant="secondary"
                                 disabled={isBusy}
-                                onClick={() => togglePriority(pickup.id, pickup.priority)}
+                                onClick={() => togglePriority(pickup.id, pickup.priority_level)}
                               >
-                                {pickup.priority ? '⭐ Remove Priority' : '⭐ Mark Priority'}
+                                {(pickup.priority_level === 'high' || pickup.priority_level === 'emergency') ? '⭐ Remove Priority' : '⭐ Mark Priority'}
                               </PrimaryButton>
                             </div>
                             <div className="flex-1">

@@ -173,6 +173,8 @@ const CommercialDocuments          = lazy(() => import('./screens/commercial/Com
 const CommercialContracts          = lazy(() => import('./screens/commercial/CommercialContracts'))
 // CO.4 — Commercial contract signature screen
 const CommercialContractSignature  = lazy(() => import('./screens/commercial/CommercialContractSignature'))
+// CO.5 — Commercial contract print view
+const CommercialContractPrintView  = lazy(() => import('./screens/commercial/CommercialContractPrintView'))
 
 // ─ Admin ──────────────────────────────────────────────────────────────────────
 // Phase G.7 — AdminDashboardPage archived to src/screens/dev/; /admin-dashboard redirects to /dashboard/admin.
@@ -453,6 +455,8 @@ function App() {
               <Route path="/commercial/contracts"                     element={<ProtectedRoute requireApproved><CommercialContracts /></ProtectedRoute>} />
               {/* CO.4 — Contract signature screen */}
               <Route path="/commercial/contracts/sign/:contractId"   element={<ProtectedRoute requireApproved><CommercialContractSignature /></ProtectedRoute>} />
+              {/* CO.5 — Contract print/PDF view */}
+              <Route path="/commercial/contracts/print/:contractId"  element={<ProtectedRoute requireApproved><CommercialContractPrintView /></ProtectedRoute>} />
 
               {/* Admin commercial */}
               <Route path="/dashboard/admin/commercial"               element={<ProtectedRoute requireApproved><AdminCommercialDashboard /></ProtectedRoute>} />

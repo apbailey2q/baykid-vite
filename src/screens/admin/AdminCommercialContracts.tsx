@@ -45,6 +45,15 @@ import {
   type SignContractInput as _SignContractInput,
 } from '../../lib/commercialContractSignatures'
 import {
+  copyCommercialContractSummary,
+  downloadCommercialContractSummary,
+  buildContractQAChecklist,
+  downloadRenewalAuditReport,
+  type QAChecklist,
+} from '../../lib/commercialContractExports'
+import { CommercialContractQAChecklist } from '../../components/commercial/CommercialContractQAChecklist'
+import { ContractSignatureCertificate }  from '../../components/commercial/ContractSignatureCertificate'
+import {
   CONTRACT_STATUS_LABEL,
   CONTRACT_STATUS_COLOR,
   SIGNATURE_STATUS_LABEL,
@@ -181,6 +190,11 @@ function ContractCard({
   onStatusChange,
   onViewHistory,
   onSendForSignature,
+  onPrint,
+  onCopySummary,
+  onDownloadSummary,
+  onQAChecklist,
+  onSigCertificate,
 }: {
   contract:           CommercialContract
   businessName?:      string
@@ -190,6 +204,11 @@ function ContractCard({
   onStatusChange:     (c: CommercialContract) => void
   onViewHistory:      (c: CommercialContract) => void
   onSendForSignature: (c: CommercialContract) => void
+  onPrint:            (c: CommercialContract) => void
+  onCopySummary:      (c: CommercialContract) => void
+  onDownloadSummary:  (c: CommercialContract) => void
+  onQAChecklist:      (c: CommercialContract) => void
+  onSigCertificate:   (c: CommercialContract) => void
 }) {
   const days         = daysUntilExpiry(contract.end_date)
   const expiringSoon = isContractExpiringSoon(contract.end_date)
@@ -287,6 +306,17 @@ function ContractCard({
         )}
         <button onClick={() => onViewHistory(contract)}   style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>📅 History</button>
       </div>
+
+      {/* CO.5 — export / QA action row */}
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <button onClick={() => onPrint(contract)}           style={{ padding: '4px 10px', borderRadius: 7, fontSize: 10, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer' }}>🖨️ Print</button>
+        <button onClick={() => onCopySummary(contract)}     style={{ padding: '4px 10px', borderRadius: 7, fontSize: 10, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer' }}>📋 Copy</button>
+        <button onClick={() => onDownloadSummary(contract)} style={{ padding: '4px 10px', borderRadius: 7, fontSize: 10, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer' }}>⬇️ Download</button>
+        <button onClick={() => onQAChecklist(contract)}     style={{ padding: '4px 10px', borderRadius: 7, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24', cursor: 'pointer' }}>🔍 QA Checklist</button>
+        {contract.signature_status === 'signed' && (
+          <button onClick={() => onSigCertificate(contract)} style={{ padding: '4px 10px', borderRadius: 7, fontSize: 10, fontWeight: 700, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa', cursor: 'pointer' }}>📜 Sig Certificate</button>
+        )}
+      </div>
     </div>
   )
 }
@@ -329,6 +359,9 @@ export default function AdminCommercialContracts() {
   // CO.4 renewal check
   const [renewalNeeded,  setRenewalNeeded]  = useState<CommercialContract[]>([])
   const [renewCheckBusy, setRenewCheckBusy] = useState(false)
+  // CO.5 export / QA modals
+  const [qaModal,        setQaModal]        = useState<{ contract: CommercialContract; checklist: QAChecklist } | null>(null)
+  const [certModal,      setCertModal]      = useState<{ contract: CommercialContract; signature: CommercialContractSignature } | null>(null)
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -540,6 +573,44 @@ export default function AdminCommercialContracts() {
     }
   }, [user, showToast, loadAll])
 
+  // ── CO.5 Export / QA handlers ─────────────────────────────────────────────────
+
+  const handlePrint = useCallback((c: CommercialContract) => {
+    window.open(`/commercial/contracts/print/${c.id}`, '_blank', 'noopener,noreferrer')
+  }, [])
+
+  const handleCopySummary = useCallback(async (c: CommercialContract) => {
+    // Fetch latest signature for the copy
+    const sigResult = await getCommercialContractSignatures(c.id)
+    const sig = sigResult.data?.[0] ?? null
+    const result = await copyCommercialContractSummary(c, sig)
+    showToast(result.ok ? 'Contract summary copied to clipboard' : (result.error ?? 'Copy failed'))
+  }, [showToast])
+
+  const handleDownloadSummary = useCallback(async (c: CommercialContract) => {
+    const sigResult = await getCommercialContractSignatures(c.id)
+    const sig = sigResult.data?.[0] ?? null
+    downloadCommercialContractSummary(c, sig)
+    showToast('Summary downloaded')
+  }, [showToast])
+
+  const handleQAChecklist = useCallback((c: CommercialContract) => {
+    const checklist = buildContractQAChecklist(c)
+    setQaModal({ contract: c, checklist })
+  }, [])
+
+  const handleSigCertificate = useCallback(async (c: CommercialContract) => {
+    const sigResult = await getCommercialContractSignatures(c.id)
+    const sig = sigResult.data?.[0] ?? null
+    if (!sig) { showToast('No signature record found'); return }
+    setCertModal({ contract: c, signature: sig })
+  }, [showToast])
+
+  const handleDownloadRenewalAudit = useCallback(() => {
+    downloadRenewalAuditReport(contracts)
+    showToast('Renewal audit report downloaded')
+  }, [contracts, showToast])
+
   // ── Open edit modal ────────────────────────────────────────────────────────────
 
   const openEdit = useCallback((c: CommercialContract) => {
@@ -604,6 +675,14 @@ export default function AdminCommercialContracts() {
                 style={{ padding: '9px 16px', borderRadius: 12, fontSize: 12, fontWeight: 700, background: renewCheckBusy ? 'rgba(255,255,255,0.05)' : 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', cursor: renewCheckBusy ? 'default' : 'pointer' }}
               >
                 {renewCheckBusy ? '⏳ Checking…' : '🔍 Run Renewal Check'}
+              </button>
+              {/* CO.5 — Download Renewal Audit Report */}
+              <button
+                onClick={handleDownloadRenewalAudit}
+                disabled={contracts.length === 0}
+                style={{ padding: '9px 16px', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.55)', cursor: contracts.length === 0 ? 'default' : 'pointer' }}
+              >
+                ⬇️ Renewal Audit
               </button>
               <PrimaryButton onClick={openCreate}>+ New Contract</PrimaryButton>
             </div>
@@ -698,6 +777,11 @@ export default function AdminCommercialContracts() {
               onStatusChange={c2 => { setStatusModal(c2); setNewStatus(c2.status); setStatusReason('') }}
               onViewHistory={handleViewHistory}
               onSendForSignature={handleSendForSignature}
+              onPrint={handlePrint}
+              onCopySummary={c2 => { void handleCopySummary(c2) }}
+              onDownloadSummary={c2 => { void handleDownloadSummary(c2) }}
+              onQAChecklist={handleQAChecklist}
+              onSigCertificate={c2 => { void handleSigCertificate(c2) }}
             />
           ))
         )}
@@ -1114,6 +1198,46 @@ export default function AdminCommercialContracts() {
               >
                 {working ? 'Sending…' : 'Send Request'}
               </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          CO.5 — QA CHECKLIST MODAL
+      ════════════════════════════════════════════ */}
+      {qaModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 9998, padding: '24px 16px', overflowY: 'auto' }}>
+          <div style={{ background: '#1a1f2e', borderRadius: 20, padding: 24, width: '100%', maxWidth: 500, border: '1px solid rgba(251,191,36,0.25)', marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0 }}>🔍 QA Checklist</p>
+              <button onClick={() => setQaModal(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '0 0 16px' }}>{qaModal.contract.contract_title}</p>
+            <CommercialContractQAChecklist checklist={qaModal.checklist} />
+            <div style={{ marginTop: 16 }}>
+              <PrimaryButton fullWidth variant="secondary" onClick={() => setQaModal(null)}>Close</PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          CO.5 — SIGNATURE CERTIFICATE MODAL
+      ════════════════════════════════════════════ */}
+      {certModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 9998, padding: '24px 16px', overflowY: 'auto' }}>
+          <div style={{ background: '#1a1f2e', borderRadius: 20, padding: 24, width: '100%', maxWidth: 580, border: '1px solid rgba(139,92,246,0.3)', marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0 }}>📜 Signature Certificate</p>
+              <button onClick={() => setCertModal(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <ContractSignatureCertificate
+              signature={certModal.signature}
+              contract={certModal.contract}
+            />
+            <div style={{ marginTop: 16 }}>
+              <PrimaryButton fullWidth variant="secondary" onClick={() => setCertModal(null)}>Close</PrimaryButton>
             </div>
           </div>
         </div>

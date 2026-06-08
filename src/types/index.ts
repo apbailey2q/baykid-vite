@@ -139,25 +139,37 @@ export interface CommercialBin {
 }
 
 export interface CommercialPickup {
-  id: string
-  account_id: string
-  driver_id: string | null
-  status: CommercialPickupStatus
-  pickup_type: string
-  material_type: string
-  estimated_volume: string
-  bin_count: number
-  preferred_window: string
-  business_name: string | null
-  pickup_location: string | null
-  building_suite: string | null
-  loading_dock_notes: string | null
-  gate_notes: string | null
-  safety_notes: string | null
-  contact_person: string
-  scheduled_at: string | null
-  completed_at: string | null
-  created_at: string
+  id:                  string
+  account_id:          string | null
+  driver_id:           string | null
+  // Use CommercialPickupStatusG5 for G5-era records; CommercialPickupStatus for legacy
+  status:              CommercialPickupStatusG5 | CommercialPickupStatus
+  priority_level:      CommercialPickupPriority  // low | normal | high | emergency
+  pickup_type:         string
+  material_type:       string | null
+  estimated_volume:    number | null
+  bin_count:           number
+  preferred_window:    string | null    // customer-requested time window
+  pickup_window:       string | null    // legacy alias for preferred_window
+  business_name:       string | null
+  pickup_location:     string | null
+  building_suite:      string | null
+  loading_dock_notes:  string | null
+  gate_notes:          string | null
+  safety_notes:        string | null
+  contact_person:      string | null
+  assigned_warehouse:  string | null    // warehouse code (text) for dispatch display
+  assigned_warehouse_id: string | null  // warehouse UUID FK
+  // G5 fields
+  scheduled_at:        string | null
+  completed_at:        string | null
+  submitted_at:        string | null
+  submitted_by:        string | null
+  preferred_date:      string | null
+  special_instructions: string | null
+  container_count:     number
+  created_at:          string
+  updated_at:          string | null
 }
 
 export interface CommercialInvoice {

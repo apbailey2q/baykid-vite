@@ -31,6 +31,11 @@ import {
   getCommercialContractSignatures,
 } from '../../lib/commercialContractSignatures'
 import {
+  downloadCommercialContractSummary,
+  copyCommercialContractSummary,
+} from '../../lib/commercialContractExports'
+import { ContractSignatureCertificate } from '../../components/commercial/ContractSignatureCertificate'
+import {
   CONTRACT_STATUS_LABEL,
   CONTRACT_STATUS_COLOR,
   SIGNATURE_STATUS_LABEL,
@@ -118,6 +123,11 @@ export default function CommercialContracts() {
   const [latestSig,      setLatestSig]      = useState<CommercialContractSignature | null>(null)
   const [allSignatures,  setAllSignatures]  = useState<CommercialContractSignature[]>([])
   const [showSigHistory, setShowSigHistory] = useState(false)
+  // CO.5 export / cert
+  const [showCertModal,  setShowCertModal]  = useState(false)
+  const [toast,          setToast]          = useState<string | null>(null)
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -608,6 +618,47 @@ export default function CommercialContracts() {
           >
             📞 Contact Support About Contract
           </PrimaryButton>
+
+          {/* CO.5 — export actions (only for real contracts) */}
+          {!isPlaceholder && (
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => window.open(`/commercial/contracts/print/${contract.id}`, '_blank', 'noopener,noreferrer')}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                >
+                  🖨️ Print Contract
+                </button>
+                <button
+                  onClick={async () => {
+                    downloadCommercialContractSummary(contract, latestSig)
+                    showToast('Summary downloaded')
+                  }}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                >
+                  ⬇️ Download Summary
+                </button>
+                <button
+                  onClick={async () => {
+                    const result = await copyCommercialContractSummary(contract, latestSig)
+                    showToast(result.ok ? 'Copied to clipboard' : (result.error ?? 'Copy failed'))
+                  }}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                >
+                  📋 Copy Summary
+                </button>
+              </div>
+              {/* Signature certificate — only when signed */}
+              {contract.signature_status === 'signed' && latestSig && (
+                <button
+                  onClick={() => setShowCertModal(true)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa', cursor: 'pointer' }}
+                >
+                  📜 Signature Certificate
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         {/* ── Disclaimer ── */}
@@ -617,6 +668,30 @@ export default function CommercialContracts() {
         </p>
 
       </div>
+
+      {/* ── CO.5 Signature Certificate Modal ── */}
+      {showCertModal && latestSig && contract && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 9998, padding: '24px 16px', overflowY: 'auto' }}>
+          <div style={{ background: '#1a1f2e', borderRadius: 20, padding: 24, width: '100%', maxWidth: 580, border: '1px solid rgba(139,92,246,0.3)', marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0 }}>📜 Signature Certificate</p>
+              <button onClick={() => setShowCertModal(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <ContractSignatureCertificate signature={latestSig} contract={contract} />
+            <div style={{ marginTop: 16 }}>
+              <PrimaryButton fullWidth variant="secondary" onClick={() => setShowCertModal(false)}>Close</PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)', background: '#1a1f2e', border: '1px solid rgba(0,200,255,0.3)', borderRadius: 12, padding: '10px 20px', color: '#fff', fontSize: 13, fontWeight: 700, zIndex: 10000, whiteSpace: 'nowrap' }}>
+          {toast}
+        </div>
+      )}
+
     </AppShell>
   )
 }

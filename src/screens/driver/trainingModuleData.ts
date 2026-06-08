@@ -2,7 +2,7 @@
 //
 // Exports two training programs:
 //   CONSUMER_TRAINING_MODULES — 5 modules for residential/consumer drivers
-//   COMMERCIAL_TRAINING_MODULES — 5 modules for commercial route drivers
+//   COMMERCIAL_TRAINING_MODULES — Commercial route drivers receive the approved commercial training set for the active training version.
 //
 // Use getTrainingModules(isCommercial) to retrieve the correct set.
 //

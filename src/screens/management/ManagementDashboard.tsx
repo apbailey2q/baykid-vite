@@ -16,7 +16,7 @@
 
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import type { ManagementProfile, ComplianceDocument } from '../../types'
 import {
@@ -30,6 +30,8 @@ import {
   getCountdownLabel,
 } from '../../lib/documentExpiration'
 import ComplianceNotificationCenter from '../../components/notifications/ComplianceNotificationCenter'
+import ComplianceGateBanner from '../../components/compliance/ComplianceGateBanner'
+import { computeGateStatus } from '../../lib/complianceGate'
 
 const BRAND        = '#00c8ff'
 const BRAND_DIM    = 'rgba(0,200,255,0.08)'
@@ -183,6 +185,17 @@ export default function ManagementDashboard() {
     if (profile) { loadSnapshot(profile) }
   }, [profile, loadSnapshot])
 
+  // ── Phase MG.5 — compliance gate (pure, from pre-loaded docs) ────────────
+  // Admin users always get 'clear' so the banner never shows for them.
+  const gateResult = useMemo(
+    () => role === 'admin' ? {
+      ok: true, status: 'clear' as const, blocked: false,
+      severity: 'info' as const, title: '', message: '',
+    } : computeGateStatus(complianceDocs),
+    [complianceDocs, role]
+  )
+  const blocked = gateResult.blocked
+
   // ── Loading spinner ────────────────────────────────────────────────────────
   if (checking) {
     return (
@@ -232,8 +245,13 @@ export default function ManagementDashboard() {
 
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
+        {/* ── Phase MG.5 — Compliance Gate Banner ── */}
+        {profile && gateResult.status !== 'clear' && (
+          <ComplianceGateBanner gateResult={gateResult} />
+        )}
+
         {/* ── Quick nav links ── */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3" style={blocked ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
           <Link
             to="/management/training"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
@@ -263,6 +281,25 @@ export default function ManagementDashboard() {
             🛡️ Admin Center
           </Link>
         </div>
+
+        {/* Blocked state: show call-to-action replacing the snapshot sections */}
+        {blocked && (
+          <div className="p-5 rounded-2xl text-center"
+            style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)' }}>
+            <p className="text-sm font-bold mb-1" style={{ color: '#f87171' }}>
+              Management Access Suspended
+            </p>
+            <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Resolve the compliance issues above to restore full access.
+            </p>
+            <Link
+              to="/management/documents"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:brightness-110"
+              style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', textDecoration: 'none' }}>
+              📂 Go to Documents & Reactivation
+            </Link>
+          </div>
+        )}
 
         {/* ── Live Status Snapshot — Phase MG.3 ── */}
         {profile && (

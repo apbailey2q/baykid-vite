@@ -10,6 +10,8 @@ import { ToastProvider } from './components/ui/Toast'
 import { PWAInstallPrompt } from './components/ui/PWAInstallPrompt'
 import { RequireAuth } from './components/RequireAuth'
 import { RequireRole } from './components/RequireRole'
+// Phase MG.5 — Compliance enforcement gate (route guard for management routes)
+import { ManagementComplianceGuard } from './components/compliance/ManagementComplianceGuard'
 
 // ── Loading fallback ───────────────────────────────────────────────────────────
 // Shown while any lazy-loaded screen chunk is downloading.
@@ -474,11 +476,14 @@ function App() {
               <Route path="/onboarding/commercial"           element={<ProtectedRoute><CommercialOnboardingG4 /></ProtectedRoute>} />
               <Route path="/onboarding/warehouse"            element={<ProtectedRoute><WarehouseOnboardingV2 /></ProtectedRoute>} />
               {/* Phase MG.1 — Management Onboarding System lives under /management/* */}
+              {/* /management/onboarding — always accessible (fix path); NOT wrapped in ManagementComplianceGuard */}
               <Route path="/management/onboarding"            element={<ProtectedRoute><ManagementOnboardingWizard /></ProtectedRoute>} />
-              <Route path="/management/dashboard"             element={<ProtectedRoute requireApproved><ManagementDashboard /></ProtectedRoute>} />
-              <Route path="/management/training"              element={<ProtectedRoute requireApproved><ManagementTrainingCenter /></ProtectedRoute>} />
+              {/* Phase MG.5 — dashboard + training + agreement-compliance are gated by ManagementComplianceGuard */}
+              {/* Deactivated users are redirected to /management/documents by the guard */}
+              <Route path="/management/dashboard"             element={<ProtectedRoute requireApproved><ManagementComplianceGuard><ManagementDashboard /></ManagementComplianceGuard></ProtectedRoute>} />
+              <Route path="/management/training"              element={<ProtectedRoute requireApproved><ManagementComplianceGuard><ManagementTrainingCenter /></ManagementComplianceGuard></ProtectedRoute>} />
               {/* Phase MG.2 — Agreement Compliance admin overview */}
-              <Route path="/management/agreement-compliance"  element={<ProtectedRoute requireApproved><ManagementAgreementCompliance /></ProtectedRoute>} />
+              <Route path="/management/agreement-compliance"  element={<ProtectedRoute requireApproved><ManagementComplianceGuard><ManagementAgreementCompliance /></ManagementComplianceGuard></ProtectedRoute>} />
               {/* Phase MG.3 — Admin management roster with approval controls */}
               <Route path="/admin/management-onboarding"      element={<ProtectedRoute requireApproved><AdminManagementOnboarding /></ProtectedRoute>} />
               {/* Phase MG.4 — Compliance document review + management documents */}

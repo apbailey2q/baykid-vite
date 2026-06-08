@@ -76,7 +76,20 @@ function filterDocs(docs: ComplianceDocument[], tab: TabKey): ComplianceDocument
 
 // ── Action panel state ────────────────────────────────────────────────────────
 
-type ActionType = 'approve' | 'reject' | 'mark_missing' | 'start_countdown' | 'cancel_countdown' | 'reactivate' | 'add_note'
+// Phase MG.5 additions: approve_reactivation, deny_reactivation, extend_countdown, finalize_deactivation
+type ActionType =
+  | 'approve'
+  | 'reject'
+  | 'mark_missing'
+  | 'start_countdown'
+  | 'cancel_countdown'
+  | 'reactivate'
+  | 'add_note'
+  // MG.5
+  | 'approve_reactivation'
+  | 'deny_reactivation'
+  | 'extend_countdown'
+  | 'finalize_deactivation'
 
 interface PendingAction {
   docId:       string
@@ -88,13 +101,19 @@ interface PendingAction {
 }
 
 const ACTION_DEFS: { type: ActionType; label: string; icon: string; color: string; requiresNote: boolean }[] = [
-  { type: 'approve',         label: 'Approve',         icon: '✅', color: SUCCESS, requiresNote: false },
-  { type: 'reject',          label: 'Reject',          icon: '🚫', color: DANGER,  requiresNote: true  },
-  { type: 'mark_missing',    label: 'Mark Missing',    icon: '❌', color: WARN,    requiresNote: false },
-  { type: 'start_countdown', label: 'Start Countdown', icon: '⏱️', color: ORANGE,  requiresNote: false },
-  { type: 'cancel_countdown',label: 'Cancel Countdown',icon: '↩️', color: PURPLE,  requiresNote: false },
-  { type: 'reactivate',      label: 'Reactivate',      icon: '🔄', color: BRAND,   requiresNote: false },
-  { type: 'add_note',        label: 'Add Note',        icon: '📝', color: 'rgba(255,255,255,0.7)', requiresNote: true },
+  // Existing actions
+  { type: 'approve',              label: 'Approve',              icon: '✅', color: SUCCESS,                        requiresNote: false },
+  { type: 'reject',               label: 'Reject',               icon: '🚫', color: DANGER,                         requiresNote: true  },
+  { type: 'mark_missing',         label: 'Mark Missing',         icon: '❌', color: WARN,                           requiresNote: false },
+  { type: 'start_countdown',      label: 'Start Countdown',      icon: '⏱️', color: ORANGE,                         requiresNote: false },
+  { type: 'cancel_countdown',     label: 'Cancel Countdown',     icon: '↩️', color: PURPLE,                         requiresNote: false },
+  { type: 'reactivate',           label: 'Reactivate',           icon: '🔄', color: BRAND,                          requiresNote: false },
+  { type: 'add_note',             label: 'Add Note',             icon: '📝', color: 'rgba(255,255,255,0.7)',         requiresNote: true  },
+  // Phase MG.5 — reactivation controls
+  { type: 'approve_reactivation', label: 'Approve Reactivation', icon: '✅', color: SUCCESS,                        requiresNote: false },
+  { type: 'deny_reactivation',    label: 'Deny Reactivation',    icon: '🚫', color: DANGER,                         requiresNote: true  },
+  { type: 'extend_countdown',     label: 'Extend +24h',          icon: '⏳', color: ORANGE,                         requiresNote: false },
+  { type: 'finalize_deactivation',label: 'Finalize Deactivation',icon: '🔒', color: DANGER,                         requiresNote: false },
 ]
 
 const STATUS_COLOR: Record<ComplianceDocumentStatus, string> = {
@@ -228,14 +247,18 @@ export default function AdminDocumentReview() {
           break
 
         case 'start_countdown': {
-          const deactivationAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+          // MG.5 fix: only set deactivation_countdown_started_at here.
+          // temporary_deactivation_at is set separately via 'finalize_deactivation'
+          // or 'extend_countdown'. This ensures the countdown is visible to the user
+          // before they're actually deactivated.
+          const scheduledDeactivationAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
           updates.deactivation_countdown_started_at = now
-          updates.temporary_deactivation_at         = deactivationAt
+          updates.temporary_deactivation_at         = scheduledDeactivationAt  // scheduled (future)
           await createCountdownStartedNotification({
             recipientUserId:  ownerId,
             ownerType:        ownerType as import('../../types').OwnerType,
             documentTitle:    docTitle,
-            deactivationDate: deactivationAt,
+            deactivationDate: scheduledDeactivationAt,
             documentId:       docId,
             actionUrl:        '/management/documents',
           })
@@ -268,6 +291,119 @@ export default function AdminDocumentReview() {
             ownerType:       ownerType as import('../../types').OwnerType,
           })
           break
+
+        // ── Phase MG.5 — Reactivation controls ───────────────────────────────
+
+        case 'approve_reactivation': {
+          // Approve: resolve deactivation event + restore doc compliance + notify
+          updates.reactivated_at                    = now
+          updates.temporary_deactivation_at         = null
+          updates.deactivation_countdown_started_at = null
+          updates.status                            = 'approved'
+          updates.reviewed_by                       = user.id
+          updates.reviewed_at                       = now
+
+          // Mark the deactivation event resolved
+          await supabase
+            .from('compliance_deactivation_events')
+            .update({ status: 'resolved', resolved_at: now })
+            .eq('owner_user_id', ownerId)
+            .eq('owner_type', ownerType)
+            .in('status', ['active', 'reactivation_pending'])
+
+          await createReactivationNotification({
+            recipientUserId: ownerId,
+            ownerType:       ownerType as import('../../types').OwnerType,
+          })
+          break
+        }
+
+        case 'deny_reactivation': {
+          // Deny: keep deactivation active, reset event from reactivation_pending → active
+          await supabase
+            .from('compliance_deactivation_events')
+            .update({ status: 'active' })
+            .eq('owner_user_id', ownerId)
+            .eq('owner_type', ownerType)
+            .eq('status', 'reactivation_pending')
+
+          const reason = actionNote.trim()
+          await createComplianceNotification({
+            recipientUserId:  ownerId,
+            ownerType:        ownerType as import('../../types').OwnerType,
+            notificationType: 'temporary_deactivation',
+            severity:         'critical',
+            title:            'Reactivation Request Denied',
+            message:          `Your reactivation request for ${docTitle} was reviewed and denied by Cyan's Brooklynn Recycling.${reason ? ` Reason: ${reason}` : ''} Please correct the outstanding issues and submit a new request.`,
+            relatedDocumentId: docId,
+            actionRequired:   true,
+            actionUrl:        '/management/documents',
+          })
+          break
+        }
+
+        case 'extend_countdown': {
+          // Extend: push temporary_deactivation_at forward by 24 hours
+          const doc = docs.find(d => d.id === docId)
+          const currentDeact = doc?.temporary_deactivation_at
+          const newDeact = currentDeact
+            ? new Date(new Date(currentDeact).getTime() + 24 * 60 * 60 * 1000).toISOString()
+            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          updates.temporary_deactivation_at = newDeact
+
+          await createComplianceNotification({
+            recipientUserId:  ownerId,
+            ownerType:        ownerType as import('../../types').OwnerType,
+            notificationType: 'countdown_started',
+            severity:         'warning',
+            title:            'Deactivation Countdown Extended',
+            message:          `Cyan's Brooklynn Recycling has extended your compliance deadline for ${docTitle} by 24 hours. Please upload the required document immediately.`,
+            relatedDocumentId: docId,
+            actionRequired:   true,
+            actionUrl:        '/management/documents',
+          })
+          break
+        }
+
+        case 'finalize_deactivation': {
+          // Finalize: mark the user as actually deactivated now
+          updates.temporary_deactivation_at = now
+
+          // Create or update the deactivation event
+          const { data: existingEvents } = await supabase
+            .from('compliance_deactivation_events')
+            .select('id')
+            .eq('owner_user_id', ownerId)
+            .eq('owner_type', ownerType)
+            .in('status', ['active', 'reactivation_pending'])
+            .limit(1)
+
+          if (!existingEvents || existingEvents.length === 0) {
+            await supabase.from('compliance_deactivation_events').insert({
+              owner_user_id:          ownerId,
+              owner_type:             ownerType,
+              reason:                 `Required document missing or expired: ${docTitle}`,
+              trigger_document_id:    docId,
+              status:                 'active',
+              started_at:             now,
+              temporary_deactivation_at: now,
+              created_by:             user.id,
+            })
+          }
+
+          await createComplianceNotification({
+            recipientUserId:  ownerId,
+            ownerType:        ownerType as import('../../types').OwnerType,
+            notificationType: 'temporary_deactivation',
+            severity:         'critical',
+            title:            'Account Temporarily Deactivated',
+            message:          `Your management access has been temporarily deactivated due to a missing or expired required document: ${docTitle}. Upload the required document and request reactivation review at Cyan's Brooklynn Recycling.`,
+            relatedDocumentId: docId,
+            actionRequired:   true,
+            actionUrl:        '/management/documents',
+          })
+          break
+        }
 
         case 'add_note':
           updates.review_notes = actionNote.trim()

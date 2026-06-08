@@ -35,11 +35,20 @@ import {
   cancelCommercialContract,
   getCommercialContractHistory,
   createCommercialContractRenewalAlert,
+  markExpiredCommercialContracts,
+  getContractsNeedingRenewalReview,
   type CreateContractInput,
 } from '../../lib/commercialContracts'
 import {
+  requestCommercialContractSignature,
+  getCommercialContractSignatures,
+  type SignContractInput as _SignContractInput,
+} from '../../lib/commercialContractSignatures'
+import {
   CONTRACT_STATUS_LABEL,
   CONTRACT_STATUS_COLOR,
+  SIGNATURE_STATUS_LABEL,
+  SIGNATURE_STATUS_COLOR,
   SERVICE_LEVEL_LABEL,
   PICKUP_FREQUENCY_LABEL,
   ACTION_TYPE_LABEL,
@@ -48,6 +57,7 @@ import {
   isContractExpired,
   type CommercialContract,
   type CommercialContractHistory,
+  type CommercialContractSignature,
   type CommercialContractStatus,
   type CommercialContractServiceLevel,
   type CommercialContractPickupFrequency,
@@ -170,14 +180,16 @@ function ContractCard({
   onCancel,
   onStatusChange,
   onViewHistory,
+  onSendForSignature,
 }: {
-  contract:      CommercialContract
-  businessName?: string
-  onEdit:        (c: CommercialContract) => void
-  onRenew:       (c: CommercialContract) => void
-  onCancel:      (c: CommercialContract) => void
-  onStatusChange:(c: CommercialContract) => void
-  onViewHistory: (c: CommercialContract) => void
+  contract:           CommercialContract
+  businessName?:      string
+  onEdit:             (c: CommercialContract) => void
+  onRenew:            (c: CommercialContract) => void
+  onCancel:           (c: CommercialContract) => void
+  onStatusChange:     (c: CommercialContract) => void
+  onViewHistory:      (c: CommercialContract) => void
+  onSendForSignature: (c: CommercialContract) => void
 }) {
   const days         = daysUntilExpiry(contract.end_date)
   const expiringSoon = isContractExpiringSoon(contract.end_date)
@@ -199,7 +211,25 @@ function ContractCard({
             {SERVICE_LEVEL_LABEL[contract.service_level]} · {PICKUP_FREQUENCY_LABEL[contract.pickup_frequency]}
           </p>
         </div>
-        <StatusBadge variant={statusVariant(contract.status)} label={CONTRACT_STATUS_LABEL[contract.status]} size="sm" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+          <StatusBadge variant={statusVariant(contract.status)} label={CONTRACT_STATUS_LABEL[contract.status]} size="sm" />
+          {/* CO.4 — signature status badge */}
+          {contract.signature_status !== 'not_requested' && (
+            <span style={{
+              padding:       '2px 8px',
+              borderRadius:  999,
+              fontSize:      9,
+              fontWeight:    800,
+              background:    SIGNATURE_STATUS_COLOR[contract.signature_status] + '22',
+              border:        `1px solid ${SIGNATURE_STATUS_COLOR[contract.signature_status]}55`,
+              color:         SIGNATURE_STATUS_COLOR[contract.signature_status],
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}>
+              {SIGNATURE_STATUS_LABEL[contract.signature_status]}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Key facts row */}
@@ -245,6 +275,10 @@ function ContractCard({
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button onClick={() => onEdit(contract)}          style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(0,200,255,0.1)',  border: '1px solid rgba(0,200,255,0.25)',  color: '#00c8ff',  cursor: 'pointer' }}>✏️ Edit</button>
         <button onClick={() => onStatusChange(contract)}  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24', cursor: 'pointer' }}>🔀 Status</button>
+        {/* CO.4 — Send for Signature: shown unless already signed or cancelled */}
+        {contract.status !== 'cancelled' && contract.signature_status !== 'signed' && (
+          <button onClick={() => onSendForSignature(contract)} style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', cursor: 'pointer' }}>✉️ Send for Sig</button>
+        )}
         {contract.status !== 'cancelled' && (
           <button onClick={() => onRenew(contract)}       style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(74,222,128,0.1)',  border: '1px solid rgba(74,222,128,0.25)',  color: '#4ade80',  cursor: 'pointer' }}>🔄 Renew</button>
         )}
@@ -285,9 +319,16 @@ export default function AdminCommercialContracts() {
   const [statusModal,   setStatusModal]   = useState<CommercialContract | null>(null)
   const [newStatus,     setNewStatus]     = useState<CommercialContractStatus>('active')
   const [statusReason,  setStatusReason]  = useState('')
-  const [historyModal,  setHistoryModal]  = useState<CommercialContract | null>(null)
-  const [historyRows,   setHistoryRows]   = useState<CommercialContractHistory[]>([])
-  const [histLoading,   setHistLoading]   = useState(false)
+  const [historyModal,   setHistoryModal]   = useState<CommercialContract | null>(null)
+  const [historyRows,    setHistoryRows]    = useState<CommercialContractHistory[]>([])
+  const [histLoading,    setHistLoading]    = useState(false)
+  // CO.4 signature
+  const [sigModal,       setSigModal]       = useState<CommercialContract | null>(null)
+  const [sigHistory,     setSigHistory]     = useState<CommercialContractSignature[]>([])
+  const [sigHistLoading, setSigHistLoading] = useState(false)
+  // CO.4 renewal check
+  const [renewalNeeded,  setRenewalNeeded]  = useState<CommercialContract[]>([])
+  const [renewCheckBusy, setRenewCheckBusy] = useState(false)
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -442,10 +483,62 @@ export default function AdminCommercialContracts() {
   const handleViewHistory = useCallback(async (c: CommercialContract) => {
     setHistoryModal(c)
     setHistLoading(true)
-    const result = await getCommercialContractHistory(c.id)
-    setHistoryRows(result.data ?? [])
+    setSigHistory([])
+    const [histResult, sigResult] = await Promise.all([
+      getCommercialContractHistory(c.id),
+      getCommercialContractSignatures(c.id),
+    ])
+    setHistoryRows(histResult.data ?? [])
+    setSigHistory(sigResult.data ?? [])
     setHistLoading(false)
   }, [])
+
+  // ── CO.4 Send for Signature ───────────────────────────────────────────────────
+
+  const handleSendForSignature = useCallback(async (c: CommercialContract) => {
+    setSigModal(c)
+    setSigHistLoading(true)
+    const result = await getCommercialContractSignatures(c.id)
+    setSigHistory(result.data ?? [])
+    setSigHistLoading(false)
+  }, [])
+
+  const handleConfirmSendForSignature = useCallback(async () => {
+    if (!sigModal) return
+    setWorking(true)
+    try {
+      const result = await requestCommercialContractSignature(sigModal.id, user?.id)
+      if (result.ok) {
+        showToast('Signature request sent')
+        setSigModal(null)
+        void loadAll()
+      } else {
+        showToast(result.error ?? 'Failed to send signature request')
+      }
+    } finally {
+      setWorking(false)
+    }
+  }, [sigModal, user, showToast, loadAll])
+
+  // ── CO.4 Run Renewal Check ────────────────────────────────────────────────────
+
+  const handleRunRenewalCheck = useCallback(async () => {
+    setRenewCheckBusy(true)
+    try {
+      const [expiredResult, renewalResult] = await Promise.all([
+        markExpiredCommercialContracts(user?.id),
+        getContractsNeedingRenewalReview(30),
+      ])
+      if (expiredResult.ok && (expiredResult.data?.markedCount ?? 0) > 0) {
+        showToast(`${expiredResult.data!.markedCount} contract(s) marked expired`)
+        void loadAll()
+      }
+      setRenewalNeeded(renewalResult.data ?? [])
+      if (!expiredResult.ok) showToast(expiredResult.error ?? 'Expiry check failed')
+    } finally {
+      setRenewCheckBusy(false)
+    }
+  }, [user, showToast, loadAll])
 
   // ── Open edit modal ────────────────────────────────────────────────────────────
 
@@ -504,7 +597,16 @@ export default function AdminCommercialContracts() {
                 Create, renew, cancel, and review commercial service agreements.
               </p>
             </div>
-            <PrimaryButton onClick={openCreate}>+ New Contract</PrimaryButton>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => { void handleRunRenewalCheck() }}
+                disabled={renewCheckBusy}
+                style={{ padding: '9px 16px', borderRadius: 12, fontSize: 12, fontWeight: 700, background: renewCheckBusy ? 'rgba(255,255,255,0.05)' : 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', cursor: renewCheckBusy ? 'default' : 'pointer' }}
+              >
+                {renewCheckBusy ? '⏳ Checking…' : '🔍 Run Renewal Check'}
+              </button>
+              <PrimaryButton onClick={openCreate}>+ New Contract</PrimaryButton>
+            </div>
           </div>
 
           {/* Payment disclaimer */}
@@ -529,6 +631,26 @@ export default function AdminCommercialContracts() {
             </div>
           ))}
         </div>
+
+        {/* ── CO.4 Renewal check results banner ── */}
+        {renewalNeeded.length > 0 && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 12, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', margin: '0 0 6px' }}>
+              🕐 {renewalNeeded.length} contract{renewalNeeded.length !== 1 ? 's' : ''} need renewal review within 30 days
+            </p>
+            {renewalNeeded.map(c => (
+              <p key={c.id} style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', margin: '2px 0' }}>
+                • {c.contract_title} — ends {c.end_date ?? c.renewal_date ?? 'unknown'}
+              </p>
+            ))}
+            <button
+              onClick={() => setRenewalNeeded([])}
+              style={{ marginTop: 6, background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 11, cursor: 'pointer' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* ── Tabs ── */}
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 20, scrollbarWidth: 'none' }}>
@@ -575,6 +697,7 @@ export default function AdminCommercialContracts() {
               onCancel={c2 => { setCancelModal(c2); setCancelReason('') }}
               onStatusChange={c2 => { setStatusModal(c2); setNewStatus(c2.status); setStatusReason('') }}
               onViewHistory={handleViewHistory}
+              onSendForSignature={handleSendForSignature}
             />
           ))
         )}
@@ -903,8 +1026,94 @@ export default function AdminCommercialContracts() {
                 </div>
               ))
             )}
+            {/* CO.4 — Signature records */}
+            {sigHistory.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(139,92,246,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>✍️ Signatures</p>
+                {sigHistory.map(s => (
+                  <div key={s.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', marginBottom: 8 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', margin: '0 0 2px' }}>
+                      {s.signer_name}{s.signer_title ? ` · ${s.signer_title}` : ''}
+                    </p>
+                    {s.signer_email && (
+                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', margin: '0 0 2px' }}>{s.signer_email}</p>
+                    )}
+                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '0 0 2px' }}>
+                      Signed: {new Date(s.signed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                    <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', margin: 0 }}>Version: {s.contract_version}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{ marginTop: 16 }}>
               <PrimaryButton fullWidth variant="secondary" onClick={() => setHistoryModal(null)}>Close</PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          CO.4 — SEND FOR SIGNATURE MODAL
+      ════════════════════════════════════════════ */}
+      {sigModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998, padding: 16 }}>
+          <div style={{ background: '#1a1f2e', borderRadius: 20, padding: 24, width: '100%', maxWidth: 420, border: '1px solid rgba(139,92,246,0.3)' }}>
+            <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: '0 0 4px' }}>✉️ Send for Signature</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: '0 0 16px' }}>{sigModal.contract_title}</p>
+
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', margin: 0, lineHeight: 1.6 }}>
+                This will mark the contract as <strong style={{ color: '#a78bfa' }}>Pending Signature</strong> and notify the commercial account representative to review and sign. The representative will see a "Review & Sign" button on their contracts screen.
+              </p>
+            </div>
+
+            {/* Current signature status */}
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: '0 0 4px', fontWeight: 600 }}>Current Signature Status</p>
+              <span style={{
+                padding:       '3px 10px',
+                borderRadius:  999,
+                fontSize:      11,
+                fontWeight:    700,
+                background:    SIGNATURE_STATUS_COLOR[sigModal.signature_status] + '22',
+                border:        `1px solid ${SIGNATURE_STATUS_COLOR[sigModal.signature_status]}55`,
+                color:         SIGNATURE_STATUS_COLOR[sigModal.signature_status],
+              }}>
+                {SIGNATURE_STATUS_LABEL[sigModal.signature_status]}
+              </span>
+            </div>
+
+            {/* Existing signatures */}
+            {sigHistLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 12 }}><Spinner /></div>
+            ) : sigHistory.length > 0 ? (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 600, margin: '0 0 6px' }}>Previous Signatures ({sigHistory.length})</p>
+                {sigHistory.map(s => (
+                  <p key={s.id} style={{ fontSize: 11, color: '#a78bfa', margin: '2px 0' }}>
+                    ✍️ {s.signer_name} · {new Date(s.signed_at).toLocaleDateString()}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+
+            {sigModal.signature_status === 'signed' && (
+              <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', marginBottom: 12 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#4ade80', margin: 0 }}>✅ This contract is already signed.</p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <PrimaryButton variant="secondary" fullWidth onClick={() => setSigModal(null)}>Cancel</PrimaryButton>
+              <PrimaryButton
+                fullWidth
+                disabled={working || sigModal.signature_status === 'signed' || sigModal.status === 'cancelled'}
+                onClick={() => { void handleConfirmSendForSignature() }}
+              >
+                {working ? 'Sending…' : 'Send Request'}
+              </PrimaryButton>
             </div>
           </div>
         </div>

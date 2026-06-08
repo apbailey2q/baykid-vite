@@ -33,13 +33,35 @@ export interface ContractResult<T> {
 
 // ── Input types ───────────────────────────────────────────────────────────────
 
+// CO.4: signature_status and its sibling fields are managed exclusively by
+// commercialContractSignatures.ts — exclude them from create/update inputs so
+// the admin form's defaultForm() doesn't need to supply them.
 export type CreateContractInput = Omit<
   CommercialContract,
-  'id' | 'created_at' | 'updated_at'
+  | 'id'
+  | 'created_at'
+  | 'updated_at'
+  | 'signature_status'
+  | 'signature_requested_at'
+  | 'signature_requested_by'
+  | 'signed_at'
+  | 'signed_by'
 >
 
 export type UpdateContractInput = Partial<
-  Omit<CommercialContract, 'id' | 'account_id' | 'created_by' | 'created_at' | 'updated_at'>
+  Omit<
+    CommercialContract,
+    | 'id'
+    | 'account_id'
+    | 'created_by'
+    | 'created_at'
+    | 'updated_at'
+    | 'signature_status'
+    | 'signature_requested_at'
+    | 'signature_requested_by'
+    | 'signed_at'
+    | 'signed_by'
+  >
 >
 
 // ── Internal: write a history record ─────────────────────────────────────────
@@ -522,5 +544,122 @@ export async function createCommercialContractRenewalAlert(
   } catch (err) {
     // Non-fatal — alert creation failure should not break the calling flow
     console.warn('[commercialContracts] createCommercialContractRenewalAlert:', err)
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 12. CO.4 — Mark active contracts with a past end_date as expired (admin job)
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface ExpiredContractResult {
+  markedCount: number
+  ids:         string[]
+}
+
+export async function markExpiredCommercialContracts(
+  adminId?: string,
+): Promise<ContractResult<ExpiredContractResult>> {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    // Fetch active contracts whose end_date has passed
+    const { data: candidates, error: fetchErr } = await supabase
+      .from('commercial_contracts')
+      .select('id, account_id, contract_title, end_date, status')
+      .eq('status', 'active')
+      .not('end_date', 'is', null)
+      .lt('end_date', todayStr)
+
+    if (fetchErr) return { ok: false, error: fetchErr.message }
+    if (!candidates || candidates.length === 0) {
+      return { ok: true, data: { markedCount: 0, ids: [] } }
+    }
+
+    const ids = (candidates as { id: string }[]).map(r => r.id)
+
+    // Bulk-update to 'expired'
+    const { error: updateErr } = await supabase
+      .from('commercial_contracts')
+      .update({ status: 'expired', updated_by: adminId ?? null })
+      .in('id', ids)
+
+    if (updateErr) return { ok: false, error: updateErr.message }
+
+    // Write history records for each expired contract
+    await Promise.allSettled(
+      (candidates as { id: string; account_id: string; contract_title: string; end_date: string }[]).map(c =>
+        recordHistory(c.id, c.account_id, 'expired', {
+          previousStatus: 'active',
+          newStatus:      'expired',
+          changeSummary:  `Contract auto-expired. End date was ${c.end_date}.`,
+          changedBy:      adminId ?? null,
+        }),
+      ),
+    )
+
+    return { ok: true, data: { markedCount: ids.length, ids } }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.warn('[commercialContracts] markExpiredCommercialContracts:', msg)
+    return { ok: false, error: msg }
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 13. CO.4 — Get active contracts needing renewal review within N days
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function getContractsNeedingRenewalReview(
+  days = 30,
+): Promise<ContractResult<CommercialContract[]>> {
+  try {
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + days)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const todayStr      = new Date().toISOString().split('T')[0]
+
+    // Contracts where end_date OR renewal_date falls within [today, today+days]
+    const { data: byEndDate, error: e1 } = await supabase
+      .from('commercial_contracts')
+      .select('*')
+      .eq('status', 'active')
+      .not('end_date', 'is', null)
+      .gte('end_date', todayStr)
+      .lte('end_date', futureDateStr)
+
+    const { data: byRenewalDate, error: e2 } = await supabase
+      .from('commercial_contracts')
+      .select('*')
+      .eq('status', 'active')
+      .not('renewal_date', 'is', null)
+      .gte('renewal_date', todayStr)
+      .lte('renewal_date', futureDateStr)
+
+    if (e1) return { ok: false, error: e1.message }
+    if (e2) return { ok: false, error: e2.message }
+
+    // Deduplicate by id (a contract may appear in both result sets)
+    const seen  = new Set<string>()
+    const merged: CommercialContract[] = []
+    for (const row of [...(byEndDate ?? []), ...(byRenewalDate ?? [])]) {
+      const r = row as CommercialContract
+      if (!seen.has(r.id)) {
+        seen.add(r.id)
+        merged.push(r)
+      }
+    }
+
+    // Sort: soonest end_date first
+    merged.sort((a, b) => {
+      const da = a.end_date ?? a.renewal_date ?? '9999-12-31'
+      const db = b.end_date ?? b.renewal_date ?? '9999-12-31'
+      return da < db ? -1 : da > db ? 1 : 0
+    })
+
+    return { ok: true, data: merged }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    console.warn('[commercialContracts] getContractsNeedingRenewalReview:', msg)
+    return { ok: false, error: msg }
   }
 }

@@ -1,15 +1,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CO.3 — Commercial Contract Type Definitions & Display Helpers
+// CO.3 / CO.4 — Commercial Contract Type Definitions & Display Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// DB STATUS: commercial_contracts table created in
-//   supabase/migrations/20260715000001_commercial_contracts.sql
+// DB STATUS:
+//   commercial_contracts table: 20260715000001_commercial_contracts.sql
+//   signature columns + commercial_contract_signatures table:
+//     20260716000001_commercial_contract_signatures.sql
 //
 // These types map 1-to-1 to the DB schema (snake_case).
 // Use emptyContract() only as a UI fallback when no DB record exists.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
+
+export type CommercialContractSignatureStatus =
+  | 'not_requested'
+  | 'pending_signature'
+  | 'signed'
+  | 'declined'
+  | 'expired'
 
 export type CommercialContractStatus =
   | 'draft'
@@ -58,6 +67,31 @@ export interface CommercialContract {
   updated_by:                    string | null
   created_at:                    string
   updated_at:                    string
+  // CO.4 signature workflow fields
+  signature_status:              CommercialContractSignatureStatus
+  signature_requested_at:        string | null
+  signature_requested_by:        string | null
+  signed_at:                     string | null
+  signed_by:                     string | null
+}
+
+// ── Signature record interface ────────────────────────────────────────────────
+
+export interface CommercialContractSignature {
+  id:                   string
+  contract_id:          string
+  account_id:           string
+  signer_user_id:       string | null
+  signer_name:          string
+  signer_title:         string | null
+  signer_email:         string | null
+  signature_text:       string
+  signature_ip:         string | null
+  signature_user_agent: string | null
+  contract_version:     string
+  contract_snapshot:    Record<string, unknown>
+  signed_at:            string
+  created_at:           string
 }
 
 // ── Contract history interface ────────────────────────────────────────────────
@@ -112,6 +146,22 @@ export const PICKUP_FREQUENCY_LABEL: Record<CommercialContractPickupFrequency, s
   custom:    'Custom Schedule',
 }
 
+export const SIGNATURE_STATUS_LABEL: Record<CommercialContractSignatureStatus, string> = {
+  not_requested:     'No Signature',
+  pending_signature: 'Awaiting Signature',
+  signed:            'Signed',
+  declined:          'Declined',
+  expired:           'Signature Expired',
+}
+
+export const SIGNATURE_STATUS_COLOR: Record<CommercialContractSignatureStatus, string> = {
+  not_requested:     'rgba(255,255,255,0.3)',
+  pending_signature: '#fbbf24',
+  signed:            '#4ade80',
+  declined:          '#f87171',
+  expired:           '#94a3b8',
+}
+
 export const ACTION_TYPE_LABEL: Record<CommercialContractHistory['action_type'], string> = {
   created:        'Contract Created',
   updated:        'Contract Updated',
@@ -148,6 +198,12 @@ export function emptyContract(accountId: string): CommercialContract {
     updated_by:                    null,
     created_at:                    new Date().toISOString(),
     updated_at:                    new Date().toISOString(),
+    // CO.4 signature workflow fields
+    signature_status:              'not_requested',
+    signature_requested_at:        null,
+    signature_requested_by:        null,
+    signed_at:                     null,
+    signed_by:                     null,
   }
 }
 

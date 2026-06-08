@@ -169,8 +169,10 @@ const CommercialSupport        = lazy(() => import('./screens/commercial/Commerc
 const CommercialOnboarding        = lazy(() => import('./screens/commercial/CommercialOnboarding'))
 const CommercialBillingDashboard  = lazy(() => import('./screens/commercial/CommercialBillingDashboard'))
 // CO.2 — Commercial compliance + contracts screens
-const CommercialDocuments         = lazy(() => import('./screens/commercial/CommercialDocuments'))
-const CommercialContracts         = lazy(() => import('./screens/commercial/CommercialContracts'))
+const CommercialDocuments          = lazy(() => import('./screens/commercial/CommercialDocuments'))
+const CommercialContracts          = lazy(() => import('./screens/commercial/CommercialContracts'))
+// CO.4 — Commercial contract signature screen
+const CommercialContractSignature  = lazy(() => import('./screens/commercial/CommercialContractSignature'))
 
 // ─ Admin ──────────────────────────────────────────────────────────────────────
 // Phase G.7 — AdminDashboardPage archived to src/screens/dev/; /admin-dashboard redirects to /dashboard/admin.
@@ -447,8 +449,10 @@ function App() {
               <Route path="/dashboard/commercial/onboarding" element={<ProtectedRoute><CommercialOnboarding /></ProtectedRoute>} />
               <Route path="/dashboard/commercial/billing"   element={<ProtectedRoute requireApproved><CommercialBillingDashboard /></ProtectedRoute>} />
               {/* CO.2 — Commercial compliance + contracts (outside /dashboard/ for direct path) */}
-              <Route path="/commercial/documents"           element={<ProtectedRoute requireApproved><CommercialDocuments /></ProtectedRoute>} />
-              <Route path="/commercial/contracts"           element={<ProtectedRoute requireApproved><CommercialContracts /></ProtectedRoute>} />
+              <Route path="/commercial/documents"                     element={<ProtectedRoute requireApproved><CommercialDocuments /></ProtectedRoute>} />
+              <Route path="/commercial/contracts"                     element={<ProtectedRoute requireApproved><CommercialContracts /></ProtectedRoute>} />
+              {/* CO.4 — Contract signature screen */}
+              <Route path="/commercial/contracts/sign/:contractId"   element={<ProtectedRoute requireApproved><CommercialContractSignature /></ProtectedRoute>} />
 
               {/* Admin commercial */}
               <Route path="/dashboard/admin/commercial"               element={<ProtectedRoute requireApproved><AdminCommercialDashboard /></ProtectedRoute>} />

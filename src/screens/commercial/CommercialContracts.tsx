@@ -27,8 +27,14 @@ import {
   getCommercialContractHistory,
 } from '../../lib/commercialContracts'
 import {
+  getLatestCommercialContractSignature,
+  getCommercialContractSignatures,
+} from '../../lib/commercialContractSignatures'
+import {
   CONTRACT_STATUS_LABEL,
   CONTRACT_STATUS_COLOR,
+  SIGNATURE_STATUS_LABEL,
+  SIGNATURE_STATUS_COLOR,
   SERVICE_LEVEL_LABEL,
   PICKUP_FREQUENCY_LABEL,
   ACTION_TYPE_LABEL,
@@ -37,6 +43,7 @@ import {
   emptyContract,
   type CommercialContract,
   type CommercialContractHistory,
+  type CommercialContractSignature,
 } from '../../data/commercialContractData'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -102,11 +109,15 @@ export default function CommercialContracts() {
   const navigate  = useNavigate()
   const { user }  = useAuthStore()
 
-  const [pageState,  setPageState]  = useState<PageState>('loading')
-  const [contract,   setContract]   = useState<CommercialContract | null>(null)
-  const [allContracts, setAllContracts] = useState<CommercialContract[]>([])
-  const [history,    setHistory]    = useState<CommercialContractHistory[]>([])
-  const [showHistory, setShowHistory] = useState(false)
+  const [pageState,      setPageState]      = useState<PageState>('loading')
+  const [contract,       setContract]       = useState<CommercialContract | null>(null)
+  const [allContracts,   setAllContracts]   = useState<CommercialContract[]>([])
+  const [history,        setHistory]        = useState<CommercialContractHistory[]>([])
+  const [showHistory,    setShowHistory]    = useState(false)
+  // CO.4 signature state
+  const [latestSig,      setLatestSig]      = useState<CommercialContractSignature | null>(null)
+  const [allSignatures,  setAllSignatures]  = useState<CommercialContractSignature[]>([])
+  const [showSigHistory, setShowSigHistory] = useState(false)
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -133,10 +144,16 @@ export default function CommercialContracts() {
     setContract(active ?? emptyContract(account.id))
     setAllContracts(allResult.data ?? [])
 
-    // Load history for the active contract
+    // Load history + signature data for the active contract
     if (active?.id) {
-      const histResult = await getCommercialContractHistory(active.id)
+      const [histResult, latestSigResult, allSigsResult] = await Promise.all([
+        getCommercialContractHistory(active.id),
+        getLatestCommercialContractSignature(active.id),
+        getCommercialContractSignatures(active.id),
+      ])
       setHistory(histResult.data ?? [])
+      setLatestSig(latestSigResult.data ?? null)
+      setAllSignatures(allSigsResult.data ?? [])
     }
 
     setPageState('ready')
@@ -279,6 +296,66 @@ export default function CommercialContracts() {
             </div>
           )}
         </GlassCard></div>
+
+        {/* ── CO.4 Signature status banner ── */}
+        {!isPlaceholder && contract.signature_status !== 'not_requested' && (
+          <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 14, background: `${SIGNATURE_STATUS_COLOR[contract.signature_status]}12`, border: `1px solid ${SIGNATURE_STATUS_COLOR[contract.signature_status]}40` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: SIGNATURE_STATUS_COLOR[contract.signature_status] }}>
+                    {contract.signature_status === 'pending_signature' ? '✉️' :
+                     contract.signature_status === 'signed'            ? '✅' :
+                     contract.signature_status === 'declined'          ? '❌' : '⏰'}{' '}
+                    {SIGNATURE_STATUS_LABEL[contract.signature_status]}
+                  </span>
+                </div>
+
+                {contract.signature_status === 'pending_signature' && (
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: '0 0 10px', lineHeight: 1.5 }}>
+                    Your service agreement is ready for your review and signature. Please sign before your contract can be activated.
+                  </p>
+                )}
+                {contract.signature_status === 'signed' && latestSig && (
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>
+                    Signed by <strong style={{ color: '#4ade80' }}>{latestSig.signer_name}</strong>
+                    {latestSig.signer_title ? ` (${latestSig.signer_title})` : ''}
+                    {' '}on {new Date(latestSig.signed_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
+                  </p>
+                )}
+                {contract.signature_status === 'declined' && (
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+                    You declined this contract. Please contact Cyan&apos;s Brooklynn Recycling for next steps.
+                  </p>
+                )}
+                {contract.signature_status === 'expired' && (
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+                    The signature request expired. A new request may be sent by your account manager.
+                  </p>
+                )}
+              </div>
+              {contract.signature_status === 'pending_signature' && (
+                <button
+                  onClick={() => navigate(`/commercial/contracts/sign/${contract.id}`)}
+                  style={{
+                    padding:      '8px 16px',
+                    borderRadius: 10,
+                    fontSize:     12,
+                    fontWeight:   800,
+                    background:   'rgba(251,191,36,0.15)',
+                    border:       '1px solid rgba(251,191,36,0.4)',
+                    color:        '#fbbf24',
+                    cursor:       'pointer',
+                    flexShrink:   0,
+                    whiteSpace:   'nowrap',
+                  }}
+                >
+                  Review & Sign →
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Service details ── */}
         <div style={{ ...GLASS, marginBottom: 16 }}>
@@ -433,6 +510,43 @@ export default function CommercialContracts() {
           </div>
         )}
 
+        {/* ── CO.4 Signature history ── */}
+        {!isPlaceholder && allSignatures.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={() => setShowSigHistory(p => !p)}
+              style={{
+                width: '100%', padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
+                background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)',
+                color: '#a78bfa', fontSize: 13, fontWeight: 700, textAlign: 'left',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              <span>✍️ Signature Records</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                {showSigHistory ? '▲ Hide' : `▼ Show (${allSignatures.length})`}
+              </span>
+            </button>
+            {showSigHistory && (
+              <div style={{ borderRadius: '0 0 12px 12px', border: '1px solid rgba(139,92,246,0.2)', borderTop: 'none', padding: '8px 16px' }}>
+                {allSignatures.map(s => (
+                  <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', margin: '0 0 2px' }}>
+                      {s.signer_name}{s.signer_title ? ` · ${s.signer_title}` : ''}
+                    </p>
+                    {s.signer_email && (
+                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: '0 0 2px' }}>{s.signer_email}</p>
+                    )}
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+                      Signed {new Date(s.signed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · v{s.contract_version}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── All contracts ── */}
         {allContracts.length > 1 && (
           <div style={{ ...GLASS, marginBottom: 16 }}>
@@ -471,6 +585,15 @@ export default function CommercialContracts() {
 
         {/* ── Actions ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* CO.4 — primary sign action shown prominently at bottom too */}
+          {!isPlaceholder && contract.signature_status === 'pending_signature' && (
+            <PrimaryButton
+              fullWidth
+              onClick={() => navigate(`/commercial/contracts/sign/${contract.id}`)}
+            >
+              ✍️ Review & Sign Contract
+            </PrimaryButton>
+          )}
           <PrimaryButton
             fullWidth
             variant="secondary"

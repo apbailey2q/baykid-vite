@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
+import { acknowledgePermissionDisclosure } from '../lib/complianceCenter'
 
 const CONTAINER_ID = 'html5-qr-container'
 
@@ -18,6 +19,11 @@ export function QrScanner({ onScan, onPermissionDenied }: Props) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    // Apple App Store compliance — record that the user has been exposed to
+    // the camera-use rationale. Best-effort; never blocks scanner startup
+    // (a connectivity drop should not prevent QR scanning).
+    void acknowledgePermissionDisclosure('camera').catch(() => { /* safe-fail */ })
+
     const scanner = new Html5Qrcode(CONTAINER_ID)
     let scanned = false
     let started = false

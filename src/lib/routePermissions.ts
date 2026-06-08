@@ -206,6 +206,17 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/moderation-center':              ['admin', 'compliance_manager'],
   // Apple Sprint C activation — admin-configurable thresholds (ops_manager read-only via RLS)
   '/dashboard/admin/compliance-settings':            ['admin', 'compliance_manager', 'operations_manager'],
+  // Sprint D — enterprise safety center + executive risk dashboard
+  '/dashboard/admin/safety-center':                  ['admin', 'compliance_manager', 'operations_manager'],
+  '/dashboard/admin/risk':                           ['admin', 'executive', 'compliance_manager', 'operations_manager'],
+  // /safety/report — any authenticated user
+  '/safety/report': [
+    'admin','consumer','commercial','driver',
+    ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES,
+    'partner','fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES,
+    'municipal_viewer','municipal_manager','city_admin',
+    'investor_viewer','regional_admin','city_manager',
+  ],
   '/settings/blocked-users': [
     'admin','consumer','commercial','driver',
     ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES,

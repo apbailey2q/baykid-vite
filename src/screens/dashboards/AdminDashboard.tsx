@@ -232,6 +232,22 @@ export default function AdminDashboard() {
         >
           ⚙️ Compliance Settings
         </Link>
+        <Link
+          to="/dashboard/admin/risk"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.32)', color: '#fca5a5', textDecoration: 'none' }}
+          title="Executive snapshot of compliance and operational risk across the platform."
+        >
+          📊 Risk Dashboard
+        </Link>
+        <Link
+          to="/dashboard/admin/safety-center"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.32)', color: '#c084fc', textDecoration: 'none' }}
+          title="Triage incidents, complaints, investigations, violations, fraud flags, and legal holds."
+        >
+          🚨 Safety Center
+        </Link>
       </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"

@@ -434,3 +434,335 @@ export type SprintCNotificationType =
   | 'insurance_expiring'
   | 'vehicle_inspection_expiring'
   | 'training_expiring'
+
+// ════════════════════════════════════════════════════════════════════════════
+// Enterprise Safety + Compliance (Sprint D) — incidents, complaints,
+// investigations, violations, scores, rules engine, fraud flags, legal holds
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Incidents ──────────────────────────────────────────────────────────────
+
+export type IncidentType =
+  | 'vehicle_accident' | 'injury' | 'near_miss' | 'slip_fall'
+  | 'chemical_spill' | 'hazardous_waste' | 'fire' | 'explosion'
+  | 'unsafe_condition' | 'aggressive_customer' | 'property_damage'
+  | 'vehicle_damage' | 'equipment_failure' | 'warehouse_incident'
+  | 'medical_emergency' | 'weather_event' | 'animal_attack'
+  | 'needle_discovery' | 'biohazard_discovery' | 'other'
+
+export const INCIDENT_TYPE_LABELS: Record<IncidentType, string> = {
+  vehicle_accident: 'Vehicle Accident', injury: 'Injury', near_miss: 'Near Miss',
+  slip_fall: 'Slip / Fall', chemical_spill: 'Chemical Spill',
+  hazardous_waste: 'Hazardous Waste Discovery', fire: 'Fire', explosion: 'Explosion',
+  unsafe_condition: 'Unsafe Condition', aggressive_customer: 'Aggressive Customer',
+  property_damage: 'Property Damage', vehicle_damage: 'Vehicle Damage',
+  equipment_failure: 'Equipment Failure', warehouse_incident: 'Warehouse Incident',
+  medical_emergency: 'Medical Emergency', weather_event: 'Weather Event',
+  animal_attack: 'Animal Attack', needle_discovery: 'Needle Discovery',
+  biohazard_discovery: 'Biohazard Discovery', other: 'Other',
+}
+
+export type IncidentSeverity = 'low' | 'moderate' | 'high' | 'critical'
+export type IncidentStatus = 'open' | 'under_review' | 'escalated' | 'investigating' | 'resolved' | 'closed'
+
+export interface IncidentReport {
+  id:                          string
+  reporter_id:                 string
+  subject_user_id:             string | null
+  incident_type:               IncidentType
+  severity:                    IncidentSeverity
+  status:                      IncidentStatus
+  location_label:              string | null
+  warehouse_id:                string | null
+  vehicle_id:                  string | null
+  occurred_at:                 string
+  description:                 string
+  immediate_action:            string | null
+  injuries_reported:           boolean
+  property_damage:             boolean
+  emergency_services_called:   boolean
+  assigned_to:                 string | null
+  resolved_at:                 string | null
+  resolution_notes:            string | null
+  metadata:                    Record<string, unknown>
+  created_at:                  string
+  updated_at:                  string
+}
+
+export interface IncidentEvidence {
+  id:          string
+  incident_id: string
+  uploaded_by: string | null
+  kind:        'photo' | 'document' | 'witness_note' | 'video' | 'other'
+  file_url:    string | null
+  note:        string | null
+  created_at:  string
+}
+
+// ── Complaints ─────────────────────────────────────────────────────────────
+
+export type ComplaintCategory =
+  | 'missed_pickup' | 'unsafe_driving' | 'property_damage'
+  | 'employee_misconduct' | 'driver_misconduct' | 'warehouse_complaint'
+  | 'service_quality' | 'contamination' | 'customer_service' | 'fraud' | 'other'
+
+export const COMPLAINT_CATEGORY_LABELS: Record<ComplaintCategory, string> = {
+  missed_pickup: 'Missed Pickup', unsafe_driving: 'Unsafe Driving',
+  property_damage: 'Property Damage', employee_misconduct: 'Employee Misconduct',
+  driver_misconduct: 'Driver Misconduct', warehouse_complaint: 'Warehouse Complaint',
+  service_quality: 'Service Quality', contamination: 'Contamination Issue',
+  customer_service: 'Customer Service', fraud: 'Fraud', other: 'Other',
+}
+
+export type ComplaintStatus = 'open' | 'reviewing' | 'investigating' | 'findings' | 'resolved' | 'closed'
+
+export interface Complaint {
+  id:                   string
+  reporter_id:          string | null
+  subject_user_id:      string | null
+  category:             ComplaintCategory
+  status:               ComplaintStatus
+  severity:             IncidentSeverity
+  description:          string
+  related_route_id:     string | null
+  related_warehouse_id: string | null
+  related_account_id:   string | null
+  resolution:           string | null
+  resolved_at:          string | null
+  metadata:             Record<string, unknown>
+  created_at:           string
+  updated_at:           string
+}
+
+// ── Investigations ─────────────────────────────────────────────────────────
+
+export type InvestigationStatus = 'open' | 'active' | 'findings' | 'closed'
+
+export interface Investigation {
+  id:                  string
+  complaint_id:        string | null
+  incident_id:         string | null
+  opened_by:           string | null
+  assigned_to:         string | null
+  status:              InvestigationStatus
+  findings:            string | null
+  recommended_actions: string | null
+  closed_at:           string | null
+  closed_by:           string | null
+  metadata:            Record<string, unknown>
+  created_at:          string
+  updated_at:          string
+}
+
+// ── Violation points ───────────────────────────────────────────────────────
+
+export type ViolationType =
+  | 'late_pickup' | 'missed_pickup' | 'route_incomplete'
+  | 'customer_complaint' | 'repeated_scan_failure'
+  | 'unsafe_conduct' | 'fraud_attempt' | 'theft_allegation' | 'admin_assigned'
+
+export const VIOLATION_TYPE_LABELS: Record<ViolationType, string> = {
+  late_pickup: 'Late Pickup', missed_pickup: 'Missed Pickup',
+  route_incomplete: 'Route Incomplete', customer_complaint: 'Customer Complaint',
+  repeated_scan_failure: 'Repeated Scan Failure', unsafe_conduct: 'Unsafe Conduct',
+  fraud_attempt: 'Fraud Attempt', theft_allegation: 'Theft Allegation',
+  admin_assigned: 'Admin Assigned',
+}
+
+export const VIOLATION_POINT_DEFAULTS: Record<ViolationType, number> = {
+  late_pickup: 1, missed_pickup: 2, route_incomplete: 3,
+  customer_complaint: 3, repeated_scan_failure: 2,
+  unsafe_conduct: 5, fraud_attempt: 10, theft_allegation: 0,   // review required
+  admin_assigned: 0,
+}
+
+export const VIOLATION_THRESHOLDS = {
+  warning:               5,
+  probation:            10,
+  temporary_suspension: 15,
+  administrative_review: 20,
+} as const
+
+export interface ViolationPoint {
+  id:                  string
+  user_id:             string
+  violation_type:      ViolationType
+  points:              number
+  reason:              string | null
+  issued_by:           string | null
+  related_entity_type: string | null
+  related_entity_id:   string | null
+  cleared:             boolean
+  cleared_at:          string | null
+  cleared_by:          string | null
+  cleared_reason:      string | null
+  created_at:          string
+}
+
+// ── Scores ──────────────────────────────────────────────────────────────────
+
+export type ComplianceRiskLevel = 'excellent' | 'good' | 'watch_list' | 'high_risk'
+
+export const RISK_LEVEL_LABELS: Record<ComplianceRiskLevel, string> = {
+  excellent: 'Excellent', good: 'Good', watch_list: 'Watch List', high_risk: 'High Risk',
+}
+
+export interface ComplianceScore {
+  user_id:     string
+  score:       number               // 0-100
+  risk_level:  ComplianceRiskLevel
+  factors:     Record<string, unknown>
+  computed_at: string
+}
+
+export type PerformanceRating = 'gold' | 'silver' | 'bronze' | 'probation'
+
+export interface PerformanceScore {
+  user_id:               string
+  acceptance_rate:       number | null
+  completion_rate:       number | null
+  attendance_rate:       number | null
+  scan_accuracy:         number | null
+  customer_satisfaction: number | null
+  safety_score:          number | null
+  compliance_score:      number | null
+  rating:                PerformanceRating
+  computed_at:           string
+}
+
+// ── Training renewals ──────────────────────────────────────────────────────
+
+export type TrainingRenewalCadence = 'annual' | 'biennial' | 'policy_change' | 'one_time'
+export type TrainingRenewalStatus  = 'current' | 'due_soon' | 'overdue' | 'renewed'
+
+export interface TrainingRenewal {
+  id:                string
+  user_id:           string
+  training_key:      string
+  cadence:           TrainingRenewalCadence
+  last_completed_at: string | null
+  next_due_at:       string | null
+  policy_version:    string | null
+  acknowledged_at:   string | null
+  status:            TrainingRenewalStatus
+  metadata:          Record<string, unknown>
+  created_at:        string
+  updated_at:        string
+}
+
+// ── Rules engine ───────────────────────────────────────────────────────────
+
+export interface StateRule {
+  id:             string
+  state_code:     string
+  rule_key:       string
+  rule_value:     Record<string, unknown>
+  notes:          string | null
+  effective_from: string | null
+  effective_to:   string | null
+  updated_at:     string
+}
+
+export interface RoleRule {
+  id:         string
+  role_type:  string
+  rule_key:   string
+  rule_value: Record<string, unknown>
+  notes:      string | null
+  updated_at: string
+}
+
+export interface DocumentRequirement {
+  id:            string
+  role_type:     string
+  state_code:    string | null
+  document_type: string
+  is_required:   boolean
+  description:   string | null
+  updated_at:    string
+}
+
+export interface TrainingRequirement {
+  id:           string
+  role_type:    string
+  state_code:   string | null
+  training_key: string
+  is_required:  boolean
+  cadence:      string | null
+  description:  string | null
+  updated_at:   string
+}
+
+export interface InsuranceRequirement {
+  id:             string
+  role_type:      string
+  state_code:     string | null
+  insurance_type: string
+  is_required:    boolean
+  min_coverage:   string | null
+  description:    string | null
+  updated_at:     string
+}
+
+// ── Fraud + legal holds ────────────────────────────────────────────────────
+
+export type FraudFlagType =
+  | 'duplicate_scans' | 'excessive_bag_scans' | 'unusual_route_activity'
+  | 'repeated_emergency_requests' | 'excessive_cancellations'
+  | 'suspicious_account_behavior' | 'manual_admin_flag'
+
+export const FRAUD_FLAG_LABELS: Record<FraudFlagType, string> = {
+  duplicate_scans: 'Duplicate Scans', excessive_bag_scans: 'Excessive Bag Scans',
+  unusual_route_activity: 'Unusual Route Activity',
+  repeated_emergency_requests: 'Repeated Emergency Requests',
+  excessive_cancellations: 'Excessive Cancellations',
+  suspicious_account_behavior: 'Suspicious Account Behavior',
+  manual_admin_flag: 'Manual Admin Flag',
+}
+
+export type FraudFlagStatus = 'open' | 'reviewing' | 'dismissed' | 'confirmed'
+
+export interface FraudFlag {
+  id:           string
+  user_id:      string | null
+  flag_type:    FraudFlagType
+  severity:     NotificationSeverity
+  description:  string | null
+  status:       FraudFlagStatus
+  reviewed_by:  string | null
+  reviewed_at:  string | null
+  review_notes: string | null
+  metadata:     Record<string, unknown>
+  detected_at:  string
+  created_at:   string
+  updated_at:   string
+}
+
+export type LegalHoldStatus = 'active' | 'archived' | 'released'
+
+export interface LegalHold {
+  id:          string
+  entity_type: string
+  entity_id:   string
+  reason:      string | null
+  status:      LegalHoldStatus
+  placed_by:   string | null
+  placed_at:   string
+  released_by: string | null
+  released_at: string | null
+  metadata:    Record<string, unknown>
+  created_at:  string
+  updated_at:  string
+}
+
+// ── Compliance timeline entry (synthesized from multiple sources) ──────────
+
+export interface ComplianceTimelineEntry {
+  at:           string
+  kind:         'document' | 'violation' | 'incident' | 'complaint'
+                | 'countdown' | 'reinstated' | 'note' | 'audit'
+  title:        string
+  detail?:      string
+  severity?:    NotificationSeverity
+  link?:        string
+}

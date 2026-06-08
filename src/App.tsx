@@ -105,6 +105,10 @@ const BlockedUsersScreen              = lazy(() => import('./screens/settings/Bl
 const AdminModerationCenter           = lazy(() => import('./screens/admin/AdminModerationCenter'))
 // Apple Sprint C activation — admin-configurable compliance settings
 const AdminComplianceSettings         = lazy(() => import('./screens/admin/AdminComplianceSettings'))
+// Sprint D — enterprise safety + risk
+const ReportSafetyIssue               = lazy(() => import('./screens/safety/ReportSafetyIssue'))
+const AdminSafetyCenter               = lazy(() => import('./screens/admin/AdminSafetyCenter'))
+const AdminRiskDashboard              = lazy(() => import('./screens/admin/AdminRiskDashboard'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -503,6 +507,10 @@ function App() {
               <Route path="/settings/blocked-users"           element={<ProtectedRoute><BlockedUsersScreen /></ProtectedRoute>} />
               <Route path="/dashboard/admin/moderation-center" element={<ProtectedRoute requireApproved><AdminModerationCenter /></ProtectedRoute>} />
               <Route path="/dashboard/admin/compliance-settings" element={<ProtectedRoute requireApproved><AdminComplianceSettings /></ProtectedRoute>} />
+              {/* Sprint D — enterprise safety */}
+              <Route path="/safety/report"                      element={<ProtectedRoute><ReportSafetyIssue /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/safety-center"      element={<ProtectedRoute requireApproved><AdminSafetyCenter /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/risk"               element={<ProtectedRoute requireApproved><AdminRiskDashboard /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

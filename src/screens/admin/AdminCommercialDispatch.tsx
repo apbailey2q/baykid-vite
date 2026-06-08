@@ -53,8 +53,7 @@ interface DispatchStop {
   stop_order:         number | null
   status:             DispatchStatus
   priority:           DispatchPriority
-  /** Copied from commercial_pickups.is_priority — set at request time when
-   *  admin has commercial_priority_dispatch enabled for an Emergency Overflow. */
+  /** Derived from commercial_pickups.priority_level — true when 'high' | 'emergency'. */
   is_priority:        boolean
   is_overflow:        boolean
   is_rerouted:        boolean
@@ -168,7 +167,7 @@ interface RawStop {
     preferred_window:   string | null
     assigned_warehouse: string | null
     account_id:         string | null
-    is_priority:        boolean
+    priority_level:     string | null
     commercial_accounts: { business_name: string } | null
   } | null
   profiles: { full_name: string | null } | null
@@ -616,7 +615,7 @@ export default function AdminCommercialDispatch() {
           id, pickup_id, driver_id, sequence, stop_order, status, priority, is_overflow, is_rerouted,
           commercial_pickups!pickup_id (
             pickup_location, bin_count, material_type, preferred_window, assigned_warehouse, account_id,
-            is_priority,
+            priority_level,
             commercial_accounts!account_id ( business_name )
           ),
           profiles!driver_id ( full_name )
@@ -647,7 +646,7 @@ export default function AdminCommercialDispatch() {
           stop_order:         r.stop_order,
           status:             r.status as DispatchStatus,
           priority:           (r.priority ?? 'normal') as DispatchPriority,
-          is_priority:        p.is_priority ?? false,
+          is_priority:        p.priority_level === 'high' || p.priority_level === 'emergency',
           is_overflow:        r.is_overflow,
           is_rerouted:        r.is_rerouted,
           business_name:      p.commercial_accounts?.business_name ?? 'Unknown Business',

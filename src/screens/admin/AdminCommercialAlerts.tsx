@@ -122,7 +122,7 @@ export default function AdminCommercialAlerts() {
         .limit(10),
       supabase
         .from('commercial_pickups')
-        .select('id, status, pickup_type, material_type, business_name, created_at, commercial_accounts(business_name)')
+        .select('id, status, pickup_type, material_type, priority_level, business_name, created_at, commercial_accounts(business_name)')
         .eq('status', 'flagged')
         .order('created_at', { ascending: false })
         .limit(10),
@@ -165,16 +165,17 @@ export default function AdminCommercialAlerts() {
     // From flagged pickups → delayed alerts
     for (const p of (pickupsRes.data ?? []) as unknown as {
       id: string; status: string; pickup_type: string; material_type: string
-      business_name: string | null; created_at: string
+      priority_level: string | null; business_name: string | null; created_at: string
       commercial_accounts: { business_name: string } | null
     }[]) {
+      const isEmergency = p.priority_level === 'emergency'
       built.push({
         id:           `pickup-${p.id}`,
         type:         'delayed',
-        title:        'Pickup Flagged',
+        title:        isEmergency ? 'Emergency Pickup Flagged' : 'Pickup Flagged',
         business:     (p.commercial_accounts?.business_name ?? p.business_name) ?? 'Unknown Business',
         detail:       `${p.pickup_type} — ${p.material_type} pickup has been flagged and requires review`,
-        severity:     'medium',
+        severity:     isEmergency ? 'critical' : 'medium',
         acknowledged: false,
         time:         relativeDate(p.created_at),
         ts:           p.created_at,

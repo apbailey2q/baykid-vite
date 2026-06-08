@@ -2,7 +2,7 @@
 // 'driver_documents' bucket.
 //
 // Bucket:  driver_documents (private, 15MB cap, image/* or PDF — see
-//          supabase/migrations/20260605000002_driver_compliance.sql)
+//          supabase/migrations/20260628000001_driver_documents_bucket.sql)
 // Path:    '<driverId>/<documentType>-<timestamp>.<ext>'   — path-based RLS
 //          requires the first segment to equal auth.uid().
 //

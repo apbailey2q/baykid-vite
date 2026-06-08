@@ -140,7 +140,8 @@ export function ProtectedRoute({ children, requireApproved = false }: Props) {
     !isDriverAccount &&
     profile &&
     profile.onboarding_completed === false &&
-    pathname !== '/onboarding'
+    pathname !== '/onboarding' &&
+    !pathname.startsWith('/onboarding/')
   ) {
     return <Navigate to="/onboarding" replace />
   }

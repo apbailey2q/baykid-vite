@@ -111,6 +111,22 @@ export async function requestCommercialContractSignature(
 
     if (error) return { ok: false, error: error.message }
 
+    // Non-fatal: write history record for the status change
+    try {
+      await supabase.from('commercial_contract_history').insert({
+        contract_id:     contractId,
+        account_id:      c.account_id,
+        action_type:     'status_changed',
+        previous_status: c.status,
+        new_status:      'pending_signature',
+        change_summary:  'Signature request sent. Contract is awaiting commercial account signature.',
+        metadata:        { requested_by: adminId ?? null, signature_status: 'pending_signature' },
+        changed_by:      adminId ?? null,
+      })
+    } catch {
+      // non-fatal
+    }
+
     // Non-fatal: write a notification event for the account owner
     try {
       await supabase.from('operational_notification_events').insert({
@@ -260,6 +276,22 @@ export async function signCommercialContract(
       // Signature is already recorded — still return success with a warning note
     }
 
+    // Non-fatal: write history record for the signing event
+    try {
+      await supabase.from('commercial_contract_history').insert({
+        contract_id:     input.contractId,
+        account_id:      input.accountId,
+        action_type:     'status_changed',
+        previous_status: 'pending_signature',
+        new_status:      'active',
+        change_summary:  `Contract signed by ${input.signerName}. Signature ID: ${(sigData as CommercialContractSignature).id}.`,
+        metadata:        { signer_name: input.signerName, signer_email: input.signerEmail, contract_version: 'commercial-contract-v1-2026' },
+        changed_by:      input.signerUserId ?? null,
+      })
+    } catch {
+      // non-fatal
+    }
+
     return { ok: true, data: sigData as CommercialContractSignature }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -291,9 +323,27 @@ export async function declineCommercialContractSignature(
 
     if (error) return { ok: false, error: error.message }
 
+    const declined = data as CommercialContract
+
+    // Non-fatal: write history record for the decline
+    try {
+      await supabase.from('commercial_contract_history').insert({
+        contract_id:     contractId,
+        account_id:      declined.account_id,
+        action_type:     'status_changed',
+        previous_status: 'pending_signature',
+        new_status:      'needs_review',
+        change_summary:  `Signature declined. Reason: ${reason || 'No reason provided.'}`,
+        metadata:        { reason, declined_by: userId ?? null, signature_status: 'declined' },
+        changed_by:      userId ?? null,
+      })
+    } catch {
+      // non-fatal
+    }
+
     // Non-fatal: notify admins
     try {
-      const c = data as CommercialContract
+      const c = declined
       await supabase.from('operational_notification_events').insert({
         event_type:   'commercial_contract_signature_declined',
         severity:     'high',
@@ -313,7 +363,7 @@ export async function declineCommercialContractSignature(
       // non-fatal
     }
 
-    return { ok: true, data: data as CommercialContract }
+    return { ok: true, data: declined }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.warn('[commercialContractSignatures] declineCommercialContractSignature:', msg)
@@ -342,7 +392,26 @@ export async function markCommercialContractSignatureExpired(
       .single()
 
     if (error) return { ok: false, error: error.message }
-    return { ok: true, data: data as CommercialContract }
+
+    const expired = data as CommercialContract
+
+    // Non-fatal: write history record for the expiry
+    try {
+      await supabase.from('commercial_contract_history').insert({
+        contract_id:     contractId,
+        account_id:      expired.account_id,
+        action_type:     'status_changed',
+        previous_status: 'pending_signature',
+        new_status:      'needs_review',
+        change_summary:  'Signature request marked expired by admin.',
+        metadata:        { admin_id: adminId ?? null, signature_status: 'expired' },
+        changed_by:      adminId ?? null,
+      })
+    } catch {
+      // non-fatal
+    }
+
+    return { ok: true, data: expired }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.warn('[commercialContractSignatures] markCommercialContractSignatureExpired:', msg)

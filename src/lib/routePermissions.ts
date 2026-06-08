@@ -20,6 +20,12 @@ const FUNDRAISER_SUB_ROLES: Role[] = [
   'fundraiser_admin', 'school_partner', 'nonprofit_partner',
   'church_partner', 'sports_team_partner',
 ]
+// Phase WH.1 — warehouse role group (includes legacy employee/supervisor +
+// new manager/admin tiers). Used by /onboarding/warehouse and admin views.
+const WAREHOUSE_ROLES: Role[] = [
+  'warehouse_employee', 'warehouse_supervisor',
+  'warehouse_manager', 'warehouse_admin',
+]
 
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Admin — top-level ──────────────────────────────────────────────────────
@@ -122,16 +128,16 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/commercial-driver':                    ['admin', 'driver'],
 
   // ── Warehouse ──────────────────────────────────────────────────────────────
-  '/dashboard/warehouse-supervisor':                 ['admin', 'warehouse_supervisor'],
-  '/dashboard/warehouse':                            ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/expected-loads':             ['admin', 'warehouse_employee', 'warehouse_supervisor'],
+  '/dashboard/warehouse-supervisor':                 ['admin', 'warehouse_supervisor', 'warehouse_manager', 'warehouse_admin'],
+  '/dashboard/warehouse':                            ['admin', ...WAREHOUSE_ROLES],
+  '/dashboard/warehouse/expected-loads':             ['admin', ...WAREHOUSE_ROLES],
   // L.2 C9 — alias for the misspelled path that several screens still use
-  '/dashboard/warehouse/commercial-expected-loads':  ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/commercial-intake':          ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/commercial-processing':      ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/alerts':                     ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/messages':                   ['admin', 'warehouse_employee', 'warehouse_supervisor'],
-  '/dashboard/warehouse/onboarding':                 ['admin', 'warehouse_employee', 'warehouse_supervisor'],
+  '/dashboard/warehouse/commercial-expected-loads':  ['admin', ...WAREHOUSE_ROLES],
+  '/dashboard/warehouse/commercial-intake':          ['admin', ...WAREHOUSE_ROLES],
+  '/dashboard/warehouse/commercial-processing':      ['admin', ...WAREHOUSE_ROLES],
+  '/dashboard/warehouse/alerts':                     ['admin', ...WAREHOUSE_ROLES],
+  '/dashboard/warehouse/messages':                   ['admin', ...WAREHOUSE_ROLES],
+  '/dashboard/warehouse/onboarding':                 ['admin', ...WAREHOUSE_ROLES],
 
   // ── Partner ────────────────────────────────────────────────────────────────
   '/dashboard/partner':                              ['admin', 'partner'],
@@ -168,15 +174,18 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // NOTE: 'driver' is intentionally ABSENT from all /onboarding/* entries.
   // Drivers complete Driver Compliance Pack V1 at /driver/compliance.
   // ProtectedRoute adds an explicit gate on top as defense-in-depth.
-  '/onboarding':                                     ['admin', 'consumer', 'commercial', 'fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES],
+  '/onboarding':                                     ['admin', 'consumer', 'commercial', 'fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES, ...WAREHOUSE_ROLES],
   // Explicit sub-route entries tighten cross-role access beyond the dispatcher.
   // Without these, prefix matching on '/onboarding' would allow commercial roles
   // to reach /onboarding/consumer and fundraiser roles to reach /onboarding/commercial.
   '/onboarding/consumer':                            ['admin', 'consumer'],
   '/onboarding/fundraiser':                          ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
+  '/onboarding/warehouse':                           ['admin', ...WAREHOUSE_ROLES],
+  // Admin oversight of warehouse onboarding (mock-data-friendly fallback)
+  '/dashboard/admin/warehouse-onboarding':           ['admin', 'warehouse_admin', 'warehouse_manager'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
-  '/welcome-back':                                   ['admin', 'consumer', 'driver', 'warehouse_employee', 'warehouse_supervisor', 'partner', 'fundraiser'],
+  '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],
 
   // ── Pending approval landings (any authenticated role can see their own) ─
   '/pending-approval': [
@@ -207,7 +216,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
 }
 
 // Roles allowed to inspect individual bags (path ends with /inspect)
-const INSPECT_ROLES: Role[] = ['admin', 'warehouse_employee', 'warehouse_supervisor']
+const INSPECT_ROLES: Role[] = ['admin', ...WAREHOUSE_ROLES]
 
 export function canAccessRoute(role: Role | null, pathname: string): boolean {
   if (!role) return false

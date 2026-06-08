@@ -70,6 +70,8 @@ export function normalizeRole(role: string | null | undefined): Role | null {
     'commercial_customer', 'business_customer',
     'restaurant_partner', 'bar_partner', 'hospital_partner', 'hotel_partner',
     'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
+    // Phase WH.1 — warehouse manager + warehouse_admin tier roles.
+    'warehouse_manager', 'warehouse_admin',
   ]
   return VALID.includes(r) ? r : null
 }
@@ -109,6 +111,8 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
     case 'consumer':            return '/dashboard/consumer'
     case 'warehouse_employee':  return '/dashboard/warehouse'
     case 'warehouse_supervisor':return '/dashboard/warehouse-supervisor'
+    case 'warehouse_manager':   return '/dashboard/warehouse-supervisor'
+    case 'warehouse_admin':     return '/dashboard/admin/warehouse-analytics'
     case 'warehouse':           return '/dashboard/warehouse'
     case 'partner':             return '/dashboard/partner'
     case 'fundraiser':          return '/dashboard/fundraiser'

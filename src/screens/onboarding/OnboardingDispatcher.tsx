@@ -7,7 +7,7 @@
  * consumer                  → /onboarding/consumer  (ConsumerOnboarding)
  * driver (unapproved)       → /driver/compliance    (Driver Compliance Pack V1 wizard)
  * driver (approved)         → /dashboard/driver
- * warehouse_employee/super  → /dashboard/warehouse/onboarding
+ * warehouse_* (all 4 tiers) → /onboarding/warehouse (Phase WH.1 — 18-step wizard)
  * commercial (legacy)       → /dashboard/commercial/onboarding
  * fundraiser + sub-roles    → /onboarding/fundraiser (Phase G.3)
  * commercial sub-roles      → /onboarding/commercial (Phase G.4)
@@ -17,11 +17,10 @@
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { isFundraiserRole, isCommercialCustomerRole } from '../../types'
+import { isWarehouseRole } from '../../types/warehouse'
 
 const ROLE_ROUTES: Record<string, string> = {
   consumer:             '/onboarding/consumer',
-  warehouse_employee:   '/dashboard/warehouse/onboarding',
-  warehouse_supervisor: '/dashboard/warehouse/onboarding',
   commercial:           '/dashboard/commercial/onboarding',
 }
 
@@ -56,6 +55,13 @@ export default function OnboardingDispatcher() {
   // wizard. The legacy `commercial` role keeps its existing flow via ROLE_ROUTES.
   if (isCommercialCustomerRole(role)) {
     return <Navigate to="/onboarding/commercial" replace />
+  }
+
+  // Phase WH.1 — all warehouse roles (employee/supervisor/manager/admin) route
+  // to the comprehensive 18-step warehouse onboarding. The legacy 5-step wizard
+  // at /dashboard/warehouse/onboarding remains accessible by direct URL.
+  if (isWarehouseRole(role)) {
+    return <Navigate to="/onboarding/warehouse" replace />
   }
 
   const target = (role && ROLE_ROUTES[role]) ?? '/onboarding/consumer'

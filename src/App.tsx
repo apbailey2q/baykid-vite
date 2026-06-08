@@ -78,6 +78,9 @@ const OnboardingDispatcher     = lazy(() => import('./screens/onboarding/Onboard
 const WaitlistScreen           = lazy(() => import('./screens/onboarding/WaitlistScreen'))
 const FundraiserOnboarding     = lazy(() => import('./screens/onboarding/FundraiserOnboarding'))
 const CommercialOnboardingG4   = lazy(() => import('./screens/onboarding/CommercialOnboarding'))
+// Phase WH.1 — comprehensive 18-step warehouse staff onboarding. Distinct from
+// the legacy 5-step wizard at /dashboard/warehouse/onboarding (kept for back-compat).
+const WarehouseOnboardingV2    = lazy(() => import('./screens/onboarding/WarehouseOnboarding'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -151,6 +154,8 @@ const AdminCommercialDispatch        = lazy(() => import('./screens/admin/AdminC
 const AdminCommercialSupport         = lazy(() => import('./screens/admin/AdminCommercialSupport'))
 const AdminDriverPayouts             = lazy(() => import('./screens/admin/AdminDriverPayouts'))
 const AdminWarehouseAnalytics        = lazy(() => import('./screens/admin/AdminWarehouseAnalytics'))
+// Phase WH.1 — admin oversight of warehouse staff onboarding (safe-fail when tables absent)
+const AdminWarehouseOnboarding       = lazy(() => import('./screens/admin/AdminWarehouseOnboarding'))
 const AdminRecyclingAnalytics        = lazy(() => import('./screens/admin/AdminRecyclingAnalytics'))
 const InvestorDashboard              = lazy(() => import('./screens/admin/InvestorDashboard'))
 const DispatcherLiveMap              = lazy(() => import('./screens/admin/DispatcherLiveMap'))
@@ -417,6 +422,7 @@ function App() {
               <Route path="/dashboard/admin/commercial/support"       element={<ProtectedRoute requireApproved><AdminCommercialSupport /></ProtectedRoute>} />
               <Route path="/dashboard/admin/driver-payouts"          element={<ProtectedRoute requireApproved><AdminDriverPayouts /></ProtectedRoute>} />
               <Route path="/dashboard/admin/warehouse-analytics"     element={<ProtectedRoute requireApproved><AdminWarehouseAnalytics /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/warehouse-onboarding"    element={<ProtectedRoute requireApproved><AdminWarehouseOnboarding /></ProtectedRoute>} />
               <Route path="/dashboard/admin/analytics"              element={<ProtectedRoute requireApproved><AdminRecyclingAnalytics /></ProtectedRoute>} />
               <Route path="/dashboard/admin/investor"              element={<ProtectedRoute requireApproved><InvestorDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/admin/dispatch-map"          element={<ProtectedRoute requireApproved><DispatcherLiveMap /></ProtectedRoute>} />
@@ -445,6 +451,7 @@ function App() {
               <Route path="/onboarding/consumer"             element={<ProtectedRoute><ConsumerOnboarding /></ProtectedRoute>} />
               <Route path="/onboarding/fundraiser"           element={<ProtectedRoute><FundraiserOnboarding /></ProtectedRoute>} />
               <Route path="/onboarding/commercial"           element={<ProtectedRoute><CommercialOnboardingG4 /></ProtectedRoute>} />
+              <Route path="/onboarding/warehouse"            element={<ProtectedRoute><WarehouseOnboardingV2 /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

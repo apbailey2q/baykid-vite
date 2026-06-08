@@ -2,8 +2,10 @@ export type Role =
   | 'consumer'
   | 'commercial'
   | 'driver'
-  | 'warehouse_employee'
+  | 'warehouse_employee'    // a.k.a. "warehouse worker" in user-facing copy
   | 'warehouse_supervisor'
+  | 'warehouse_manager'     // Phase WH.1 — facility manager
+  | 'warehouse_admin'       // Phase WH.1 — warehouse-level admin (distinct from global admin)
   | 'partner'
   | 'admin'
   | 'fundraiser'

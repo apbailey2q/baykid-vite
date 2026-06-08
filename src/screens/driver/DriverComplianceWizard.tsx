@@ -1,7 +1,7 @@
 // DriverComplianceWizard.tsx — Driver Compliance Pack V1, driver-type-aware.
 //
 // Route:    /driver/compliance  (wired in App.tsx)
-// Persona:  driver_1099 (consumer_only) OR commercial_driver (commercial_only / hybrid)
+// Persona:  consumer_only (1099 contractor) OR commercial_only / hybrid (commercial driver)
 //
 // Key rules from the platform spec:
 //   • Commercial drivers use COMPANY vehicles only. Personal vehicle info
@@ -44,35 +44,46 @@ import type {
   DriverBackgroundCheck,
   DriverPayoutAccount,
 } from '../../types'
+import { StepTraining } from './DriverTrainingModules'
+import type { TrainingInfo } from './DriverTrainingModules'
+import { DriverManualStep } from './DriverManualStep'
+import { agreementKey } from './driverComplianceVersions'
 
 // ── Step names ───────────────────────────────────────────────────────────────
 
 type StepName =
   | 'welcome' | 'personal' | 'license' | 'insurance' | 'vehicle'
-  | 'w9' | 'background' | 'deposit' | 'agreement' | 'training'
+  | 'employment' | 'w9' | 'background' | 'deposit' | 'manual' | 'agreement' | 'training'
   | 'policy' | 'review'
 
-// Commercial drivers skip insurance + vehicle (company equipment required).
+// Commercial employee drivers: Welcome → Personal → License → Employment Docs →
+// Background → Agreement → Training → Review
+// Removed vs. consumer: insurance, vehicle, w9, deposit, manual (compliance manual), policy
+// Commercial employees are company employees — no personal vehicle data, no 1099 tax forms,
+// no payout account, and their employment agreement covers what the manual covers.
 const COMMERCIAL_STEPS: ReadonlyArray<StepName> = [
-  'welcome', 'personal', 'license', 'w9', 'background',
-  'deposit', 'agreement', 'training', 'policy', 'review',
+  'welcome', 'personal', 'license', 'employment',
+  'background', 'agreement', 'training', 'review',
 ]
 
 // Consumer/1099 drivers include personal insurance + vehicle registration.
 const CONSUMER_STEPS: ReadonlyArray<StepName> = [
   'welcome', 'personal', 'license', 'insurance', 'vehicle',
-  'w9', 'background', 'deposit', 'agreement', 'training', 'policy', 'review',
+  'w9', 'background', 'deposit', 'manual', 'agreement', 'training', 'policy', 'review',
 ]
 
 // Map criterion key → step name for "Jump back to fix" links on the review screen.
+// Commercial drivers only see employment/background/agreement/training criteria.
 const CRITERION_TO_STEP: Record<string, StepName> = {
   license_front:      'license',
   license_back:       'license',
   insurance:          'insurance',
   registration:       'vehicle',
+  employment:         'employment',
   w9:                 'w9',
   background:         'background',
   payout:             'deposit',
+  manual_ack:         'manual',
   agreement_training: 'agreement',
   policy_ack:         'policy',
 }
@@ -80,12 +91,6 @@ const CRITERION_TO_STEP: Record<string, StepName> = {
 const STORAGE_KEY = 'baykid-driver-compliance-step'
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
-
-async function getAuthHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
 
 // ── Shared UI pieces ─────────────────────────────────────────────────────────
 
@@ -222,9 +227,7 @@ interface W9Info {
 
 interface AgreementInfo { signature: string; signed_date: string }
 
-interface TrainingInfo {
-  safety: boolean; qr_bag: boolean; pickup: boolean; customer: boolean; photo: boolean
-}
+// TrainingInfo is now defined in DriverTrainingModules.tsx (imported above).
 
 interface WizardState {
   personal:        PersonalInfo
@@ -254,8 +257,8 @@ export default function DriverComplianceWizard() {
   const driverId  = user?.id ?? null
 
   // Determine driver type from profile.driver_service_type.
-  // 'commercial_only' and 'hybrid' are commercial drivers.
-  // 'consumer_only' (driver_1099) collects personal vehicle / insurance.
+  // 'commercial_only' and 'hybrid' are commercial employees.
+  // 'consumer_only' collects personal vehicle / insurance.
   // Unset defaults to consumer for safety (more complete criteria).
   const dst = profile?.driver_service_type ?? null
   const isCommercialDriver = dst === 'commercial_only' || dst === 'hybrid'
@@ -389,6 +392,17 @@ export default function DriverComplianceWizard() {
           onNext={next}
         />
       )
+    case 'employment':
+      return (
+        <StepEmploymentDocs
+          {...shellProps}
+          driverId={driverId}
+          documents={documents}
+          onUploaded={refreshServerState}
+          onBack={back}
+          onNext={next}
+        />
+      )
     case 'w9':
       return (
         <StepW9
@@ -404,6 +418,7 @@ export default function DriverComplianceWizard() {
       return (
         <StepBackgroundConsent
           {...shellProps}
+          driverId={driverId}
           bgCheck={bgCheck}
           onBack={back}
           onNext={async () => { await refreshServerState(); next() }}
@@ -413,7 +428,20 @@ export default function DriverComplianceWizard() {
       return (
         <StepDirectDeposit
           {...shellProps}
+          driverId={driverId}
           payout={payout}
+          onBack={back}
+          onNext={async () => { await refreshServerState(); next() }}
+        />
+      )
+    case 'manual':
+      return (
+        <DriverManualStep
+          stepIndex={shellProps.stepIndex}
+          totalSteps={shellProps.totalSteps}
+          driverId={driverId}
+          isCommercialDriver={isCommercialDriver}
+          driverProfile={driverProfile}
           onBack={back}
           onNext={async () => { await refreshServerState(); next() }}
         />
@@ -423,6 +451,7 @@ export default function DriverComplianceWizard() {
         <StepDriverAgreement
           {...shellProps}
           driverId={driverId}
+          isCommercialDriver={isCommercialDriver}
           value={state.agreement}
           onChange={(v) => setState((s) => ({ ...s, agreement: v }))}
           onBack={back}
@@ -434,6 +463,8 @@ export default function DriverComplianceWizard() {
         <StepTraining
           {...shellProps}
           driverId={driverId}
+          driverProfile={driverProfile}
+          isCommercialDriver={isCommercialDriver}
           value={state.training}
           onChange={(v) => setState((s) => ({ ...s, training: v }))}
           onBack={back}
@@ -654,6 +685,66 @@ function StepLicenseUpload({ stepIndex, totalSteps, driverId, documents, onUploa
         <DocumentTile driverId={driverId} documentType="license_back"
                       label="License — back"  existing={back}  onUploaded={onUploaded} />
       </div>
+      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        Accepted formats: JPEG, PNG, WebP, or PDF. Max 15 MB per file.
+      </p>
+      <StepFooter onBack={onBack} onNext={onNext} nextDisabled={!ready} />
+    </StepShell>
+  )
+}
+
+// ── Step: Employment Documentation (commercial employees only) ───────────────
+// Collects I-9 (Employment Eligibility) and W-4 (Employee's Withholding).
+// Commercial drivers use company vehicles — personal insurance/registration
+// are NOT collected here.
+
+interface StepEmploymentDocsProps {
+  stepIndex: number; totalSteps: number
+  driverId: string; documents: DriverDocument[]
+  onUploaded: () => Promise<void> | void; onBack: () => void; onNext: () => void
+}
+
+function StepEmploymentDocs({ stepIndex, totalSteps, driverId, documents, onUploaded, onBack, onNext }: StepEmploymentDocsProps) {
+  const i9Doc = documents.find((d) => d.document_type === 'i9')
+  const w4Doc = documents.find((d) => d.document_type === 'w4')
+  const ready = Boolean(i9Doc) && Boolean(w4Doc)
+
+  return (
+    <StepShell stepIndex={stepIndex} totalSteps={totalSteps}
+               title="Employment Documentation"
+               subtitle="Upload your I-9 and W-4 forms. These are required before your application can be reviewed.">
+      <Banner tone="info">
+        These documents are reviewed by HR before your account is activated.
+        Make sure all fields on each form are complete and legible before uploading.
+      </Banner>
+
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm font-semibold text-white mb-1">I-9 — Employment Eligibility Verification</p>
+          <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            Form I-9 verifies your identity and authorization to work in the United States.
+            Upload the completed form with all required sections filled.
+          </p>
+          <DocumentTile driverId={driverId} documentType="i9"
+                        label="I-9 Employment Eligibility" existing={i9Doc} onUploaded={onUploaded} />
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-white mb-1">W-4 — Employee's Withholding Certificate</p>
+          <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            Form W-4 determines your federal income tax withholding.
+            Upload your completed W-4 signed and dated.
+          </p>
+          <DocumentTile driverId={driverId} documentType="w4"
+                        label="W-4 Withholding Certificate" existing={w4Doc} onUploaded={onUploaded} />
+        </div>
+      </div>
+
+      <Banner tone="warn">
+        <strong>Status: Pending Review</strong> — HR will review your documents after submission.
+        You may continue the onboarding steps while your documents are being processed.
+      </Banner>
+
       <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
         Accepted formats: JPEG, PNG, WebP, or PDF. Max 15 MB per file.
       </p>
@@ -907,11 +998,12 @@ function StepW9({ stepIndex, totalSteps, driverId, value, onChange, onBack, onNe
 
 interface StepBackgroundConsentProps {
   stepIndex: number; totalSteps: number
+  driverId: string
   bgCheck: DriverBackgroundCheck | null
   onBack: () => void; onNext: () => void | Promise<void>
 }
 
-function StepBackgroundConsent({ stepIndex, totalSteps, bgCheck, onBack, onNext }: StepBackgroundConsentProps) {
+function StepBackgroundConsent({ stepIndex, totalSteps, driverId, bgCheck, onBack, onNext }: StepBackgroundConsentProps) {
   const [agreed, setAgreed]   = useState(Boolean(bgCheck?.consent_timestamp))
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState<string | null>(null)
@@ -921,14 +1013,21 @@ function StepBackgroundConsent({ stepIndex, totalSteps, bgCheck, onBack, onNext 
     if (!agreed || saving) return
     setSaving(true); setError(null)
     try {
-      const headers = await getAuthHeader()
-      const r = await fetch('/api/driver/background-consent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({}),
-      })
-      const data = await r.json().catch(() => ({}))
-      if (!r.ok || !data?.ok) throw new Error(data?.error || data?.message || `HTTP ${r.status}`)
+      const now = new Date().toISOString()
+      const { error: upErr } = await supabase
+        .from('driver_background_checks')
+        .upsert(
+          {
+            driver_id:         driverId,
+            consent_timestamp: now,
+            consent_ip:        null,
+            status:            'pending',
+            provider:          'manual_review',
+            requested_at:      now,
+          },
+          { onConflict: 'driver_id' },
+        )
+      if (upErr) throw upErr
       setSubmitted(true)
       await onNext()
     } catch (err) {
@@ -960,7 +1059,7 @@ function StepBackgroundConsent({ stepIndex, totalSteps, bgCheck, onBack, onNext 
         <span>I authorize a background check.</span>
       </label>
       {submitted && (
-        <Banner tone="info">Pending background check — Checkr integration coming in a future phase.</Banner>
+        <Banner tone="info">Background check authorization submitted. Admin will complete review before dispatch approval.</Banner>
       )}
       <ErrorLine msg={error} />
       <StepFooter onBack={onBack}
@@ -976,55 +1075,52 @@ function StepBackgroundConsent({ stepIndex, totalSteps, bgCheck, onBack, onNext 
 
 interface StepDirectDepositProps {
   stepIndex: number; totalSteps: number
+  driverId: string
   payout: DriverPayoutAccount | null
   onBack: () => void; onNext: () => void | Promise<void>
 }
 
-function StepDirectDeposit({ stepIndex, totalSteps, payout, onBack, onNext }: StepDirectDepositProps) {
+function StepDirectDeposit({ stepIndex, totalSteps, driverId, payout, onBack, onNext }: StepDirectDepositProps) {
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
-  const [confirmedMessage, setConfirmedMessage] = useState<string | null>(null)
+  const [registered, setRegistered] = useState(false)
   const alreadyPending = Boolean(payout && payout.status !== 'rejected')
 
   const submit = async () => {
     if (saving) return
     setSaving(true); setError(null)
     try {
-      const headers = await getAuthHeader()
-      const r = await fetch('/api/driver/payout-init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({}),
-      })
-      const data = await r.json().catch(() => ({}))
-      if (!r.ok || !data?.ok) throw new Error(data?.error || data?.message || `HTTP ${r.status}`)
-      setConfirmedMessage(data.message ?? 'Payout intent recorded.')
+      const { error: upErr } = await supabase
+        .from('driver_payout_accounts')
+        .upsert(
+          { driver_id: driverId, status: 'pending' },
+          { onConflict: 'driver_id' },
+        )
+      if (upErr) throw upErr
+      setRegistered(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not record payout intent')
+      setError(err instanceof Error ? err.message : 'Could not register payout account')
     } finally {
       setSaving(false)
     }
   }
 
-  const showBanner = alreadyPending || Boolean(confirmedMessage)
+  const showBanner = alreadyPending || registered
 
   return (
     <StepShell stepIndex={stepIndex} totalSteps={totalSteps}
-               title="Direct Deposit"
-               subtitle="We pay drivers through Stripe Connect Express. You'll get a secure onboarding link once the integration is live.">
+               title="Payout Account"
+               subtitle="Earnings are paid manually by the admin team through the payout ledger. Register below to be included in payout batches.">
       <p className="text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
-        Click <strong>Set up payouts</strong> below to record your intent. We'll finish wiring you
-        up to Stripe Connect in a future phase.
+        Click <strong>Register for payouts</strong> to mark this step complete.
+        Once your compliance review is approved, the admin team will process
+        earnings manually and record them in your payout history.
       </p>
-      <Banner tone="warn">
-        <strong>Heads up:</strong> you cannot be paid until this is fully wired with Stripe Connect.
-        Recording your intent here marks the step complete for compliance review only.
-      </Banner>
-      <PrimaryButton onClick={submit} loading={saving} disabled={alreadyPending && !confirmedMessage}>
-        {alreadyPending ? 'Payout intent on file' : 'Set up payouts'}
+      <PrimaryButton onClick={submit} loading={saving} disabled={alreadyPending || registered}>
+        {alreadyPending || registered ? 'Payout account registered' : 'Register for payouts'}
       </PrimaryButton>
       {showBanner && (
-        <Banner tone="info">Payout setup pending — Stripe Connect integration coming soon.</Banner>
+        <Banner tone="info">Payout account registered. Admin will process earnings manually after dispatch approval.</Banner>
       )}
       <ErrorLine msg={error} />
       <StepFooter onBack={onBack} onNext={onNext} nextLabel="Continue" />
@@ -1033,51 +1129,146 @@ function StepDirectDeposit({ stepIndex, totalSteps, payout, onBack, onNext }: St
 }
 
 // ── Step: Driver Agreement ────────────────────────────────────────────────────
+//
+// GOVERNANCE: Two separate agreements per Driver Agreement Policy in CLAUDE.md.
+//   Agreement A — Consumer Driver Independent Contractor Agreement (v1.0)
+//   Agreement B — Commercial Driver Independent Contractor Agreement (v1.0)
+//
+// The correct agreement is selected by isCommercialDriver (driver_service_type).
+// Both agreements share version control metadata: Version, Effective Date, Last Updated.
+// Signed versions are archived via agreement_signed_at + agreement_signature in driver_profiles.
 
-const AGREEMENT_TEXT = `Cyan's Brooklynn Recycling Driver Agreement v1
+const CONSUMER_AGREEMENT_TEXT =
+`CONSUMER DRIVER INDEPENDENT CONTRACTOR AGREEMENT
+Agreement Version: 1.0
+Effective Date: January 1, 2026
+Last Updated: January 1, 2026
 
-This Driver Agreement ("Agreement") is entered into between Cyan's Brooklynn Recycling, a recycling collection service ("Company"), and you ("Driver"). By signing below you acknowledge that you have read, understood, and agreed to be bound by the terms herein.
+This Consumer Driver Independent Contractor Agreement ("Agreement") is entered into between Cyan's Brooklynn Recycling, a recycling collection service ("Company"), and you ("Driver"). This Agreement governs residential and consumer recycling pickup services only. By signing below you acknowledge that you have read, understood, and agreed to be bound by the terms herein.
 
-1. Independent Contractor Status. Driver is engaged as an independent contractor and not as an employee of Company. Driver is responsible for all federal, state, and local taxes on compensation received, including but not limited to self-employment taxes. Nothing in this Agreement constitutes an employer-employee, partnership, or joint-venture relationship between the parties.
+1. INDEPENDENT CONTRACTOR STATUS
+Driver is engaged as an independent contractor and not as an employee, partner, or agent of Company. Driver is solely responsible for all federal, state, and local taxes on compensation received, including self-employment taxes. Nothing in this Agreement creates an employer-employee, partnership, or joint-venture relationship.
 
-2. Driver Responsibilities. Driver shall (a) maintain a valid driver's license; (b) comply with all applicable traffic laws; (c) collect, transport, and deliver recyclable materials in accordance with Company route plans and customer instructions; (d) wear or display Company-issued identification while on routes; and (e) report any incident, injury, or property damage to Company within 24 hours.
+2. SCOPE OF SERVICES
+Driver agrees to perform residential and consumer recycling pickup services as assigned by Company through its dispatch application. Services are limited to curbside residential pickups, consumer-schedule pickups, and other consumer-side recycling collection activities. Driver shall not perform commercial route pickups unless separately authorized by Company in writing.
 
-3. Safety and Conduct. Driver shall obey all traffic laws, refrain from operating any vehicle while impaired, and treat customers, the public, and Company personnel with professionalism. Use of mobile devices while driving is prohibited except for hands-free navigation and dispatch communication required by Company.
+3. VEHICLE AND EQUIPMENT — DRIVER-PROVIDED
+Driver shall provide, at Driver's own expense, a clean, road-worthy personal vehicle suitable for pickup routes. Driver is solely responsible for (a) vehicle registration and maintenance; (b) fuel and operating costs; (c) complying with all applicable vehicle and traffic laws; and (d) maintaining comprehensive and collision insurance coverage for the vehicle used during services. Driver must provide proof of current vehicle insurance upon request. Company assumes no liability for Driver's personal vehicle.
 
-4. Confidential Information; Customer Data. Customer addresses, contact details, recycling activity, and any other information Driver receives in the course of performing services are confidential. Driver shall not disclose, sell, or use such information for any purpose other than performing services for Company.
+4. DRIVER RESPONSIBILITIES
+Driver shall (a) maintain a valid, current driver's license throughout the term of this Agreement; (b) comply with all applicable federal, state, and local traffic laws; (c) collect, transport, and process recyclable materials in accordance with Company route plans and customer instructions; (d) wear or display Company-issued identification while on routes; (e) use the Company dispatch application to scan, verify, and record every pickup; and (f) report any incident, injury, or property damage to Company within 24 hours of occurrence.
 
-5. Termination. Either party may terminate this Agreement at any time, with or without cause, upon written notice (including email). Upon termination Driver shall promptly return all Company property. Sections 1, 3, 4, and this Section 5 survive termination.
+5. SAFETY AND CONDUCT
+Driver shall (a) wear appropriate personal protective equipment (including gloves and closed-toe shoes) on all pickups; (b) refrain from operating any vehicle while impaired by alcohol, drugs, or any substance that may impair driving ability; (c) treat customers, the public, and Company personnel with professionalism and respect at all times; (d) never enter a customer's home, business, or private property without explicit written authorization; and (e) immediately report and refuse to collect any material that appears hazardous, including but not limited to needles, medical waste, chemicals, batteries, or leaking containers.
 
-By typing my full name below I am affixing my electronic signature to this Agreement, which is legally equivalent to a handwritten signature.`
+6. CUSTOMER PRIVACY AND CONFIDENTIALITY
+Customer names, addresses, contact details, pickup schedules, photographs, and any other information obtained in the course of performing services are strictly confidential. Driver shall not disclose, sell, share, or use such information for any purpose other than performing services for Company. This obligation survives termination of this Agreement.
+
+7. CONSUMER PICKUP STANDARDS
+Driver shall (a) verify QR bag codes before accepting each pickup; (b) photograph pickups when required by the dispatch application; (c) record accurate pickup status for every stop; (d) never collect bags or materials not associated with a verified customer order; and (e) escalate any unsafe or incomplete pickup to Company through the dispatch application promptly.
+
+8. EARNINGS AND PAYMENT
+Driver's earnings are calculated by Company based on completed, verified pickups and are subject to Company's current rate schedule. Earnings are paid manually by the admin team through the Company payout ledger. Company does not guarantee minimum earnings. Earnings are subject to Company review and may be adjusted for incomplete, disputed, or fraudulent pickups.
+
+9. PLATFORM CONDUCT
+Driver's continued access to the dispatch platform is subject to Company's Platform Conduct Policy. Violations of Company policies may result in warnings, suspension, or termination of this Agreement. Refer to the Platform Conduct Policy for the full violation matrix.
+
+10. TERMINATION
+Either party may terminate this Agreement at any time, with or without cause, upon written notice (including email or in-app notification). Upon termination Driver shall (a) immediately cease performing services; (b) return all Company-issued property; and (c) cease use of all Company applications and identification. Sections 1, 6, 7, and this Section 10 survive termination.
+
+11. GOVERNING LAW
+This Agreement shall be governed by the laws of the state in which the majority of Driver's routes are performed, without regard to conflict-of-law principles.
+
+12. ENTIRE AGREEMENT
+This Agreement, together with Company's Platform Conduct Policy and applicable Compliance Manual, constitutes the entire agreement between the parties with respect to consumer driver services and supersedes all prior discussions or agreements on this subject.
+
+By typing my full legal name below I am affixing my electronic signature to this Agreement, which is legally equivalent to a handwritten signature under applicable electronic signature law.`
+
+const COMMERCIAL_AGREEMENT_TEXT =
+`COMMERCIAL DRIVER INDEPENDENT CONTRACTOR AGREEMENT
+Agreement Version: 1.0
+Effective Date: January 1, 2026
+Last Updated: January 1, 2026
+
+This Commercial Driver Independent Contractor Agreement ("Agreement") is entered into between Cyan's Brooklynn Recycling, a recycling collection service ("Company"), and you ("Driver"). This Agreement governs commercial recycling pickup services including business, restaurant, bar, hospital, apartment complex, warehouse, and emergency commercial routes. By signing below you acknowledge that you have read, understood, and agreed to be bound by the terms herein.
+
+1. INDEPENDENT CONTRACTOR STATUS
+Driver is engaged as an independent contractor and not as an employee, partner, or agent of Company. Driver is solely responsible for all federal, state, and local taxes on compensation received, including self-employment taxes. Nothing in this Agreement creates an employer-employee, partnership, or joint-venture relationship.
+
+2. SCOPE OF SERVICES — COMMERCIAL ROUTES
+Driver agrees to perform commercial recycling pickup services as assigned by Company through its dispatch application. Commercial services include, but are not limited to: business establishment pickups, restaurant and food-service location pickups, bar and hospitality pickups, hospital and medical facility pickups (non-hazardous recyclables only), apartment complex and multi-unit residential pickups, warehouse pickups, and emergency commercial pickups as dispatched. Driver shall not perform consumer residential pickups unless separately authorized by Company in writing.
+
+3. VEHICLE AND EQUIPMENT — COMPANY-PROVIDED OR COMPANY-APPROVED
+Commercial drivers operate using Company-provided, Company-leased, or Company-approved commercial vehicles and equipment. Driver shall (a) inspect assigned equipment before each shift using the in-app inspection checklist; (b) report any equipment damage, malfunction, or safety issue immediately through the dispatch application; (c) operate only equipment assigned to Driver by Company; and (d) not use Company equipment for any purpose outside assigned routes. Driver is responsible for maintaining a valid commercial driver's license or appropriate license class required for assigned equipment. Company maintains vehicle insurance on all Company-owned equipment; Driver is not required to provide personal vehicle insurance for Company equipment.
+
+4. DRIVER RESPONSIBILITIES
+Driver shall (a) maintain a valid, current driver's license of the class required for assigned routes throughout the term of this Agreement; (b) comply with all applicable federal, state, and local traffic and commercial vehicle laws; (c) collect, transport, and process recyclable materials in accordance with Company route plans and commercial client instructions; (d) wear or display Company-issued identification and required personal protective equipment at all times on commercial routes; (e) use the Company dispatch application to scan, verify, and record every pickup and commercial stop; and (f) report any incident, injury, property damage, or client complaint to Company within 24 hours.
+
+5. COMMERCIAL SITE ACCESS AND CLIENT RULES
+Driver acknowledges that commercial pickup sites are governed by the rules of the commercial client in addition to Company policies. Driver shall (a) comply with all access procedures, sign-in requirements, and site-specific safety rules at each commercial location; (b) never access areas of a commercial site beyond what is necessary for pickup; (c) treat commercial client staff and premises with the same professionalism expected with residential customers; and (d) immediately report to Company any site access problems, client complaints, or unusual conditions at a commercial location.
+
+6. EMERGENCY COMMERCIAL PICKUPS
+Driver may be dispatched for emergency commercial pickups outside standard hours. Driver is not required to accept emergency dispatches but agrees to respond to the dispatch application within the response window specified by Company when available. Emergency dispatch rates are governed by the current Company rate schedule.
+
+7. SAFETY AND COMMERCIAL WASTE HANDLING
+Driver shall (a) wear required personal protective equipment on all commercial routes, including gloves, closed-toe shoes, and any additional equipment specified for a route; (b) refuse to collect any material that appears hazardous, including chemicals, medical waste, sharps, or leaking containers, and report such refusals immediately; (c) comply with all applicable environmental regulations for commercial waste handling; (d) not mix commercial recyclables with consumer bags or other non-assigned materials; and (e) never operate any Company vehicle while impaired.
+
+8. CUSTOMER AND CLIENT CONFIDENTIALITY
+Commercial client names, addresses, contact details, operational schedules, photographs taken on-site, and any other information obtained during services are strictly confidential. Driver shall not disclose, sell, share, or use such information for any purpose outside performing services for Company. Commercial client information is subject to heightened confidentiality obligations due to potential business sensitivity. This obligation survives termination of this Agreement.
+
+9. EARNINGS AND PAYMENT
+Driver's earnings are calculated by Company based on completed, verified commercial pickups and emergency dispatches and are subject to Company's current commercial rate schedule. Earnings are paid manually by the admin team through the Company payout ledger. Company does not guarantee minimum earnings. Earnings are subject to Company review and may be adjusted for incomplete, disputed, or fraudulent pickups.
+
+10. PLATFORM CONDUCT
+Driver's continued access to the commercial dispatch platform is subject to Company's Platform Conduct Policy. Violations may result in warnings, suspension from commercial routes, or full termination. Suspension or termination from commercial routes simultaneously suspends or terminates consumer route access. Refer to the Platform Conduct Policy for the complete violation and sanction matrix.
+
+11. TERMINATION
+Either party may terminate this Agreement at any time, with or without cause, upon written notice (including email or in-app notification). Upon termination Driver shall (a) immediately cease performing services; (b) return all Company-issued equipment, identification, and property; and (c) cease use of all Company applications. Sections 1, 8, 9, and this Section 11 survive termination.
+
+12. GOVERNING LAW
+This Agreement shall be governed by the laws of the state in which the majority of Driver's routes are performed, without regard to conflict-of-law principles.
+
+13. ENTIRE AGREEMENT
+This Agreement, together with Company's Platform Conduct Policy and applicable Commercial Driver Compliance Manual, constitutes the entire agreement between the parties with respect to commercial driver services and supersedes all prior discussions or agreements on this subject.
+
+By typing my full legal name below I am affixing my electronic signature to this Agreement, which is legally equivalent to a handwritten signature under applicable electronic signature law.`
 
 interface StepDriverAgreementProps {
   stepIndex: number; totalSteps: number
-  driverId: string; value: AgreementInfo; onChange: (v: AgreementInfo) => void
+  driverId: string; isCommercialDriver: boolean
+  value: AgreementInfo; onChange: (v: AgreementInfo) => void
   onBack: () => void; onNext: () => void | Promise<void>
 }
 
-function StepDriverAgreement({ stepIndex, totalSteps, driverId, value, onChange, onBack, onNext }: StepDriverAgreementProps) {
+function StepDriverAgreement({
+  stepIndex, totalSteps, driverId, isCommercialDriver,
+  value, onChange, onBack, onNext,
+}: StepDriverAgreementProps) {
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
   const set = (patch: Partial<AgreementInfo>) => onChange({ ...value, ...patch })
   const ready = value.signature.trim() !== '' && value.signed_date.trim() !== ''
 
+  const agreementText  = isCommercialDriver ? COMMERCIAL_AGREEMENT_TEXT : CONSUMER_AGREEMENT_TEXT
+  const agreementLabel = isCommercialDriver
+    ? 'Commercial Driver Independent Contractor Agreement — v1.0'
+    : 'Consumer Driver Independent Contractor Agreement — v1.0'
+
   const submit = async () => {
     if (!ready || saving) return
     setSaving(true); setError(null)
     try {
-      const { data: existing } = await supabase
-        .from('driver_profiles')
-        .select('driver_type')
-        .eq('driver_id', driverId)
-        .maybeSingle()
-      const driverType = (existing as { driver_type?: string } | null)?.driver_type ?? 'driver_1099'
+      const driverType = isCommercialDriver ? 'commercial_driver' : 'driver_1099'
       const { error: upErr } = await supabase
         .from('driver_profiles')
         .upsert(
-          { driver_id: driverId, driver_type: driverType,
+          {
+            driver_id:           driverId,
+            driver_type:         driverType,
             agreement_signed_at: new Date().toISOString(),
-            agreement_signature: value.signature.trim() },
+            agreement_signature: value.signature.trim(),
+            agreement_version:   agreementKey(isCommercialDriver),
+          },
           { onConflict: 'driver_id' },
         )
       if (upErr) throw upErr
@@ -1091,10 +1282,23 @@ function StepDriverAgreement({ stepIndex, totalSteps, driverId, value, onChange,
 
   return (
     <StepShell stepIndex={stepIndex} totalSteps={totalSteps}
-               title="Driver Agreement" subtitle="Please read the agreement below before signing.">
+               title="Driver Agreement"
+               subtitle="Read the full agreement before signing. Scroll to the bottom.">
+      {/* Agreement type badge */}
+      <div style={{
+        background:   isCommercialDriver ? 'rgba(245,158,11,0.12)' : 'rgba(0,200,255,0.10)',
+        border:       `1px solid ${isCommercialDriver ? 'rgba(245,158,11,0.35)' : 'rgba(0,200,255,0.30)'}`,
+        borderRadius: 10,
+        padding:      '8px 14px',
+        fontSize:     12,
+        fontWeight:   700,
+        color:        isCommercialDriver ? 'rgba(254,215,170,1)' : 'rgba(186,230,253,1)',
+      }}>
+        {isCommercialDriver ? '🏢' : '🏠'} {agreementLabel}
+      </div>
       <div className="max-h-72 overflow-y-auto rounded-xl border p-4 text-xs leading-relaxed whitespace-pre-line"
            style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(0,190,255,0.18)', color: 'rgba(255,255,255,0.78)' }}>
-        {AGREEMENT_TEXT}
+        {agreementText}
       </div>
       <TextInput label="Type your full legal name to sign" value={value.signature}
                  onChange={(e) => set({ signature: e.target.value })} required
@@ -1109,70 +1313,7 @@ function StepDriverAgreement({ stepIndex, totalSteps, driverId, value, onChange,
 
 // ── Step: Training ────────────────────────────────────────────────────────────
 
-interface StepTrainingProps {
-  stepIndex: number; totalSteps: number
-  driverId: string; value: TrainingInfo; onChange: (v: TrainingInfo) => void
-  onBack: () => void; onNext: () => void | Promise<void>
-}
-
-const TRAINING_MODULES: ReadonlyArray<{ key: keyof TrainingInfo; label: string }> = [
-  { key: 'safety',   label: 'I have reviewed the Safety module' },
-  { key: 'qr_bag',   label: 'I have reviewed the QR Bag module' },
-  { key: 'pickup',   label: 'I have reviewed the Pickup Procedures module' },
-  { key: 'customer', label: 'I have reviewed the Customer Interaction module' },
-  { key: 'photo',    label: 'I have reviewed the Photo Verification module' },
-]
-
-function StepTraining({ stepIndex, totalSteps, driverId, value, onChange, onBack, onNext }: StepTrainingProps) {
-  const [saving, setSaving] = useState(false)
-  const [error,  setError]  = useState<string | null>(null)
-  const ready = TRAINING_MODULES.every((m) => value[m.key])
-
-  const submit = async () => {
-    if (!ready || saving) return
-    setSaving(true); setError(null)
-    try {
-      const { data: existing } = await supabase
-        .from('driver_profiles')
-        .select('driver_type')
-        .eq('driver_id', driverId)
-        .maybeSingle()
-      const driverType = (existing as { driver_type?: string } | null)?.driver_type ?? 'driver_1099'
-      const { error: upErr } = await supabase
-        .from('driver_profiles')
-        .upsert(
-          { driver_id: driverId, driver_type: driverType,
-            training_completed_at: new Date().toISOString() },
-          { onConflict: 'driver_id' },
-        )
-      if (upErr) throw upErr
-      await onNext()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save training')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <StepShell stepIndex={stepIndex} totalSteps={totalSteps}
-               title="Training Modules" subtitle="Confirm you've reviewed each module. All five are required.">
-      <ul className="space-y-2">
-        {TRAINING_MODULES.map((m) => (
-          <li key={m.key}>
-            <label className="flex items-start gap-2 text-sm text-white">
-              <input type="checkbox" className="mt-1" checked={value[m.key]}
-                     onChange={(e) => onChange({ ...value, [m.key]: e.target.checked })} />
-              <span>{m.label}</span>
-            </label>
-          </li>
-        ))}
-      </ul>
-      <ErrorLine msg={error} />
-      <StepFooter onBack={onBack} onNext={submit} nextDisabled={!ready} nextLoading={saving} nextLabel="Complete training" />
-    </StepShell>
-  )
-}
+// StepTraining is now imported from DriverTrainingModules.tsx (full content modules + quiz).
 
 // ── Step: Platform Conduct Policy ─────────────────────────────────────────────
 // Required for ALL driver types. Explains warnings vs violations and the

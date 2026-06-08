@@ -621,7 +621,7 @@ export default function AdminCommercialDispatch() {
         .order('stop_order', { ascending: true, nullsFirst: false })
         .order('sequence',   { ascending: true }),
       // L.2 H3 — only commercial-capable drivers can be assigned commercial pickups.
-      // driver_1099 (consumer_only) is blocked at RLS but would still appear in the
+      // consumer_only drivers are blocked at RLS but would still appear in the
       // dropdown without this filter, creating ghost assignments dispatch can't see.
       supabase.from('profiles').select('id, full_name').eq('role', 'driver').in('driver_service_type', ['hybrid', 'commercial_only']),
       supabase.from('warehouses').select('id, code, name, city, accepts_commercial, accepted_materials, capacity_percent, bay_count, bays_available, is_active').eq('is_active', true).order('code'),

@@ -85,7 +85,15 @@ export function isCommercialCustomerRole(role: string | null | undefined): boole
 
 // ── Commercial ───────────────────────────────────────────────────────────────
 
+// DB CHECK on profiles.driver_service_type: ('consumer_only','commercial_only','hybrid')
+// (see supabase/migrations/20260625000001_driver_service_type_production.sql)
+// consumer_only   — 1099 independent contractor, consumer pickups only
+// commercial_only — Commercial employee (company vehicles/equipment only)
+// hybrid          — Approved for both commercial AND consumer routes
 export type DriverServiceType = 'consumer_only' | 'commercial_only' | 'hybrid'
+
+// Admin-set access type for commercial drivers — stored for audit trail
+export type DriverAccessType = 'commercial_only' | 'hybrid'
 
 export type CommercialPickupStatus = 'requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
 export type CommercialBinType = 'qr_bin' | 'qr_dumpster' | 'qr_compactor' | 'qr_pallet'
@@ -587,8 +595,8 @@ export interface PartnerStats {
 
 // ── Driver Compliance Pack V1 ────────────────────────────────────────────────
 // Schema lives in supabase/migrations/20260605000002_driver_compliance.sql.
-// driver_1099 ≡ DriverServiceType 'consumer_only'
-// commercial_driver ≡ DriverServiceType 'hybrid' OR 'commercial_only'
+// driver_1099       ≡ DriverServiceType 'driver_1099'
+// commercial_driver ≡ DriverServiceType 'commercial_only' OR 'hybrid_driver'
 
 export type DriverComplianceStatus =
   | 'pending_review'
@@ -597,11 +605,23 @@ export type DriverComplianceStatus =
   | 'rejected'
   | 'more_info_required'
 
+/**
+ * Platform-level conduct status — controls access to all driver dispatch
+ * surfaces (both commercial and consumer sides). Enforced in ProtectedRoute.
+ *   active     — normal operation
+ *   warned     — formal written warning on file; dispatch still permitted
+ *   suspended  — cannot accept new pickups; can log in and view account
+ *   terminated — access to all driver workflows revoked; admin restores only
+ */
+export type DriverPlatformStatus = 'active' | 'warned' | 'suspended' | 'terminated'
+
 export type DriverDocumentType =
   | 'license_front'
   | 'license_back'
-  | 'insurance'
-  | 'registration'
+  | 'insurance'      // consumer/1099 only — personal vehicle insurance
+  | 'registration'   // consumer/1099 only — personal vehicle registration
+  | 'i9'             // commercial employee — Employment Eligibility Verification
+  | 'w4'             // commercial employee — Employee's Withholding Certificate
 
 export type DriverDocumentStatus = 'pending_review' | 'approved' | 'rejected'
 
@@ -612,6 +632,10 @@ export type PayoutAccountStatus = 'pending' | 'onboarding' | 'complete' | 'rejec
 export interface DriverProfile {
   driver_id:              string
   driver_type:            'driver_1099' | 'commercial_driver'
+  // Admin-set access type — determines routing after approval.
+  // commercial_only → /dashboard/commercial-driver
+  // hybrid_driver   → /driver-mode-select (both consumer + commercial)
+  driver_access_type:     DriverAccessType | null
   status:                 DriverComplianceStatus
   approved_at:            string | null
   approved_by:            string | null
@@ -621,7 +645,7 @@ export interface DriverProfile {
   w9_legal_name:          string | null
   w9_address:             string | null
   w9_submitted_at:        string | null
-  // Vehicle
+  // Vehicle (consumer/1099 drivers only — commercial drivers use company vehicles)
   vehicle_make:           string | null
   vehicle_model:          string | null
   vehicle_year:           number | null
@@ -630,8 +654,20 @@ export interface DriverProfile {
   // Driver agreement
   agreement_signed_at:    string | null
   agreement_signature:    string | null
+  // Compliance document version tracking (see driverComplianceVersions.ts)
+  agreement_version:      string | null   // e.g. "consumer_v1.0"
+  manual_acknowledged_at: string | null   // when driver read + acknowledged compliance manual
+  manual_version:         string | null   // e.g. "consumer_v1.0"
   // Training
   training_completed_at:  string | null
+  training_version:       string | null   // e.g. "consumer_v1.0"
+  // Platform conduct policy (required for all driver types)
+  policy_acknowledged_at: string | null
+  // Platform status — governs access to all dispatch surfaces (commercial + consumer)
+  platform_status:            DriverPlatformStatus | null
+  platform_status_reason:     string | null
+  platform_status_updated_at: string | null
+  platform_status_updated_by: string | null
   created_at:             string
   updated_at:             string
 }

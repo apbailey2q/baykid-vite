@@ -161,6 +161,7 @@ const AdminDriverCompliance          = lazy(() => import('./screens/admin/AdminD
 const AdminRegions                   = lazy(() => import('./screens/admin/AdminRegions'))
 const AdminForecasting               = lazy(() => import('./screens/admin/AdminForecasting'))
 const AdminLaunchRoadmap             = lazy(() => import('./screens/admin/AdminLaunchRoadmap'))
+const AdminOperationsSettings        = lazy(() => import('./screens/admin/AdminOperationsSettings'))
 const ReleaseNotesPage               = lazy(() => import('./screens/admin/ReleaseNotesPage'))
 const LaunchCenter                   = lazy(() => import('./screens/admin/launch/LaunchCenter'))
 const FraudDetectionPage             = lazy(() => import('./screens/FraudDetectionPage'))
@@ -288,9 +289,11 @@ function HomeRedirect() {
   // Driver routing by service type
   if (normalized === 'driver') {
     const dst = profile?.driver_service_type
-    if (dst === 'consumer_only')   return <Navigate to="/dashboard/driver/consumer-routes" replace />
-    if (dst === 'commercial_only') return <Navigate to="/dashboard/driver/commercial-routes" replace />
-    return <Navigate to="/dashboard/driver/hybrid-routes" replace />
+    if (dst === 'consumer_only')   return <Navigate to="/dashboard/driver" replace />
+    if (dst === 'commercial_only') return <Navigate to="/dashboard/commercial-driver" replace />
+    if (dst === 'hybrid')          return <Navigate to="/driver-mode-select" replace />
+    // unset — show mode-select screen (treat as hybrid for safety)
+    return <Navigate to="/driver-mode-select" replace />
   }
 
   const dest = (normalized && ROLE_HOME[normalized]) ?? '/real-login'
@@ -423,6 +426,7 @@ function App() {
               <Route path="/dashboard/admin/regions"                 element={<ProtectedRoute requireApproved><AdminRegions /></ProtectedRoute>} />
               <Route path="/dashboard/admin/forecasting"             element={<ProtectedRoute requireApproved><AdminForecasting /></ProtectedRoute>} />
               <Route path="/dashboard/admin/launch-roadmap"          element={<ProtectedRoute requireApproved><AdminLaunchRoadmap /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/operations"              element={<ProtectedRoute requireApproved><AdminOperationsSettings /></ProtectedRoute>} />
               <Route path="/dashboard/admin/ai-marketing"            element={<ProtectedRoute requireApproved><AIMarketingCenter /></ProtectedRoute>} />
               <Route path="/dashboard/municipal"                     element={<ProtectedRoute requireApproved><MunicipalDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/municipal/reports"             element={<ProtectedRoute requireApproved><MunicipalReports /></ProtectedRoute>} />
@@ -443,6 +447,9 @@ function App() {
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 
               {/* ── Driver mode flow (approved drivers only) ── */}
+              {/* /driver-mode-select — canonical path for hybrid_driver post-login */}
+              {/* /driver/mode         — legacy alias kept for backwards compatibility */}
+              <Route path="/driver-mode-select"      element={<ProtectedRoute requireApproved><DriverModeSelect /></ProtectedRoute>} />
               <Route path="/driver/mode"             element={<ProtectedRoute requireApproved><DriverModeSelect /></ProtectedRoute>} />
               <Route path="/driver/residential"      element={<ProtectedRoute requireApproved><DriverModeLanding mode="residential" /></ProtectedRoute>} />
               <Route path="/driver/commercial"       element={<ProtectedRoute requireApproved><DriverModeLanding mode="commercial"  /></ProtectedRoute>} />

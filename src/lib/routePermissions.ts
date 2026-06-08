@@ -204,6 +204,8 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/route-alerts':                   ['admin', 'operations_manager', 'compliance_manager'],
   // Apple Sprint C — moderation + blocked users + per-user compliance notifications
   '/dashboard/admin/moderation-center':              ['admin', 'compliance_manager'],
+  // Apple Sprint C activation — admin-configurable thresholds (ops_manager read-only via RLS)
+  '/dashboard/admin/compliance-settings':            ['admin', 'compliance_manager', 'operations_manager'],
   '/settings/blocked-users': [
     'admin','consumer','commercial','driver',
     ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES,
@@ -234,6 +236,8 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/admin/document-review':           ['admin'],
   // Phase MG.4 — management documents (management roles + admin)
   '/management/documents':            ['admin', ...MANAGEMENT_ROLES],
+  // Phase MG.6 — operational notification inbox (admin only)
+  '/admin/operational-notifications': ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

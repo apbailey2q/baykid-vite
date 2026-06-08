@@ -68,6 +68,33 @@ export default function AdminDashboard() {
     + (complianceCounts?.countdowns ?? 0)
     + (complianceCounts?.deactivated ?? 0)
 
+  // Phase MG.6 — operational notification open counts for tile badge
+  const { data: opNotifCounts } = useQuery({
+    queryKey: ['admin-op-notif-counts'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('operational_notification_events')
+          .select('severity')
+          .eq('status', 'open')
+
+        if (error || !data) return { open: 0, urgent: 0 }
+
+        const rows    = data as { severity: string }[]
+        const open   = rows.length
+        const urgent = rows.filter(r => r.severity === 'urgent' || r.severity === 'critical').length
+        return { open, urgent }
+      } catch {
+        return { open: 0, urgent: 0 }
+      }
+    },
+    refetchInterval: 5 * 60 * 1000,
+    staleTime:       60_000,
+  })
+
+  const opOpen   = opNotifCounts?.open   ?? 0
+  const opUrgent = opNotifCounts?.urgent ?? 0
+
   const tabs: { value: Tab; label: string; urgent?: boolean; muted?: boolean }[] = [
     { value: 'overview',    label: 'Overview' },
     { value: 'users',       label: `Users${pendingCount > 0 ? ` (${pendingCount})` : ''}`, urgent: pendingCount > 0 },
@@ -162,6 +189,30 @@ export default function AdminDashboard() {
         >
           ⚠️ Route & Driver Alerts
         </Link>
+        {/* Phase MG.6 — Operational Notifications tile */}
+        <Link
+          to="/admin/operational-notifications"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{
+            background:      opUrgent > 0 ? 'rgba(249,115,22,0.13)' : opOpen > 0 ? 'rgba(251,191,36,0.10)' : 'rgba(74,222,128,0.07)',
+            border:          `1px solid ${opUrgent > 0 ? 'rgba(249,115,22,0.40)' : opOpen > 0 ? 'rgba(251,191,36,0.32)' : 'rgba(74,222,128,0.22)'}`,
+            color:           opUrgent > 0 ? '#f97316' : opOpen > 0 ? '#fbbf24' : '#4ade80',
+            textDecoration:  'none',
+          }}
+          title="Review route issues, driver coverage needs, document issues, warehouse staffing, and commercial pickup alerts."
+        >
+          🔔 Operational Notifications
+          {opUrgent > 0 && (
+            <span style={{ background: '#f97316', color: '#fff', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              {opUrgent} urgent
+            </span>
+          )}
+          {opOpen > 0 && opUrgent === 0 && (
+            <span style={{ background: '#fbbf24', color: '#000', borderRadius: '999px', fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+              {opOpen} open
+            </span>
+          )}
+        </Link>
         <Link
           to="/dashboard/admin/moderation-center"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
@@ -169,6 +220,14 @@ export default function AdminDashboard() {
           title="Review content reports, blocked users, compliance alerts, audit logs, and Apple safety requirements."
         >
           🛡️ Moderation & Compliance
+        </Link>
+        <Link
+          to="/dashboard/admin/compliance-settings"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.32)', color: '#4ade80', textDecoration: 'none' }}
+          title="Configure document warnings, deactivation countdowns, route alert timing, and driver coverage thresholds."
+        >
+          ⚙️ Compliance Settings
         </Link>
       </div>
       <div

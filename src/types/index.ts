@@ -900,3 +900,54 @@ export interface ComplianceDeactivationEvent {
   created_by?:               string | null
   created_at:                string
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase MG.6 — Operational Notifications
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OperationalNotificationEventType =
+  | 'route_not_completed'
+  | 'drivers_needed'
+  | 'driver_document_issue'
+  | 'warehouse_staffing_issue'
+  | 'commercial_pickup_issue'
+  | 'admin_review_required'
+  | 'compliance_escalation'
+
+export type OperationalNotificationStatus =
+  | 'open'
+  | 'acknowledged'
+  | 'resolved'
+  | 'dismissed'
+
+export interface OperationalNotificationRule {
+  id:              string
+  rule_code:       string
+  rule_title:      string
+  event_type:      OperationalNotificationEventType
+  recipient_roles: string[]
+  severity:        ComplianceSeverity
+  is_active:       boolean
+  created_at:      string
+  updated_at:      string
+}
+
+export interface OperationalNotificationEvent {
+  id:                 string
+  event_type:         OperationalNotificationEventType
+  severity:           ComplianceSeverity
+  owner_type?:        OwnerType | null
+  owner_profile_id?:  string | null
+  recipient_user_id?: string | null
+  title:              string
+  message:            string
+  action_required:    boolean
+  action_url?:        string | null
+  metadata:           Record<string, unknown>
+  status:             OperationalNotificationStatus
+  created_by?:        string | null
+  acknowledged_at?:   string | null
+  resolved_at?:       string | null
+  created_at:         string
+  updated_at:         string
+}

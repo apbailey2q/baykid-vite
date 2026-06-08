@@ -32,6 +32,7 @@ import {
 import ComplianceNotificationCenter from '../../components/notifications/ComplianceNotificationCenter'
 import ComplianceGateBanner from '../../components/compliance/ComplianceGateBanner'
 import { computeGateStatus } from '../../lib/complianceGate'
+import OperationalNotificationCenter from '../../components/notifications/OperationalNotificationCenter'
 
 const BRAND        = '#00c8ff'
 const BRAND_DIM    = 'rgba(0,200,255,0.08)'
@@ -581,6 +582,18 @@ export default function ManagementDashboard() {
               style={{ color: 'rgba(0,200,255,0.6)', textDecoration: 'none' }}>
               View all documents →
             </Link>
+          </section>
+        )}
+
+        {/* ── Phase MG.6 — Operational Notifications ── */}
+        {user && (
+          <section>
+            <OperationalNotificationCenter
+              userId={user.id}
+              compact
+              maxItems={5}
+              showResolve={role === 'admin'}
+            />
           </section>
         )}
 

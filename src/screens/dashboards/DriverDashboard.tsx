@@ -28,6 +28,7 @@ import { PickupsNearYou } from '../driver/PickupsNearYou'
 import { DriverRouteView } from '../driver/DriverRouteView'
 import { logout } from '../../lib/auth'
 import { DriverHeader } from '../../components/driver/DriverHeader'
+import OperationalComplianceBanner from '../../components/compliance/OperationalComplianceBanner'
 import { SectionLabel } from '../../components/ui/dashboard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -629,6 +630,9 @@ export default function DriverDashboard() {
         {/* ── HOME ─────────────────────────────────────────────────────────── */}
         {driverTab === 'home' && (
           <div className="px-5 pt-5 space-y-5" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
+
+            {/* Compliance banner — only renders when severity > none */}
+            <OperationalComplianceBanner />
 
             {/* Auto-pause notice */}
             {autoPausedAt && (

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { DashboardShell } from '../../components/DashboardShell'
+import OperationalComplianceBanner from '../../components/compliance/OperationalComplianceBanner'
 import { QrScanner } from '../../components/QrScanner'
 import { lookupOrCreateBag } from '../../lib/bags'
 import { markBagAtWarehouse, getInspectionQueue, getMyStatsToday } from '../../lib/warehouse'
@@ -955,6 +956,7 @@ export default function WarehouseDashboard() {
 
   return (
     <DashboardShell title="Warehouse">
+      <OperationalComplianceBanner className="mb-4" />
       {/* ── Tab bar ── */}
       <div
         className="flex mb-5 -mx-4 px-2 overflow-x-auto"

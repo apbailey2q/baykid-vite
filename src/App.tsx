@@ -94,6 +94,8 @@ const AdminManagementOnboarding       = lazy(() => import('./screens/admin/Admin
 // Phase MG.4 — Compliance document review + management documents
 const AdminDocumentReview             = lazy(() => import('./screens/admin/AdminDocumentReview'))
 const ManagementDocuments             = lazy(() => import('./screens/management/ManagementDocuments'))
+// Phase MG.6 — Operational notification inbox (admin only)
+const AdminOperationalNotifications   = lazy(() => import('./screens/admin/AdminOperationalNotifications'))
 // Apple Sprint B — user-facing Document Center + admin route/driver-need alerts
 const DocumentCenter                  = lazy(() => import('./screens/compliance/DocumentCenter'))
 const AdminRouteAlertsCenter          = lazy(() => import('./screens/admin/AdminRouteAlertsCenter'))
@@ -101,6 +103,8 @@ const AdminRouteAlertsCenter          = lazy(() => import('./screens/admin/Admin
 const ComplianceNotificationsCenter   = lazy(() => import('./screens/compliance/ComplianceNotificationsCenter'))
 const BlockedUsersScreen              = lazy(() => import('./screens/settings/BlockedUsersScreen'))
 const AdminModerationCenter           = lazy(() => import('./screens/admin/AdminModerationCenter'))
+// Apple Sprint C activation — admin-configurable compliance settings
+const AdminComplianceSettings         = lazy(() => import('./screens/admin/AdminComplianceSettings'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -489,6 +493,8 @@ function App() {
               {/* Phase MG.4 — Compliance document review + management documents */}
               <Route path="/admin/document-review"            element={<ProtectedRoute requireApproved><AdminDocumentReview /></ProtectedRoute>} />
               <Route path="/management/documents"             element={<ProtectedRoute requireApproved><ManagementDocuments /></ProtectedRoute>} />
+              {/* Phase MG.6 — Operational notification inbox (admin only) */}
+              <Route path="/admin/operational-notifications"  element={<ProtectedRoute requireApproved><AdminOperationalNotifications /></ProtectedRoute>} />
               {/* Apple Sprint B — user-facing Document Center for non-management roles */}
               <Route path="/compliance/documents"             element={<ProtectedRoute><DocumentCenter /></ProtectedRoute>} />
               <Route path="/dashboard/admin/route-alerts"     element={<ProtectedRoute requireApproved><AdminRouteAlertsCenter /></ProtectedRoute>} />
@@ -496,6 +502,7 @@ function App() {
               <Route path="/compliance/notifications"         element={<ProtectedRoute><ComplianceNotificationsCenter /></ProtectedRoute>} />
               <Route path="/settings/blocked-users"           element={<ProtectedRoute><BlockedUsersScreen /></ProtectedRoute>} />
               <Route path="/dashboard/admin/moderation-center" element={<ProtectedRoute requireApproved><AdminModerationCenter /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/compliance-settings" element={<ProtectedRoute requireApproved><AdminComplianceSettings /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

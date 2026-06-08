@@ -603,11 +603,13 @@ function ReviewCard({
       const { error } = await supabase
         .from('driver_profiles')
         .update({
-          status:           'rejected',
-          rejected_at:      new Date().toISOString(),
-          rejection_reason: reason,
-          approved_at:      null,
-          approved_by:      null,
+          status:             'rejected',
+          rejected_at:        new Date().toISOString(),
+          rejection_reason:   reason,
+          approved_at:        null,
+          approved_by:        null,
+          // Clear access type so stale values never carry into a future re-approval.
+          driver_access_type: null,
         })
         .eq('driver_id', profile.driver_id)
       if (error) throw error
@@ -659,10 +661,10 @@ function ReviewCard({
                 : bgCheck ? '#00c8ff' : '#fbbf24'
 
   const payoutLabel = payout
-    ? payout.status === 'complete'   ? 'Stripe Connect: complete'
-    : payout.status === 'onboarding' ? 'Stripe Connect: onboarding'
-    : payout.status === 'rejected'   ? 'Stripe Connect: rejected'
-    : 'Stripe Connect: pending'
+    ? payout.status === 'complete'   ? 'Payout account: complete'
+    : payout.status === 'onboarding' ? 'Payout account: onboarding'
+    : payout.status === 'rejected'   ? 'Payout account: rejected'
+    : 'Payout account: pending'
     : 'No payout account'
   const payoutColor = payout?.status === 'complete' ? '#4ade80'
                     : payout?.status === 'rejected' ? '#f87171'

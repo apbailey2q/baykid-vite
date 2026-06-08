@@ -195,9 +195,11 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // These three paths are the primary entry points for management personnel.
   // Admin can always access for QA/oversight. MANAGEMENT_ROLES already includes
   // warehouse_manager + executive so no need to spread separately.
-  '/management/onboarding': ['admin', ...MANAGEMENT_ROLES],
-  '/management/dashboard':  ['admin', ...MANAGEMENT_ROLES],
-  '/management/training':   ['admin', ...MANAGEMENT_ROLES],
+  '/management/onboarding':           ['admin', ...MANAGEMENT_ROLES],
+  '/management/dashboard':            ['admin', ...MANAGEMENT_ROLES],
+  '/management/training':             ['admin', ...MANAGEMENT_ROLES],
+  // Phase MG.2 — agreement compliance overview (admin only)
+  '/management/agreement-compliance': ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

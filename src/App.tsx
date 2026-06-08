@@ -82,9 +82,11 @@ const CommercialOnboardingG4   = lazy(() => import('./screens/onboarding/Commerc
 // the legacy 5-step wizard at /dashboard/warehouse/onboarding (kept for back-compat).
 const WarehouseOnboardingV2    = lazy(() => import('./screens/onboarding/WarehouseOnboarding'))
 // Phase MG.1 — Management Onboarding System: /management/* routes
-const ManagementOnboardingWizard = lazy(() => import('./screens/management/ManagementOnboardingWizard'))
-const ManagementDashboard        = lazy(() => import('./screens/management/ManagementDashboard'))
-const ManagementTrainingCenter   = lazy(() => import('./screens/management/ManagementTrainingCenter'))
+const ManagementOnboardingWizard      = lazy(() => import('./screens/management/ManagementOnboardingWizard'))
+const ManagementDashboard             = lazy(() => import('./screens/management/ManagementDashboard'))
+const ManagementTrainingCenter        = lazy(() => import('./screens/management/ManagementTrainingCenter'))
+// Phase MG.2 — Management Agreement Compliance admin view
+const ManagementAgreementCompliance   = lazy(() => import('./screens/management/ManagementAgreementCompliance'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -457,9 +459,11 @@ function App() {
               <Route path="/onboarding/commercial"           element={<ProtectedRoute><CommercialOnboardingG4 /></ProtectedRoute>} />
               <Route path="/onboarding/warehouse"            element={<ProtectedRoute><WarehouseOnboardingV2 /></ProtectedRoute>} />
               {/* Phase MG.1 — Management Onboarding System lives under /management/* */}
-              <Route path="/management/onboarding" element={<ProtectedRoute><ManagementOnboardingWizard /></ProtectedRoute>} />
-              <Route path="/management/dashboard"  element={<ProtectedRoute requireApproved><ManagementDashboard /></ProtectedRoute>} />
-              <Route path="/management/training"   element={<ProtectedRoute requireApproved><ManagementTrainingCenter /></ProtectedRoute>} />
+              <Route path="/management/onboarding"            element={<ProtectedRoute><ManagementOnboardingWizard /></ProtectedRoute>} />
+              <Route path="/management/dashboard"             element={<ProtectedRoute requireApproved><ManagementDashboard /></ProtectedRoute>} />
+              <Route path="/management/training"              element={<ProtectedRoute requireApproved><ManagementTrainingCenter /></ProtectedRoute>} />
+              {/* Phase MG.2 — Agreement Compliance admin overview */}
+              <Route path="/management/agreement-compliance"  element={<ProtectedRoute requireApproved><ManagementAgreementCompliance /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

@@ -18,7 +18,7 @@ Confirm: browser opens, login screen renders, no console errors at startup.
 
 ### 0.2 Create the admin QA test account
 
-The admin test account email is **`admin@baykid.test`**.
+The admin test account email is **`admin@cyansbrooklynn.test`**.
 You must create the auth user first, then seed the profile.
 
 **Step 1 — Create the auth.users row** (pick one method):
@@ -32,14 +32,14 @@ You must create the auth user first, then seed the profile.
 **Supabase Dashboard:**
 1. Open your project → Authentication → Users
 2. Click **"Add user"** → **"Create new user"**
-3. Email: `admin@baykid.test`
+3. Email: `admin@cyansbrooklynn.test`
 4. Set a strong local-only test password (e.g. `AdminQA2026!`)
 5. Check **"Auto Confirm User"** if the option appears
 
 **Supabase CLI (local stack):**
 ```bash
 supabase auth create-user \
-  --email admin@baykid.test \
+  --email admin@cyansbrooklynn.test \
   --password AdminQA2026!
 ```
 
@@ -59,7 +59,7 @@ supabase db query --linked --file supabase/seeds/admin_qa_user.sql
 ```sql
 SELECT id, email, role, approval_status
 FROM public.profiles
-WHERE email = 'admin@baykid.test';
+WHERE email = 'admin@cyansbrooklynn.test';
 -- Expected: role = 'admin', approval_status = 'approved'
 ```
 
@@ -69,7 +69,7 @@ WHERE email = 'admin@baykid.test';
 
 1. Navigate to `http://localhost:5173`
 2. The login page should appear (no auto-redirect if no active session)
-3. Sign in with `admin@baykid.test` and your test password
+3. Sign in with `admin@cyansbrooklynn.test` and your test password
 4. **Expected:** Redirect to `/dashboard/admin` (admin dashboard)
 5. **Check:** Browser console shows no auth errors
 
@@ -332,7 +332,7 @@ LIMIT 5;
 ## 9. RealLoginPage Session Banner
 
 1. While logged in as admin, navigate to `http://localhost:5173` (the login page URL)
-2. **Expected:** A banner appears: "Currently signed in as admin@baykid.test"
+2. **Expected:** A banner appears: "Currently signed in as admin@cyansbrooklynn.test"
 3. **Expected:** Two buttons: **"Go to Dashboard"** and **"Sign Out"**
 4. **Expected:** No automatic redirect — the user must click
 5. Click **"Go to Dashboard"** → should land on `/dashboard/admin`
@@ -358,7 +358,7 @@ After completing all tests, open DevTools → Console and confirm:
 After smoke testing is complete:
 
 1. Restore operations settings to defaults (window 6 PM–8 PM, fees at defaults)
-2. Optionally delete the `admin@baykid.test` auth user from staging (but keep the SQL seed)
+2. Optionally delete the `admin@cyansbrooklynn.test` auth user from staging (but keep the SQL seed)
 3. Never commit `.env.local` with test credentials
 
 ---
@@ -418,7 +418,7 @@ LIMIT 10;
 ```sql
 SELECT email, role, approval_status, driver_service_type
 FROM public.profiles
-WHERE email LIKE '%@baykid.test' OR email LIKE '%@cbrecycling.test'
+WHERE email LIKE '%@baykid.test' OR email LIKE '%@cyansbrooklynn.test' OR email LIKE '%@cbrecycling.test'
 ORDER BY role, email;
 ```
 
@@ -439,7 +439,7 @@ WHERE email = 'your-test-email@example.com';
 
 | Email | Role | Notes |
 |-------|------|-------|
-| `admin@baykid.test` | `admin` | Primary QA admin — created by `supabase/seeds/admin_qa_user.sql` |
+| `admin@cyansbrooklynn.test` | `admin` | Primary QA admin — created by `supabase/seeds/admin_qa_user.sql` |
 | `commercial@baykid.test` | `commercial` | Commercial account — set up in migration `20260518_role_constraint_and_test_accounts.sql` |
 | `driver@baykid.test` | `driver` (commercial_only) | Commercial driver — same migration |
 | `warehouse@baykid.test` | `warehouse_employee` | Warehouse — same migration |

@@ -15,21 +15,21 @@
 --   Method A — Supabase Dashboard (recommended for cloud staging):
 --     1. Open your project: https://supabase.com/dashboard
 --     2. Go to Authentication → Users → "Invite user" or "Add user"
---     3. Email: admin@baykid.test
+--     3. Email: admin@cyansbrooklynn.test
 --     4. Set a strong password you'll remember for local testing
 --     5. Copy the resulting UUID — it will auto-populate below when you run
 --        this script (the DO $$ block looks it up by email).
 --
 --   Method B — Supabase CLI (local stack / CI):
 --     supabase auth create-user \
---       --email admin@baykid.test \
+--       --email admin@cyansbrooklynn.test \
 --       --password <your-local-test-password> \
 --       --role service_role
 --
 --   Method C — Direct REST (for CI pipelines):
 --     POST https://<project-ref>.supabase.co/auth/v1/admin/users
 --     Authorization: Bearer <SERVICE_ROLE_KEY>
---     { "email": "admin@baykid.test", "password": "...", "email_confirm": true }
+--     { "email": "admin@cyansbrooklynn.test", "password": "...", "email_confirm": true }
 --
 -- USAGE
 --   After the auth user exists, run this file in the Supabase SQL Editor:
@@ -43,7 +43,7 @@
 DO $$
 DECLARE
   v_user_id   uuid;
-  v_email     text := 'admin@baykid.test';
+  v_email     text := 'admin@cyansbrooklynn.test';
   v_full_name text := 'QA Admin';
 BEGIN
 
@@ -97,4 +97,4 @@ SELECT
   u.email_confirmed_at IS NOT NULL AS email_confirmed
 FROM public.profiles  p
 JOIN auth.users        u ON u.id = p.id
-WHERE p.email = 'admin@baykid.test';
+WHERE p.email = 'admin@cyansbrooklynn.test';

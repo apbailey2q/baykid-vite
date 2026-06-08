@@ -53,6 +53,9 @@ interface DispatchStop {
   stop_order:         number | null
   status:             DispatchStatus
   priority:           DispatchPriority
+  /** Copied from commercial_pickups.is_priority — set at request time when
+   *  admin has commercial_priority_dispatch enabled for an Emergency Overflow. */
+  is_priority:        boolean
   is_overflow:        boolean
   is_rerouted:        boolean
   business_name:      string
@@ -165,6 +168,7 @@ interface RawStop {
     preferred_window:   string | null
     assigned_warehouse: string | null
     account_id:         string | null
+    is_priority:        boolean
     commercial_accounts: { business_name: string } | null
   } | null
   profiles: { full_name: string | null } | null
@@ -612,6 +616,7 @@ export default function AdminCommercialDispatch() {
           id, pickup_id, driver_id, sequence, stop_order, status, priority, is_overflow, is_rerouted,
           commercial_pickups!pickup_id (
             pickup_location, bin_count, material_type, preferred_window, assigned_warehouse, account_id,
+            is_priority,
             commercial_accounts!account_id ( business_name )
           ),
           profiles!driver_id ( full_name )
@@ -620,10 +625,11 @@ export default function AdminCommercialDispatch() {
         .order('driver_id',  { ascending: true })
         .order('stop_order', { ascending: true, nullsFirst: false })
         .order('sequence',   { ascending: true }),
-      // L.2 H3 — only commercial-capable drivers can be assigned commercial pickups.
-      // consumer_only drivers are blocked at RLS but would still appear in the
-      // dropdown without this filter, creating ghost assignments dispatch can't see.
-      supabase.from('profiles').select('id, full_name').eq('role', 'driver').in('driver_service_type', ['hybrid', 'commercial_only']),
+      // Only commercial-capable drivers can be assigned commercial pickups.
+      // 'hybrid_driver' is the current value after migration 20260701000001
+      // (renamed from 'hybrid'). Listing both values would be wrong — 'hybrid'
+      // no longer exists in any profiles row after the migration was applied.
+      supabase.from('profiles').select('id, full_name').eq('role', 'driver').in('driver_service_type', ['hybrid_driver', 'commercial_only']),
       supabase.from('warehouses').select('id, code, name, city, accepts_commercial, accepted_materials, capacity_percent, bay_count, bays_available, is_active').eq('is_active', true).order('code'),
     ])
 
@@ -641,6 +647,7 @@ export default function AdminCommercialDispatch() {
           stop_order:         r.stop_order,
           status:             r.status as DispatchStatus,
           priority:           (r.priority ?? 'normal') as DispatchPriority,
+          is_priority:        p.is_priority ?? false,
           is_overflow:        r.is_overflow,
           is_rerouted:        r.is_rerouted,
           business_name:      p.commercial_accounts?.business_name ?? 'Unknown Business',
@@ -653,7 +660,15 @@ export default function AdminCommercialDispatch() {
         }
       })
 
-    setStops(mapped)
+    // Priority stops surface first within each driver group so dispatch can
+    // see Emergency Overflow pickups flagged at submission time immediately.
+    const sorted = [...mapped].sort((a, b) => {
+      if (a.is_priority && !b.is_priority) return -1
+      if (!a.is_priority && b.is_priority) return 1
+      return 0
+    })
+
+    setStops(sorted)
     setLoading(false)
 
     const driverList: AvailableDriver[] = (driversRes.data ?? []).map(d => ({

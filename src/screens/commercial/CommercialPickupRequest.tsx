@@ -209,8 +209,12 @@ export default function CommercialPickupRequest() {
   }
 
   const isEmergency  = form.pickupType === 'Emergency Overflow'
-  // is_priority: true when admin has priority dispatch enabled AND this is an emergency
-  const isPriority   = isEmergency && settings.commercial_priority_dispatch
+  // is_priority: true only when ALL three admin conditions hold:
+  //   1. emergency pickups are enabled
+  //   2. priority dispatch is enabled
+  //   3. this pickup is an emergency overflow
+  // Matching the comment in 20260627000001_operations_settings.sql lines 111-120.
+  const isPriority   = isEmergency && settings.commercial_emergency_enabled && settings.commercial_priority_dispatch
   // Which fee to show in the banner (after-hours vs standard — simplified: show standard for now)
   const emergencyFee = settings.commercial_emergency_fee
 

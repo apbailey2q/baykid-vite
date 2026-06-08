@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../store/authStore'
 import CashDonateModal from '../../components/CashDonateModal'
+import ReportContentButton from '../../components/compliance/ReportContentButton'
 
 type Fundraiser = {
   id:               string
@@ -208,7 +209,7 @@ export default function LiveFundraiserDetailPage() {
                 )}
               </div>
 
-              {/* Description */}
+              {/* Description (user-generated content — reportable per Apple 1.2) */}
               {fundraiser.description && (
                 <div
                   className="rounded-2xl p-4 mb-5"
@@ -217,6 +218,13 @@ export default function LiveFundraiserDetailPage() {
                   <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65 }}>
                     {fundraiser.description}
                   </p>
+                  <div className="mt-3 flex justify-end">
+                    <ReportContentButton
+                      contentType="fundraiser"
+                      contentId={fundraiser.id}
+                      variant="inline"
+                    />
+                  </div>
                 </div>
               )}
 

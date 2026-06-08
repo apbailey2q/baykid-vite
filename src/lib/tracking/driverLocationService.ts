@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '../supabase'
+import { acknowledgePermissionDisclosure } from '../complianceCenter'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -64,6 +65,10 @@ export function startLocationTracking(userId: string, callbacks: LocationCallbac
     callbacks.onError('GPS not available on this device')
     return () => {}
   }
+
+  // Apple App Store compliance — record the location-use rationale exposure.
+  // Fire-and-forget; never blocks the location prompt.
+  void acknowledgePermissionDisclosure('location_driver').catch(() => { /* safe-fail */ })
 
   let watchId: number | null = null
 

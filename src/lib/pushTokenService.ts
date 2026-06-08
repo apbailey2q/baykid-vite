@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { VAPID_PUBLIC_KEY, urlBase64ToUint8Array } from './vapid'
+import { acknowledgePermissionDisclosure } from './complianceCenter'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,9 @@ export function getOrCreateDeviceId(): string {
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (typeof window === 'undefined' || !('Notification' in window)) return 'denied'
   if (Notification.permission !== 'default') return Notification.permission
+  // Apple App Store compliance — record the disclosure acknowledgment before
+  // firing the OS prompt. Fire-and-forget; never blocks the prompt.
+  void acknowledgePermissionDisclosure('notifications').catch(() => { /* safe-fail */ })
   try { return await Notification.requestPermission() }
   catch { return 'denied' }
 }

@@ -4,20 +4,32 @@
  *
  * Route: /onboarding
  *
- * consumer                  → /onboarding/consumer  (ConsumerOnboarding)
- * driver (unapproved)       → /driver/compliance    (Driver Compliance Pack V1 wizard)
+ * consumer                  → /onboarding/consumer    (ConsumerOnboarding)
+ * driver (unapproved)       → /driver/compliance      (Driver Compliance Pack V1 wizard)
  * driver (approved)         → /dashboard/driver
- * warehouse_* (all 4 tiers) → /onboarding/warehouse (Phase WH.1 — 18-step wizard)
+ * warehouse_* (worker tier) → /onboarding/warehouse   (Phase WH.1 — 18-step wizard)
+ * management roles (MG.1)   → /management/onboarding  (Phase MG.1 wizard) —
+ *                              includes operations_manager, warehouse_manager,
+ *                              compliance_manager, community_fundraising_manager,
+ *                              municipal_relations_manager, executive
  * commercial (legacy)       → /dashboard/commercial/onboarding
- * fundraiser + sub-roles    → /onboarding/fundraiser (Phase G.3)
- * commercial sub-roles      → /onboarding/commercial (Phase G.4)
- * unknown / other           → /onboarding/consumer  (safe fallback)
+ * fundraiser + sub-roles    → /onboarding/fundraiser  (Phase G.3)
+ * commercial sub-roles      → /onboarding/commercial  (Phase G.4)
+ * unknown / other           → /onboarding/consumer    (safe fallback)
  */
 
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { isFundraiserRole, isCommercialCustomerRole } from '../../types'
 import { isWarehouseRole } from '../../types/warehouse'
+
+// Phase MG.1 — management roles that flow through /management/onboarding.
+// Includes warehouse_manager + executive in addition to the 4 net-new tiers:
+// management roles need leadership/compliance training, not frontline training.
+const MANAGEMENT_ONBOARDING_ROLES = new Set<string>([
+  'operations_manager', 'warehouse_manager', 'compliance_manager',
+  'community_fundraising_manager', 'municipal_relations_manager', 'executive',
+])
 
 const ROLE_ROUTES: Record<string, string> = {
   consumer:             '/onboarding/consumer',
@@ -57,9 +69,17 @@ export default function OnboardingDispatcher() {
     return <Navigate to="/onboarding/commercial" replace />
   }
 
-  // Phase WH.1 — all warehouse roles (employee/supervisor/manager/admin) route
-  // to the comprehensive 18-step warehouse onboarding. The legacy 5-step wizard
-  // at /dashboard/warehouse/onboarding remains accessible by direct URL.
+  // Phase MG.1 — management roles route to the management onboarding wizard.
+  // Checked BEFORE warehouse so that warehouse_manager (which lives in both
+  // WAREHOUSE and MANAGEMENT groups) goes through the management wizard rather
+  // than the frontline warehouse wizard.
+  if (role && MANAGEMENT_ONBOARDING_ROLES.has(role)) {
+    return <Navigate to="/management/onboarding" replace />
+  }
+
+  // Phase WH.1 — remaining warehouse roles (employee, supervisor, warehouse_admin)
+  // route to the 18-step warehouse onboarding. The legacy 5-step wizard at
+  // /dashboard/warehouse/onboarding remains accessible by direct URL.
   if (isWarehouseRole(role)) {
     return <Navigate to="/onboarding/warehouse" replace />
   }

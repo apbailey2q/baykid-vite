@@ -72,6 +72,9 @@ export function normalizeRole(role: string | null | undefined): Role | null {
     'school_business', 'apartment_partner', 'office_partner', 'manufacturing_partner',
     // Phase WH.1 — warehouse manager + warehouse_admin tier roles.
     'warehouse_manager', 'warehouse_admin',
+    // Phase MG.1 — management personnel onboarding tiers.
+    'operations_manager', 'compliance_manager',
+    'community_fundraising_manager', 'municipal_relations_manager',
   ]
   return VALID.includes(r) ? r : null
 }
@@ -114,6 +117,13 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
     case 'warehouse_manager':   return '/dashboard/warehouse-supervisor'
     case 'warehouse_admin':     return '/dashboard/admin/warehouse-analytics'
     case 'warehouse':           return '/dashboard/warehouse'
+    // Phase MG.1 — management roles land on the Management Dashboard at
+    // /management/dashboard. The dashboard itself redirects them to
+    // /management/onboarding if they haven't completed it yet.
+    case 'operations_manager':
+    case 'compliance_manager':
+    case 'community_fundraising_manager':
+    case 'municipal_relations_manager': return '/management/dashboard'
     case 'partner':             return '/dashboard/partner'
     case 'fundraiser':          return '/dashboard/fundraiser'
     case 'admin':               return '/dashboard/admin'

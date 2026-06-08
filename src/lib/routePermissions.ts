@@ -26,6 +26,13 @@ const WAREHOUSE_ROLES: Role[] = [
   'warehouse_employee', 'warehouse_supervisor',
   'warehouse_manager', 'warehouse_admin',
 ]
+// Phase MG.1 — management role group. Includes warehouse_manager and executive
+// because they are management personnel who also go through /onboarding/management,
+// in addition to the 4 net-new management roles created in this phase.
+const MANAGEMENT_ROLES: Role[] = [
+  'operations_manager', 'warehouse_manager', 'compliance_manager',
+  'community_fundraising_manager', 'municipal_relations_manager', 'executive',
+]
 
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Admin — top-level ──────────────────────────────────────────────────────
@@ -42,14 +49,14 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/commercial/support':             ['admin'],
 
   // ── Admin — operations sub-routes ─────────────────────────────────────────
-  '/dashboard/admin/driver-payouts':                 ['admin'],
-  '/dashboard/admin/warehouse-analytics':            ['admin'],
+  '/dashboard/admin/driver-payouts':                 ['admin', 'operations_manager'],
+  '/dashboard/admin/warehouse-analytics':            ['admin', 'warehouse_manager', 'warehouse_admin'],
   '/dashboard/admin/warehouses':                     ['admin'],
   '/dashboard/admin/warehouse-alerts':               ['admin'],
   '/dashboard/admin/messaging-qa':                   ['admin'],
-  '/dashboard/admin/approvals':                      ['admin'],
-  '/dashboard/admin/driver-compliance':              ['admin'],
-  '/dashboard/admin/regions':                        ['admin', 'regional_admin', 'city_manager'],
+  '/dashboard/admin/approvals':                      ['admin', 'compliance_manager'],
+  '/dashboard/admin/driver-compliance':              ['admin', 'operations_manager', 'compliance_manager'],
+  '/dashboard/admin/regions':                        ['admin', 'regional_admin', 'city_manager', 'municipal_relations_manager'],
   '/dashboard/admin/forecasting':                    ['admin'],
   '/dashboard/admin/launch-roadmap':                 ['admin'],
 
@@ -146,17 +153,17 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // Phase G.9 — fundraiser sub-roles share the fundraiser dashboard.
   // fundraiser_admin has its own /live-fundraiser-dashboard landing (gated
   // by RequireRole at App.tsx, not routePermissions).
-  '/dashboard/fundraiser':                           ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
+  '/dashboard/fundraiser':                           ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES, 'community_fundraising_manager'],
   '/dashboard/fundraiser/wallet':                    ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
 
   // ── Municipal ──────────────────────────────────────────────────────────────
-  '/dashboard/municipal':                            ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
-  '/dashboard/municipal/reports':                    ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],
+  '/dashboard/municipal':                            ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin', 'municipal_relations_manager'],
+  '/dashboard/municipal/reports':                    ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin', 'municipal_relations_manager'],
 
   // ── Admin — missing sub-routes (Phase 1 stabilization fix) ──────────────
   '/dashboard/admin/investor':                       ['admin', 'executive', 'investor_viewer'],
   '/dashboard/admin/analytics':                      ['admin'],
-  '/dashboard/admin/dispatch-map':                   ['admin'],
+  '/dashboard/admin/dispatch-map':                   ['admin', 'operations_manager'],
   '/dashboard/admin/ai-marketing':                   ['admin'],
   '/dashboard/admin/operations':                     ['admin'],
 
@@ -174,7 +181,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // NOTE: 'driver' is intentionally ABSENT from all /onboarding/* entries.
   // Drivers complete Driver Compliance Pack V1 at /driver/compliance.
   // ProtectedRoute adds an explicit gate on top as defense-in-depth.
-  '/onboarding':                                     ['admin', 'consumer', 'commercial', 'fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES, ...WAREHOUSE_ROLES],
+  '/onboarding':                                     ['admin', 'consumer', 'commercial', 'fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES, ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES],
   // Explicit sub-route entries tighten cross-role access beyond the dispatcher.
   // Without these, prefix matching on '/onboarding' would allow commercial roles
   // to reach /onboarding/consumer and fundraiser roles to reach /onboarding/commercial.
@@ -183,6 +190,14 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/onboarding/warehouse':                           ['admin', ...WAREHOUSE_ROLES],
   // Admin oversight of warehouse onboarding (mock-data-friendly fallback)
   '/dashboard/admin/warehouse-onboarding':           ['admin', 'warehouse_admin', 'warehouse_manager'],
+
+  // ── Management Onboarding System — Phase MG.1 ────────────────────────────
+  // These three paths are the primary entry points for management personnel.
+  // Admin can always access for QA/oversight. MANAGEMENT_ROLES already includes
+  // warehouse_manager + executive so no need to spread separately.
+  '/management/onboarding': ['admin', ...MANAGEMENT_ROLES],
+  '/management/dashboard':  ['admin', ...MANAGEMENT_ROLES],
+  '/management/training':   ['admin', ...MANAGEMENT_ROLES],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

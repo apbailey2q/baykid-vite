@@ -6,6 +6,10 @@ export type Role =
   | 'warehouse_supervisor'
   | 'warehouse_manager'     // Phase WH.1 — facility manager
   | 'warehouse_admin'       // Phase WH.1 — warehouse-level admin (distinct from global admin)
+  | 'operations_manager'    // Phase MG.1 — driver/dispatch oversight, escalation handling
+  | 'compliance_manager'    // Phase MG.1 — driver/warehouse approvals, audit prep
+  | 'community_fundraising_manager' // Phase MG.1 — fundraiser + nonprofit relationships
+  | 'municipal_relations_manager'   // Phase MG.1 — city contracts + government partnerships
   | 'partner'
   | 'admin'
   | 'fundraiser'
@@ -707,4 +711,69 @@ export interface DriverPayoutAccount {
   onboarding_url:    string | null
   created_at:        string
   updated_at:        string
+}
+
+// ── Management Onboarding System — Phase MG.1 ────────────────────────────────
+//
+// ManagementType — the tier/level of the management position.
+// Distinct from the platform Role (operations_manager, compliance_manager, etc.)
+// which controls routing and RBAC. ManagementType is stored in management_profiles
+// and describes the seniority level within the organisation.
+
+export type ManagementType =
+  | 'executive'
+  | 'director'
+  | 'manager'
+  | 'supervisor'
+
+export type ManagementDepartment =
+  | 'operations'
+  | 'warehouse'
+  | 'compliance'
+  | 'hr'
+  | 'finance'
+  | 'fundraising'
+  | 'commercial'
+  | 'technology'
+  | 'owner'
+
+export type ManagementStatus =
+  | 'pending_onboarding'
+  | 'active'
+  | 'suspended'
+  | 'terminated'
+
+export interface ManagementProfile {
+  id:                      string
+  user_id:                 string
+  employee_id?:            string | null
+  management_type:         ManagementType
+  department:              ManagementDepartment
+  status:                  ManagementStatus
+  hire_date?:              string | null
+  certified:               boolean
+  certified_at?:           string | null
+  onboarding_completed:    boolean
+  onboarding_completed_at?: string | null
+  created_at:              string
+  updated_at:              string
+}
+
+export interface ManagementPermissions {
+  id:                      string
+  management_profile_id:   string
+  can_view_consumers:      boolean
+  can_view_drivers:        boolean
+  can_view_commercial:     boolean
+  can_view_warehouses:     boolean
+  can_view_fundraisers:    boolean
+  can_assign_routes:       boolean
+  can_dispatch_drivers:    boolean
+  can_manage_finances:     boolean
+  can_manage_compliance:   boolean
+  can_manage_users:        boolean
+  can_manage_training:     boolean
+  can_view_reports:        boolean
+  created_at:              string
+  updated_at:              string
 }

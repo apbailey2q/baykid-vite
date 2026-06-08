@@ -168,6 +168,9 @@ const CommercialProfile        = lazy(() => import('./screens/commercial/Commerc
 const CommercialSupport        = lazy(() => import('./screens/commercial/CommercialSupport'))
 const CommercialOnboarding        = lazy(() => import('./screens/commercial/CommercialOnboarding'))
 const CommercialBillingDashboard  = lazy(() => import('./screens/commercial/CommercialBillingDashboard'))
+// CO.2 — Commercial compliance + contracts screens
+const CommercialDocuments         = lazy(() => import('./screens/commercial/CommercialDocuments'))
+const CommercialContracts         = lazy(() => import('./screens/commercial/CommercialContracts'))
 
 // ─ Admin ──────────────────────────────────────────────────────────────────────
 // Phase G.7 — AdminDashboardPage archived to src/screens/dev/; /admin-dashboard redirects to /dashboard/admin.
@@ -180,6 +183,8 @@ const AdminCommercialAlerts          = lazy(() => import('./screens/admin/AdminC
 const AdminCommercialInspectionReview= lazy(() => import('./screens/admin/AdminCommercialInspectionReview'))
 const AdminCommercialDispatch        = lazy(() => import('./screens/admin/AdminCommercialDispatch'))
 const AdminCommercialSupport         = lazy(() => import('./screens/admin/AdminCommercialSupport'))
+// CO.2 — Admin commercial compliance view
+const AdminCommercialCompliance      = lazy(() => import('./screens/admin/AdminCommercialCompliance'))
 const AdminDriverPayouts             = lazy(() => import('./screens/admin/AdminDriverPayouts'))
 const AdminWarehouseAnalytics        = lazy(() => import('./screens/admin/AdminWarehouseAnalytics'))
 // Phase WH.1 — admin oversight of warehouse staff onboarding (safe-fail when tables absent)
@@ -439,6 +444,9 @@ function App() {
               <Route path="/dashboard/commercial/support"  element={<ProtectedRoute requireApproved><CommercialSupport /></ProtectedRoute>} />
               <Route path="/dashboard/commercial/onboarding" element={<ProtectedRoute><CommercialOnboarding /></ProtectedRoute>} />
               <Route path="/dashboard/commercial/billing"   element={<ProtectedRoute requireApproved><CommercialBillingDashboard /></ProtectedRoute>} />
+              {/* CO.2 — Commercial compliance + contracts (outside /dashboard/ for direct path) */}
+              <Route path="/commercial/documents"           element={<ProtectedRoute requireApproved><CommercialDocuments /></ProtectedRoute>} />
+              <Route path="/commercial/contracts"           element={<ProtectedRoute requireApproved><CommercialContracts /></ProtectedRoute>} />
 
               {/* Admin commercial */}
               <Route path="/dashboard/admin/commercial"               element={<ProtectedRoute requireApproved><AdminCommercialDashboard /></ProtectedRoute>} />
@@ -499,6 +507,8 @@ function App() {
               <Route path="/management/documents"             element={<ProtectedRoute requireApproved><ManagementDocuments /></ProtectedRoute>} />
               {/* Phase MG.6 — Operational notification inbox (admin only) */}
               <Route path="/admin/operational-notifications"  element={<ProtectedRoute requireApproved><AdminOperationalNotifications /></ProtectedRoute>} />
+              {/* CO.2 — Admin commercial compliance review */}
+              <Route path="/admin/commercial-compliance"      element={<ProtectedRoute requireApproved><AdminCommercialCompliance /></ProtectedRoute>} />
               {/* Apple Sprint B — user-facing Document Center for non-management roles */}
               <Route path="/compliance/documents"             element={<ProtectedRoute><DocumentCenter /></ProtectedRoute>} />
               <Route path="/dashboard/admin/route-alerts"     element={<ProtectedRoute requireApproved><AdminRouteAlertsCenter /></ProtectedRoute>} />

@@ -322,7 +322,32 @@ export default function CommercialDashboard() {
           ))}
         </div>
 
-        {/* ── 6. Invoice Summary ── */}
+        {/* ── 6. Compliance & Contracts quick-links ── */}
+        <SectionLabel>Compliance & Agreements</SectionLabel>
+        <div className="grid grid-cols-2 gap-2.5 mb-5">
+          <button
+            onClick={() => navigate('/commercial/documents')}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+          >
+            <GlassCard padding="md">
+              <p style={{ fontSize: 24, margin: '0 0 4px' }}>📄</p>
+              <p style={{ fontSize: 13, fontWeight: 800, color: '#fff', margin: '0 0 2px' }}>Documents</p>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Compliance &amp; Permits</p>
+            </GlassCard>
+          </button>
+          <button
+            onClick={() => navigate('/commercial/contracts')}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+          >
+            <GlassCard padding="md">
+              <p style={{ fontSize: 24, margin: '0 0 4px' }}>📋</p>
+              <p style={{ fontSize: 13, fontWeight: 800, color: '#fff', margin: '0 0 2px' }}>Contract</p>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Service Agreement</p>
+            </GlassCard>
+          </button>
+        </div>
+
+        {/* ── 7. Invoice Summary ── */}
         <SectionLabel>Invoice Summary</SectionLabel>
         <GlassCard variant="elevated" padding="md" className="mb-5">
           <div className="flex items-center justify-between mb-3">

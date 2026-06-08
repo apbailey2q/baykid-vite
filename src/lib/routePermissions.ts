@@ -249,6 +249,12 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/management/documents':            ['admin', ...MANAGEMENT_ROLES],
   // Phase MG.6 — operational notification inbox (admin only)
   '/admin/operational-notifications': ['admin'],
+  // CO.2 — Commercial compliance document management (commercial users + admin)
+  '/commercial/documents':            ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  // CO.2 — Commercial contract dashboard (commercial users + admin)
+  '/commercial/contracts':            ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  // CO.2 — Admin commercial compliance review (admin only)
+  '/admin/commercial-compliance':     ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

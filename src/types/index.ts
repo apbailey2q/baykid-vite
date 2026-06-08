@@ -755,6 +755,10 @@ export interface ManagementProfile {
   certified_at?:           string | null
   onboarding_completed:    boolean
   onboarding_completed_at?: string | null
+  // Phase MG.3 — retraining fields (added by 20260703000003 migration)
+  retraining_required:     boolean
+  retraining_required_at?: string | null
+  retraining_reason?:      string | null
   created_at:              string
   updated_at:              string
 }
@@ -776,4 +780,28 @@ export interface ManagementPermissions {
   can_view_reports:        boolean
   created_at:              string
   updated_at:              string
+}
+
+// Phase MG.3 — Admin action types for management profile audit log
+
+export type ManagementAdminActionType =
+  | 'approved'
+  | 'suspended'
+  | 'terminated'
+  | 'certification_revoked'
+  | 'certification_restored'
+  | 'retraining_required'
+  | 'permissions_updated'
+  | 'note_added'
+
+export interface ManagementAdminAction {
+  id:                    string
+  management_profile_id: string
+  admin_user_id?:        string | null
+  action_type:           ManagementAdminActionType
+  reason?:               string | null
+  previous_status?:      string | null
+  new_status?:           string | null
+  metadata:              Record<string, unknown>
+  created_at:            string
 }

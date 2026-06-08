@@ -200,6 +200,8 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/management/training':             ['admin', ...MANAGEMENT_ROLES],
   // Phase MG.2 — agreement compliance overview (admin only)
   '/management/agreement-compliance': ['admin'],
+  // Phase MG.3 — admin management roster (admin only)
+  '/admin/management-onboarding':     ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

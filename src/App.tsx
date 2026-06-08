@@ -87,6 +87,8 @@ const ManagementDashboard             = lazy(() => import('./screens/management/
 const ManagementTrainingCenter        = lazy(() => import('./screens/management/ManagementTrainingCenter'))
 // Phase MG.2 — Management Agreement Compliance admin view
 const ManagementAgreementCompliance   = lazy(() => import('./screens/management/ManagementAgreementCompliance'))
+// Phase MG.3 — Admin management roster with approval controls
+const AdminManagementOnboarding       = lazy(() => import('./screens/admin/AdminManagementOnboarding'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -464,6 +466,8 @@ function App() {
               <Route path="/management/training"              element={<ProtectedRoute requireApproved><ManagementTrainingCenter /></ProtectedRoute>} />
               {/* Phase MG.2 — Agreement Compliance admin overview */}
               <Route path="/management/agreement-compliance"  element={<ProtectedRoute requireApproved><ManagementAgreementCompliance /></ProtectedRoute>} />
+              {/* Phase MG.3 — Admin management roster with approval controls */}
+              <Route path="/admin/management-onboarding"      element={<ProtectedRoute requireApproved><AdminManagementOnboarding /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

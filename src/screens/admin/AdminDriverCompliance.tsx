@@ -35,14 +35,149 @@ import {
   loadDriverPayoutAccount,
   completionPercent,
 } from '../../lib/driverCompliance'
+
+// ── Platform status helpers ───────────────────────────────────────────────────
+
+const PLATFORM_STATUS_COLORS: Record<DriverPlatformStatus, string> = {
+  active:     '#4ade80',
+  warned:     '#fbbf24',
+  suspended:  '#fb923c',
+  terminated: '#f87171',
+}
+
+const PLATFORM_STATUS_LABELS: Record<DriverPlatformStatus, string> = {
+  active:     'Active',
+  warned:     'Warned',
+  suspended:  'Suspended',
+  terminated: 'Terminated',
+}
+
+async function setPlatformStatus(
+  driverId: string,
+  status: DriverPlatformStatus,
+  reason: string,
+  adminId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_driver_platform_status', {
+    p_driver_id: driverId,
+    p_status:    status,
+    p_reason:    reason,
+    p_admin_id:  adminId,
+  })
+  if (error) throw error
+}
+
+// ── Platform status modal ─────────────────────────────────────────────────────
+
+const PLATFORM_STATUS_OPTIONS: { value: DriverPlatformStatus; label: string; description: string; color: string }[] = [
+  { value: 'active',     label: 'Active',     color: '#4ade80', description: 'Normal dispatch access restored.' },
+  { value: 'warned',     label: 'Warned',     color: '#fbbf24', description: 'Formal written warning — dispatch access maintained.' },
+  { value: 'suspended',  label: 'Suspended',  color: '#fb923c', description: 'Cannot accept new pickups; can view account.' },
+  { value: 'terminated', label: 'Terminated', color: '#f87171', description: 'All driver platform access revoked (commercial + consumer).' },
+]
+
+function PlatformStatusModal({
+  open, onClose, onSubmit, fullName, currentStatus,
+}: {
+  open: boolean
+  onClose: () => void
+  onSubmit: (status: DriverPlatformStatus, reason: string) => Promise<void>
+  fullName: string
+  currentStatus: DriverPlatformStatus | null
+}) {
+  const [selected, setSelected] = useState<DriverPlatformStatus>(currentStatus ?? 'active')
+  const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setSelected(currentStatus ?? 'active')
+      setReason('')
+    }
+  }, [open, currentStatus])
+
+  async function submit() {
+    if (!reason.trim()) return
+    setSubmitting(true)
+    try { await onSubmit(selected, reason.trim()) }
+    finally { setSubmitting(false) }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Platform Status — ${fullName}`}
+      description="This affects BOTH commercial and consumer/residential access. Termination is platform-wide."
+      width={480}
+      footer={
+        <>
+          <button onClick={onClose} disabled={submitting}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                     borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600,
+                     padding: '8px 18px', cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button onClick={submit} disabled={submitting || !reason.trim()}
+            style={{
+              background:   selected === 'terminated' ? 'rgba(239,68,68,0.18)' : 'linear-gradient(135deg,#0080ff,#00c8ff)',
+              border:       selected === 'terminated' ? '1px solid rgba(239,68,68,0.35)' : 'none',
+              borderRadius: 8,
+              color:        selected === 'terminated' ? '#f87171' : '#fff',
+              fontSize:     13, fontWeight: 700, padding: '8px 20px',
+              cursor:       submitting || !reason.trim() ? 'not-allowed' : 'pointer',
+              opacity:      submitting || !reason.trim() ? 0.6 : 1,
+            }}>
+            {submitting ? 'Saving…' : 'Apply Status'}
+          </button>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {PLATFORM_STATUS_OPTIONS.map((opt) => (
+          <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+            <input type="radio" name="platform_status" value={opt.value}
+                   checked={selected === opt.value}
+                   onChange={() => setSelected(opt.value)}
+                   style={{ marginTop: 3 }} />
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: opt.color }}>{opt.label}</span>
+              <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{opt.description}</p>
+            </div>
+          </label>
+        ))}
+        <div style={{ marginTop: 4 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+                          textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            Reason (required — shown on the driver&rsquo;s account)
+          </label>
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
+                    placeholder="e.g. Customer complaint — unprofessional conduct on 2026-06-27"
+                    style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)',
+                             border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#fff',
+                             padding: '10px 12px', fontSize: 13, resize: 'vertical' }} />
+        </div>
+        {selected === 'terminated' && (
+          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                        borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#f87171' }}>
+            <strong>⚠ Hybrid driver rule:</strong> Termination removes access to{' '}
+            <em>both</em> commercial and consumer/residential platforms immediately.
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
 import { getSignedUrl } from '../../lib/driverDocuments'
 import type {
   DriverProfile,
   DriverDocument,
   DriverDocumentType,
+  DriverAccessType,
   DriverBackgroundCheck,
   DriverPayoutAccount,
   DriverComplianceStatus,
+  DriverPlatformStatus,
 } from '../../types'
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
@@ -119,7 +254,7 @@ async function fetchReviewRows(statuses: DriverComplianceStatus[]): Promise<Revi
       documents,
       bgCheck,
       payout,
-      completion: completionPercent(profile, documents, bgCheck, payout),
+      completion: completionPercent(profile, documents, bgCheck, payout, profile.driver_type),
     } satisfies ReviewRow
   }))
 
@@ -148,6 +283,8 @@ const DOC_LABELS: Record<DriverDocumentType, string> = {
   license_back:  "License (back)",
   insurance:     'Insurance',
   registration:  'Registration',
+  i9:            'I-9 (Employment Eligibility)',
+  w4:            'W-4 (Withholding)',
 }
 
 function DocThumbnail({ doc }: { doc: DriverDocument | null; type: DriverDocumentType }) {
@@ -406,8 +543,12 @@ function ReviewCard({
   const [docsOpen, setDocsOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [moreInfoOpen, setMoreInfoOpen] = useState(false)
+  const [platformOpen, setPlatformOpen] = useState(false)
+  // Driver access type — required for commercial drivers before approval
+  const [accessType, setAccessType] = useState<DriverAccessType | null>(null)
 
   const { profile, fullName, email, documents, bgCheck, payout, completion } = row
+  const isCommercialDriver = profile.driver_type === 'commercial_driver'
 
   const docByType = useMemo(() => {
     const m = new Map<DriverDocumentType, DriverDocument>()
@@ -416,19 +557,37 @@ function ReviewCard({
   }, [documents])
 
   async function approve() {
+    // Commercial drivers require access type selection before approval
+    if (isCommercialDriver && !accessType) {
+      toast.error('Select a Driver Access Type before approving a commercial driver')
+      return
+    }
     setActing(true)
     try {
+      // 1. Update driver_profiles compliance status
       const { error } = await supabase
         .from('driver_profiles')
         .update({
-          status:           'approved_for_dispatch',
-          approved_at:      new Date().toISOString(),
-          approved_by:      adminId,
-          rejected_at:      null,
-          rejection_reason: null,
+          status:             'approved_for_dispatch',
+          approved_at:        new Date().toISOString(),
+          approved_by:        adminId,
+          rejected_at:        null,
+          rejection_reason:   null,
+          driver_access_type: isCommercialDriver ? accessType : null,
         })
         .eq('driver_id', profile.driver_id)
       if (error) throw error
+
+      // 2. For commercial drivers, set driver_service_type on profiles table
+      //    so routing logic (HomeRedirect, ProtectedRoute) knows where to send them.
+      if (isCommercialDriver && accessType) {
+        const { error: pfError } = await supabase
+          .from('profiles')
+          .update({ driver_service_type: accessType })
+          .eq('id', profile.driver_id)
+        if (pfError) throw pfError
+      }
+
       toast.success(`${fullName} approved for dispatch`)
       onChanged()
     } catch (err) {
@@ -544,9 +703,14 @@ function ReviewCard({
         </div>
       </div>
 
-      {/* 4 thumbnail previews */}
+      {/* Document thumbnail previews
+          Consumer/1099 drivers: license + insurance + registration
+          Commercial employees: license + I-9 + W-4 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginTop: 14 }}>
-        {(['license_front', 'license_back', 'insurance', 'registration'] as DriverDocumentType[]).map((t) => (
+        {(isCommercialDriver
+          ? ['license_front', 'license_back', 'i9', 'w4'] as DriverDocumentType[]
+          : ['license_front', 'license_back', 'insurance', 'registration'] as DriverDocumentType[]
+        ).map((t) => (
           <div key={t}>
             <DocThumbnail doc={docByType.get(t) ?? null} type={t} />
             <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.45)', textAlign: 'center' }}>
@@ -556,11 +720,15 @@ function ReviewCard({
         ))}
       </div>
 
-      {/* Pipeline pills */}
+      {/* Pipeline pills — show payout + W9 only for 1099 drivers */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-        <StatusPill label={w9Status.label} color={w9Status.color} />
+        {!isCommercialDriver && (
+          <>
+            <StatusPill label={w9Status.label} color={w9Status.color} />
+            <StatusPill label={payoutLabel} color={payoutColor} />
+          </>
+        )}
         <StatusPill label={bgLabel} color={bgColor} />
-        <StatusPill label={payoutLabel} color={payoutColor} />
       </div>
 
       {profile.rejection_reason && (
@@ -579,11 +747,106 @@ function ReviewCard({
         </div>
       )}
 
+      {/* Platform conduct status */}
+      {(() => {
+        const ps = (profile.platform_status ?? 'active') as DriverPlatformStatus
+        const psColor = PLATFORM_STATUS_COLORS[ps]
+        return (
+          <div style={{
+            marginTop:    14,
+            padding:      '12px 14px',
+            background:   'rgba(255,255,255,0.03)',
+            border:       '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 10,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+                               textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Platform Status
+                </span>
+                <StatusPill label={PLATFORM_STATUS_LABELS[ps]} color={psColor} />
+              </div>
+              <button
+                onClick={() => setPlatformOpen(true)}
+                style={{
+                  background:   'rgba(0,200,255,0.1)',
+                  color:        '#00c8ff',
+                  border:       '1px solid rgba(0,200,255,0.3)',
+                  borderRadius: 6,
+                  padding:      '5px 12px',
+                  fontSize:     12,
+                  fontWeight:   600,
+                  cursor:       'pointer',
+                }}
+              >
+                Set Status
+              </button>
+            </div>
+            {profile.platform_status_reason && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'rgba(255,255,255,0.7)' }}>Reason:</strong>{' '}
+                {profile.platform_status_reason}
+              </p>
+            )}
+            {profile.platform_status_updated_at && (
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                Updated {fmtDate(profile.platform_status_updated_at)}
+              </p>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Driver Access Type — required for commercial drivers before approval */}
+      {isCommercialDriver && profile.status !== 'approved_for_dispatch' && (
+        <div style={{
+          marginTop:    14,
+          padding:      '12px 14px',
+          background:   'rgba(167,139,250,0.06)',
+          border:       '1px solid rgba(167,139,250,0.25)',
+          borderRadius: 10,
+        }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'rgba(167,139,250,0.9)',
+                      textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Driver Access Type — Required Before Approval
+          </p>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+            Select the access level for this commercial driver. This cannot be changed after approval without admin intervention.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[
+              { value: 'commercial_only' as DriverAccessType, label: 'Commercial Only', desc: 'Routes directly to Commercial Driver Dashboard' },
+              { value: 'hybrid_driver'   as DriverAccessType, label: 'Hybrid Driver',   desc: 'Can access both Consumer and Commercial routes' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setAccessType(opt.value)}
+                style={{
+                  flex: '1 1 140px',
+                  padding: '10px 14px',
+                  background: accessType === opt.value ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${accessType === opt.value ? '#a78bfa' : 'rgba(255,255,255,0.12)'}`,
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: accessType === opt.value ? '#a78bfa' : '#fff', marginBottom: 4 }}>
+                  {opt.label}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
         <button
           onClick={approve}
-          disabled={acting}
+          disabled={acting || (isCommercialDriver && !accessType && profile.status !== 'approved_for_dispatch')}
           style={{
             background:   '#4ade80',
             color:        '#000',
@@ -592,8 +855,8 @@ function ReviewCard({
             padding:      '9px 18px',
             fontSize:     13,
             fontWeight:   700,
-            cursor:       acting ? 'not-allowed' : 'pointer',
-            opacity:      acting ? 0.6 : 1,
+            cursor:       (acting || (isCommercialDriver && !accessType)) ? 'not-allowed' : 'pointer',
+            opacity:      (acting || (isCommercialDriver && !accessType && profile.status !== 'approved_for_dispatch')) ? 0.45 : 1,
           }}
         >
           ✓ Approve
@@ -673,6 +936,22 @@ function ReviewCard({
         title={`Request more info from ${fullName}`}
         description="Describe what the driver needs to fix or upload before re-submitting."
         confirmLabel="Send request"
+      />
+      <PlatformStatusModal
+        open={platformOpen}
+        onClose={() => setPlatformOpen(false)}
+        fullName={fullName}
+        currentStatus={(profile.platform_status ?? 'active') as DriverPlatformStatus}
+        onSubmit={async (status, reason) => {
+          try {
+            await setPlatformStatus(profile.driver_id, status, reason, adminId)
+            toast.success(`Platform status set to "${PLATFORM_STATUS_LABELS[status]}" for ${fullName}`)
+            setPlatformOpen(false)
+            onChanged()
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Could not update platform status')
+          }
+        }}
       />
     </div>
   )

@@ -2,7 +2,13 @@
 // wizard + admin review screens.
 //
 // Schema:    supabase/migrations/20260605000002_driver_compliance.sql
-// Server SR: public.driver_meets_success_criteria(uuid) mirrors completionPercent.
+//            supabase/migrations/20260628000002_driver_platform_status.sql
+// Server SR: public.driver_meets_success_criteria(uuid) mirrors getSuccessCriteria.
+//
+// Key rule: commercial drivers (driver_type='commercial_driver') MUST use
+// company-approved vehicles. Their onboarding does NOT include personal vehicle
+// information (make/model/year/plate) or personal vehicle documents (insurance,
+// registration). Those items apply only to consumer/1099 drivers.
 //
 // RLS guarantees: a non-admin caller only ever reads their own rows, so these
 // helpers are safe to call with the calling user's own driver_id; admin
@@ -76,11 +82,11 @@ export async function canAcceptRoutes(driverId: string): Promise<boolean> {
   return profile?.status === 'approved_for_dispatch'
 }
 
-// ── Success criteria — the 8 gates the wizard surfaces and the admin review
-// screen ticks off. Each entry has a stable `key` (i18n + analytics), a
-// human-readable label (Cyan's Brooklynn Recycling voice — never 'BayKid'),
-// and a pure `check` taking the four loaded rows. The server enforces the
-// same rule in public.driver_meets_success_criteria().
+// ── Success criteria ─────────────────────────────────────────────────────────
+// Two sets: one for commercial_driver (no personal vehicle / insurance),
+// one for driver_1099 (consumer). Both include the platform policy acknowledgment.
+//
+// The server mirrors these rules in public.driver_meets_success_criteria().
 
 export interface ComplianceState {
   profile:   DriverProfile | null
@@ -89,69 +95,144 @@ export interface ComplianceState {
   payout:    DriverPayoutAccount | null
 }
 
+export interface CriterionEntry {
+  key:   string
+  label: string
+  check: (state: ComplianceState) => boolean
+}
+
 function hasDoc(documents: DriverDocument[], type: DriverDocumentType): boolean {
   return documents.some((d) => d.document_type === type && d.status !== 'rejected')
 }
 
-export const SUCCESS_CRITERIA: ReadonlyArray<{
-  key:   string
-  label: string
-  check: (state: ComplianceState) => boolean
-}> = [
-  {
-    key:   'license_front',
-    label: "Driver's license — front uploaded",
-    check: (s) => hasDoc(s.documents, 'license_front'),
-  },
-  {
-    key:   'license_back',
-    label: "Driver's license — back uploaded",
-    check: (s) => hasDoc(s.documents, 'license_back'),
-  },
-  {
-    key:   'insurance',
-    label: 'Proof of insurance uploaded',
-    check: (s) => hasDoc(s.documents, 'insurance'),
-  },
-  {
-    key:   'registration',
-    label: 'Vehicle registration uploaded',
-    check: (s) => hasDoc(s.documents, 'registration'),
-  },
-  {
-    key:   'w9',
-    label: 'W-9 tax info submitted',
-    check: (s) => Boolean(s.profile?.w9_submitted_at),
-  },
-  {
-    key:   'background',
-    label: 'Background check consent given',
-    check: (s) => Boolean(s.bgCheck?.consent_timestamp),
-  },
-  {
-    key:   'payout',
-    label: 'Direct deposit account on file',
-    check: (s) => Boolean(s.payout && s.payout.status !== 'rejected'),
-  },
-  {
-    key:   'agreement_training',
-    label: 'Driver agreement signed and training completed',
-    check: (s) =>
-      Boolean(s.profile?.agreement_signed_at) &&
-      Boolean(s.profile?.training_completed_at),
-  },
+// ── Shared criteria (all driver types) ───────────────────────────────────────
+
+const LICENSE_FRONT: CriterionEntry = {
+  key:   'license_front',
+  label: "Driver's license — front uploaded",
+  check: (s) => hasDoc(s.documents, 'license_front'),
+}
+const LICENSE_BACK: CriterionEntry = {
+  key:   'license_back',
+  label: "Driver's license — back uploaded",
+  check: (s) => hasDoc(s.documents, 'license_back'),
+}
+const W9: CriterionEntry = {
+  key:   'w9',
+  label: 'W-9 tax info submitted',
+  check: (s) => Boolean(s.profile?.w9_submitted_at),
+}
+const BACKGROUND: CriterionEntry = {
+  key:   'background',
+  label: 'Background check consent given',
+  check: (s) => Boolean(s.bgCheck?.consent_timestamp),
+}
+const PAYOUT: CriterionEntry = {
+  key:   'payout',
+  label: 'Direct deposit account on file',
+  check: (s) => Boolean(s.payout && s.payout.status !== 'rejected'),
+}
+const AGREEMENT_TRAINING: CriterionEntry = {
+  key:   'agreement_training',
+  label: 'Driver agreement signed and training completed',
+  check: (s) =>
+    Boolean(s.profile?.agreement_signed_at) &&
+    Boolean(s.profile?.training_completed_at),
+}
+const POLICY_ACK: CriterionEntry = {
+  key:   'policy_ack',
+  label: 'Platform conduct policy acknowledged',
+  check: (s) => Boolean(s.profile?.policy_acknowledged_at),
+}
+const MANUAL_ACK: CriterionEntry = {
+  key:   'manual_ack',
+  label: 'Driver compliance manual acknowledged',
+  check: (s) => Boolean(s.profile?.manual_acknowledged_at),
+}
+
+// ── Consumer / 1099 driver criteria ──────────────────────────────────────────
+// Includes personal vehicle insurance + registration (driver-owned vehicle).
+
+const INSURANCE: CriterionEntry = {
+  key:   'insurance',
+  label: 'Proof of insurance uploaded',
+  check: (s) => hasDoc(s.documents, 'insurance'),
+}
+const REGISTRATION: CriterionEntry = {
+  key:   'registration',
+  label: 'Vehicle registration uploaded',
+  check: (s) => hasDoc(s.documents, 'registration'),
+}
+
+export const CONSUMER_SUCCESS_CRITERIA: ReadonlyArray<CriterionEntry> = [
+  LICENSE_FRONT,
+  LICENSE_BACK,
+  INSURANCE,
+  REGISTRATION,
+  W9,
+  BACKGROUND,
+  PAYOUT,
+  MANUAL_ACK,
+  AGREEMENT_TRAINING,
+  POLICY_ACK,
 ]
+
+// ── Commercial employee driver criteria ───────────────────────────────────────
+// Commercial employees are NOT 1099 contractors:
+//   ✗ Personal vehicle insurance / registration — company equipment used
+//   ✗ W-9 tax form — employee withholding handled via W-4
+//   ✗ Payout account — payroll handled outside the platform
+//   ✗ Compliance manual step — covered by the employment agreement
+// Employment docs (I-9 + W-4) are uploaded in the employment step.
+
+const EMPLOYMENT: CriterionEntry = {
+  key:   'employment',
+  label: 'Employment documents uploaded (I-9 and W-4)',
+  check: (s) =>
+    hasDoc(s.documents, 'i9') && hasDoc(s.documents, 'w4'),
+}
+
+export const COMMERCIAL_SUCCESS_CRITERIA: ReadonlyArray<CriterionEntry> = [
+  LICENSE_FRONT,
+  LICENSE_BACK,
+  EMPLOYMENT,
+  BACKGROUND,
+  AGREEMENT_TRAINING,
+]
+
+/**
+ * Returns the correct success-criteria set for a given driver_type.
+ * Use this whenever the driver type is known — e.g. in the wizard and the
+ * admin review screen — so commercial drivers are not incorrectly failed
+ * for missing insurance/registration.
+ */
+export function getSuccessCriteria(
+  driverType: DriverProfile['driver_type'] | null | undefined,
+): ReadonlyArray<CriterionEntry> {
+  return driverType === 'commercial_driver'
+    ? COMMERCIAL_SUCCESS_CRITERIA
+    : CONSUMER_SUCCESS_CRITERIA
+}
+
+/**
+ * Backward-compatible alias — used when driver type is unknown or not
+ * yet determined. Falls back to the consumer (more-complete) set so the
+ * display is never falsely "complete" for a driver still being provisioned.
+ */
+export const SUCCESS_CRITERIA: ReadonlyArray<CriterionEntry> = CONSUMER_SUCCESS_CRITERIA
 
 /** Percent (0–100, rounded) of SUCCESS_CRITERIA satisfied. */
 export function completionPercent(
-  profile:   DriverProfile | null,
-  documents: DriverDocument[],
-  bgCheck:   DriverBackgroundCheck | null,
-  payout:    DriverPayoutAccount | null,
+  profile:    DriverProfile | null,
+  documents:  DriverDocument[],
+  bgCheck:    DriverBackgroundCheck | null,
+  payout:     DriverPayoutAccount | null,
+  driverType?: DriverProfile['driver_type'] | null,
 ): number {
+  const criteria = getSuccessCriteria(driverType ?? profile?.driver_type)
   const state: ComplianceState = { profile, documents, bgCheck, payout }
-  const total = SUCCESS_CRITERIA.length
+  const total = criteria.length
   if (total === 0) return 0
-  const met = SUCCESS_CRITERIA.reduce((n, c) => (c.check(state) ? n + 1 : n), 0)
+  const met = criteria.reduce((n, c) => (c.check(state) ? n + 1 : n), 0)
   return Math.round((met / total) * 100)
 }

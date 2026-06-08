@@ -526,7 +526,7 @@ function StepWelcome({ stepIndex, totalSteps, isCommercialDriver, onNext }: Step
         )}
         <li>• W-9 tax info (your TIN is encrypted server-side before storage)</li>
         <li>• Background check authorization and direct deposit intent</li>
-        <li>• Driver agreement signature and a 5-module training checklist</li>
+        <li>• Driver agreement signature and approved training module checklist</li>
         <li>• Platform conduct policy acknowledgment</li>
       </ul>
       <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>

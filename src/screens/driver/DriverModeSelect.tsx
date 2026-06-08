@@ -1,6 +1,8 @@
 // ── Driver Mode Selection ────────────────────────────────────────────────────
-// Approved drivers land here after WelcomeBack. They pick Residential or
-// Commercial; the choice routes them to the corresponding mode landing.
+// Only shown to hybrid_driver accounts. commercial_only drivers bypass this
+// screen entirely and go straight to /dashboard/commercial-driver.
+// driver_1099 accounts are redirected to /dashboard/driver.
+//
 // Choice is persisted to localStorage so the same browser remembers the
 // last-used mode for the "Switch mode" affordance on each landing.
 
@@ -28,28 +30,29 @@ export function getDriverMode(): DriverMode | null {
 export default function DriverModeSelect() {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
-  const firstName = (profile?.full_name ?? '').split(' ')[0]
+  const firstName        = (profile?.full_name ?? '').split(' ')[0]
+  const isCommercialOnly = profile?.driver_service_type === 'commercial_only'
 
   // Consumer-only 1099 drivers must NEVER see the selection screen. Whether
   // they got here via direct URL or stale localStorage, route them straight
-  // to their consumer-routes dashboard. The server-side RLS gate
+  // to their driver dashboard. The server-side RLS gate
   // (is_commercial_capable_driver) is the authoritative defense; this is
   // the matching client-side UX guard.
   useEffect(() => {
     if (profile && !canAccessCommercialDriver(profile)) {
       setDriverMode('residential')
-      navigate('/dashboard/driver/consumer-routes', { replace: true })
+      navigate('/dashboard/driver', { replace: true })
     }
   }, [profile, navigate])
 
   function choose(mode: DriverMode) {
     setDriverMode(mode)
-    // Consumer routes → consumer/residential driver dashboard
-    // Commercial routes → commercial driver dashboard
+    // Driver (consumer) → consumer driver dashboard
+    // Commercial → commercial driver dashboard
     navigate(
       mode === 'residential'
-        ? '/dashboard/driver/consumer-routes'
-        : '/dashboard/driver/commercial-routes',
+        ? '/dashboard/driver'
+        : '/dashboard/commercial-driver',
       { replace: true },
     )
   }
@@ -69,30 +72,34 @@ export default function DriverModeSelect() {
             {firstName ? `Hi, ${firstName}` : 'Driver'}
           </p>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
-            Choose Driver Mode
+            Select Work Mode
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55 }}>
             Select the type of pickups you will perform today.
           </p>
         </header>
 
-        <ModeCard
-          accent="#00c8ff"
-          icon="🏠"
-          title="Consumer Driver"
-          body="Residential recycling pickups, QR bag scans, apartment routes, and customer pickup tracking."
-          cta="Consumer Routes"
-          onClick={() => choose('residential')}
-        />
-
-        <div style={{ height: 14 }} />
+        {/* Driver (consumer) card — hidden for commercial_only drivers */}
+        {!isCommercialOnly && (
+          <>
+            <ModeCard
+              accent="#00c8ff"
+              icon="🏠"
+              title="Driver"
+              body="Residential recycling pickups, QR bag scans, apartment routes, and customer pickup tracking."
+              cta="Driver"
+              onClick={() => choose('residential')}
+            />
+            <div style={{ height: 14 }} />
+          </>
+        )}
 
         <ModeCard
           accent="#5eead4"
           icon="🏢"
-          title="Commercial Driver"
+          title="Commercial"
           body="Business pickups, bulk container scans, commercial routes, manifests, and warehouse delivery tracking."
-          cta="Commercial Routes"
+          cta="Commercial"
           onClick={() => choose('commercial')}
         />
 

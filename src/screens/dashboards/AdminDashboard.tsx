@@ -257,6 +257,15 @@ export default function AdminDashboard() {
         >
           🏢 Commercial Compliance
         </Link>
+        {/* CO.3 — Commercial Contracts tile */}
+        <Link
+          to="/admin/commercial-contracts"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', textDecoration: 'none' }}
+          title="Create, renew, cancel, and review commercial service agreements."
+        >
+          📋 Commercial Contracts
+        </Link>
       </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"

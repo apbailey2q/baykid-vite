@@ -30,8 +30,8 @@ import {
   REQUIRED_COMMERCIAL_DOCUMENTS,
   type CommercialDocumentDefinition,
 } from '../data/commercialComplianceData'
-import type { CommercialContract } from '../data/commercialContractData'
-import { emptyContract } from '../data/commercialContractData'
+import type { CommercialContract, CommercialContractStatus } from '../data/commercialContractData'
+import { getActiveCommercialContract } from './commercialContracts'
 
 // ── Shared result envelope ────────────────────────────────────────────────────
 
@@ -69,19 +69,24 @@ export interface CommercialComplianceDoc {
 // ── Summary shape ─────────────────────────────────────────────────────────────
 
 export interface CommercialComplianceSummary {
-  totalRequired:      number
-  uploaded:           number
-  approved:           number
-  pending:            number
-  missing:            number
-  rejected:           number
-  expired:            number
-  expiringSoon:       number
-  completionPct:      number   // 0–100
-  onServiceHold:      boolean
-  reactivationPending: boolean
-  holdStartedAt:      string | null
-  holdExpiresAt:      string | null
+  totalRequired:        number
+  uploaded:             number
+  approved:             number
+  pending:              number
+  missing:              number
+  rejected:             number
+  expired:              number
+  expiringSoon:         number
+  completionPct:        number   // 0–100
+  onServiceHold:        boolean
+  reactivationPending:  boolean
+  holdStartedAt:        string | null
+  holdExpiresAt:        string | null
+  // CO.3 — contract status fields
+  contractStatus:       CommercialContractStatus | null
+  contractRenewalDate:  string | null
+  contractExpiringSoon: boolean
+  contractExpired:      boolean
 }
 
 // ── Service hold shape ────────────────────────────────────────────────────────
@@ -413,12 +418,14 @@ export async function getCommercialComplianceSummary(
   accountId: string,
 ): Promise<ComplianceResult<CommercialComplianceSummary>> {
   try {
-    const [docsResult, holdResult] = await Promise.all([
+    const [docsResult, holdResult, contractResult] = await Promise.all([
       getCommercialDocuments(accountId),
       getCommercialServiceHoldStatus(accountId),
+      getActiveCommercialContract(accountId),
     ])
 
-    const docs    = docsResult.data ?? []
+    const docs     = docsResult.data ?? []
+    const contract = contractResult.data ?? null
     const hold    = holdResult.data ?? {
       onHold:              false,
       reactivationPending: false,
@@ -477,10 +484,21 @@ export async function getCommercialComplianceSummary(
         expired,
         expiringSoon,
         completionPct,
-        onServiceHold:       hold.onHold,
-        reactivationPending: hold.reactivationPending,
-        holdStartedAt:       hold.holdStartedAt,
-        holdExpiresAt:       hold.holdExpiresAt,
+        onServiceHold:        hold.onHold,
+        reactivationPending:  hold.reactivationPending,
+        holdStartedAt:        hold.holdStartedAt,
+        holdExpiresAt:        hold.holdExpiresAt,
+        // CO.3 contract fields
+        contractStatus:       contract?.status ?? null,
+        contractRenewalDate:  contract?.renewal_date ?? null,
+        contractExpiringSoon: contract
+          ? !!(contract.end_date || contract.renewal_date) &&
+            Math.ceil((new Date(contract.end_date ?? contract.renewal_date!).getTime() - Date.now()) / 86400000) <= 30 &&
+            Math.ceil((new Date(contract.end_date ?? contract.renewal_date!).getTime() - Date.now()) / 86400000) >= 0
+          : false,
+        contractExpired: contract?.end_date
+          ? Math.ceil((new Date(contract.end_date).getTime() - Date.now()) / 86400000) < 0
+          : false,
       },
     }
   } catch (err) {
@@ -671,60 +689,14 @@ export async function approveCommercialReactivation(
   }
 }
 
-// ── 13. Placeholder contract loader ─────────────────────────────────────────
-// Until a commercial_contracts table is created, returns a placeholder.
+// ── 13. Contract loader — thin wrapper over commercialContracts.ts ──────────
+// CO.3: delegates to getActiveCommercialContract which queries the real
+// commercial_contracts table. Previously returned a proxy from
+// commercial_accounts.service_plan — that proxy has been replaced.
 
 export async function getCommercialContract(
   accountId: string,
 ): Promise<ComplianceResult<CommercialContract | null>> {
-  try {
-    // Check commercial_accounts for service_plan + plan_name as a proxy
-    const { data, error } = await supabase
-      .from('commercial_accounts')
-      .select('id, service_plan, plan_name, account_status, created_at')
-      .eq('id', accountId)
-      .maybeSingle()
-
-    if (error) return { ok: false, error: error.message }
-    if (!data) return { ok: true, data: null }
-
-    const acct = data as {
-      id: string; service_plan: string | null; plan_name: string | null
-      account_status: string; created_at: string
-    }
-
-    if (!acct.service_plan && !acct.plan_name) {
-      return { ok: true, data: null }
-    }
-
-    // Build a representative contract from what we have
-    const contract: CommercialContract = {
-      contractId:                   acct.id, // no separate ID yet
-      accountId:                    acct.id,
-      contractTitle:                acct.plan_name
-                                    ? `${acct.plan_name} Commercial Service Agreement`
-                                    : 'Commercial Recycling Service Agreement',
-      serviceLevel:                 (acct.service_plan as CommercialContract['serviceLevel']) ?? 'standard',
-      pickupFrequency:              'on_demand',
-      binCount:                     1,
-      emergencyPickupAllowed:       false,
-      overflowPickupAllowed:        false,
-      contaminationPolicyAccepted:  false,
-      startDate:                    acct.created_at.split('T')[0],
-      endDate:                      null,
-      renewalDate:                  null,
-      status:                       acct.account_status === 'active' ? 'active' : 'needs_review',
-      createdAt:                    acct.created_at,
-      updatedAt:                    acct.created_at,
-    }
-
-    return { ok: true, data: contract }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    console.warn('[commercialCompliance] getCommercialContract:', msg)
-    return { ok: false, error: msg }
-  }
+  const result = await getActiveCommercialContract(accountId)
+  return result as ComplianceResult<CommercialContract | null>
 }
-
-// Re-export emptyContract for convenience
-export { emptyContract }

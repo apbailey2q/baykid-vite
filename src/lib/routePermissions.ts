@@ -255,6 +255,8 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/commercial/contracts':            ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
   // CO.2 — Admin commercial compliance review (admin only)
   '/admin/commercial-compliance':     ['admin'],
+  // CO.3 — Admin commercial contracts editor (admin only)
+  '/admin/commercial-contracts':      ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

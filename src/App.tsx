@@ -185,6 +185,8 @@ const AdminCommercialDispatch        = lazy(() => import('./screens/admin/AdminC
 const AdminCommercialSupport         = lazy(() => import('./screens/admin/AdminCommercialSupport'))
 // CO.2 — Admin commercial compliance view
 const AdminCommercialCompliance      = lazy(() => import('./screens/admin/AdminCommercialCompliance'))
+// CO.3 — Admin commercial contracts editor
+const AdminCommercialContracts       = lazy(() => import('./screens/admin/AdminCommercialContracts'))
 const AdminDriverPayouts             = lazy(() => import('./screens/admin/AdminDriverPayouts'))
 const AdminWarehouseAnalytics        = lazy(() => import('./screens/admin/AdminWarehouseAnalytics'))
 // Phase WH.1 — admin oversight of warehouse staff onboarding (safe-fail when tables absent)
@@ -509,6 +511,8 @@ function App() {
               <Route path="/admin/operational-notifications"  element={<ProtectedRoute requireApproved><AdminOperationalNotifications /></ProtectedRoute>} />
               {/* CO.2 — Admin commercial compliance review */}
               <Route path="/admin/commercial-compliance"      element={<ProtectedRoute requireApproved><AdminCommercialCompliance /></ProtectedRoute>} />
+              {/* CO.3 — Admin commercial contracts editor */}
+              <Route path="/admin/commercial-contracts"       element={<ProtectedRoute requireApproved><AdminCommercialContracts /></ProtectedRoute>} />
               {/* Apple Sprint B — user-facing Document Center for non-management roles */}
               <Route path="/compliance/documents"             element={<ProtectedRoute><DocumentCenter /></ProtectedRoute>} />
               <Route path="/dashboard/admin/route-alerts"     element={<ProtectedRoute requireApproved><AdminRouteAlertsCenter /></ProtectedRoute>} />

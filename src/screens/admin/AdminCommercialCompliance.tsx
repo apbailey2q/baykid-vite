@@ -329,7 +329,7 @@ export default function AdminCommercialCompliance() {
     }
 
     if (action === 'view_contracts') {
-      showToast(`Contract management for ${acct.business_name} — full contracts table coming in CO.3`)
+      navigate('/admin/commercial-contracts')
       return
     }
 
@@ -527,29 +527,40 @@ export default function AdminCommercialCompliance() {
               ))
         )}
 
-        {/* CONTRACTS tab */}
+        {/* CONTRACTS tab — CO.3: links to full contract editor */}
         {tab === 'contracts' && (
           <div>
-            <div style={{ padding: '12px 16px', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 12, marginBottom: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', margin: '0 0 4px' }}>
-                📋 Contract Management — CO.3 Scope
-              </p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0, lineHeight: 1.5 }}>
-                Full contract tracking with a <code>commercial_contracts</code> table, digital signing, version history, and renewal alerts is scoped for CO.3.
-                Below is the current service plan status from <code>commercial_accounts</code>.
-              </p>
+            <div style={{ padding: '12px 16px', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 12, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', margin: '0 0 2px' }}>
+                  📋 Contract Management
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+                  Create, edit, renew, and cancel service contracts in the full contract editor.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/admin/commercial-contracts')}
+                style={{ padding: '8px 16px', borderRadius: 10, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Open Contract Editor →
+              </button>
             </div>
+            {/* Compliance-summary contract status per account */}
             {accounts.length === 0
               ? <EmptyState icon="📋" title="No Accounts" description="No commercial accounts found." />
               : accounts.map(acct => {
-                  const contractStatus = acct.account_status === 'active' ? 'active' : 'needs_review'
+                  const s = acct.summary
+                  const contractStatus = s?.contractStatus ?? (acct.account_status === 'active' ? 'active' : 'needs_review')
                   return (
                     <div key={acct.id} style={{ ...GLASS, marginBottom: 10 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 14, fontWeight: 800, color: '#fff', margin: 0 }}>{acct.business_name}</p>
                           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0' }}>
-                            Plan: {acct.plan_name ?? acct.service_plan ?? '—'} · Since {formatDate(acct.created_at)}
+                            {s?.contractExpiringSoon && '⚠️ Contract expiring soon · '}
+                            {s?.contractExpired && '⛔ Contract expired · '}
+                            {s?.contractRenewalDate ? `Renewal: ${formatDate(s.contractRenewalDate)}` : 'No renewal date'}
                           </p>
                         </div>
                         <span style={{
@@ -557,6 +568,7 @@ export default function AdminCommercialCompliance() {
                           background: `${CONTRACT_STATUS_COLOR[contractStatus]}22`,
                           color: CONTRACT_STATUS_COLOR[contractStatus],
                           border: `1px solid ${CONTRACT_STATUS_COLOR[contractStatus]}33`,
+                          flexShrink: 0,
                         }}>
                           {CONTRACT_STATUS_LABEL[contractStatus]}
                         </span>

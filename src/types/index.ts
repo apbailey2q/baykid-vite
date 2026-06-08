@@ -31,6 +31,10 @@ export type Role =
   | 'municipal_viewer'
   | 'municipal_manager'
   | 'city_admin'
+  | 'county_admin'              // MU.1 — county-level government partner
+  | 'public_works_director'     // MU.1 — public works department lead
+  | 'sustainability_director'   // MU.1 — sustainability/environmental program lead
+  | 'procurement_officer'       // MU.1 — procurement/purchasing officer
   | 'executive'
   | 'investor_viewer'
   | 'regional_admin'
@@ -87,6 +91,20 @@ export const COMMERCIAL_CUSTOMER_ROLES: readonly Role[] = [
 
 export function isCommercialCustomerRole(role: string | null | undefined): boolean {
   return !!role && (COMMERCIAL_CUSTOMER_ROLES as readonly string[]).includes(role)
+}
+
+// ── Municipal (MU.1) ─────────────────────────────────────────────────────────
+
+/** All municipal / government partner roles. Includes the 3 legacy roles +
+ *  the 4 new MU.1 roles. Used by routePermissions and OnboardingDispatcher. */
+export const MUNICIPAL_ROLES: readonly Role[] = [
+  'municipal_viewer', 'municipal_manager', 'city_admin',
+  'county_admin', 'public_works_director',
+  'sustainability_director', 'procurement_officer',
+] as const
+
+export function isMunicipalRole(role: string | null | undefined): boolean {
+  return !!role && (MUNICIPAL_ROLES as readonly string[]).includes(role)
 }
 
 // ── Commercial ───────────────────────────────────────────────────────────────

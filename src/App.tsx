@@ -220,6 +220,10 @@ const ReportsCenterPage              = lazy(() => import('./screens/ReportsCente
 // ─ Municipal / Executive / Special roles ──────────────────────────────────────
 const MunicipalDashboard       = lazy(() => import('./screens/municipal/MunicipalDashboard'))
 const MunicipalReports         = lazy(() => import('./screens/municipal/MunicipalReports'))
+// MU.1 — Municipal/Government Partner Onboarding system
+const MunicipalOnboarding      = lazy(() => import('./screens/municipal/MunicipalOnboarding'))
+const MunicipalPartnerDashboard = lazy(() => import('./screens/municipal/MunicipalPartnerDashboard'))
+const AdminMunicipalOnboarding = lazy(() => import('./screens/admin/AdminMunicipalOnboarding'))
 const ExecutiveDashboard       = lazy(() => import('./screens/executive/ExecutiveDashboard'))
 
 // ─ Billing ────────────────────────────────────────────────────────────────────
@@ -512,6 +516,10 @@ function App() {
               <Route path="/management/agreement-compliance"  element={<ProtectedRoute requireApproved><ManagementComplianceGuard><ManagementAgreementCompliance /></ManagementComplianceGuard></ProtectedRoute>} />
               {/* Phase MG.3 — Admin management roster with approval controls */}
               <Route path="/admin/management-onboarding"      element={<ProtectedRoute requireApproved><AdminManagementOnboarding /></ProtectedRoute>} />
+              {/* MU.1 — Municipal/Government Partner Onboarding system */}
+              <Route path="/municipal/onboarding"             element={<ProtectedRoute requireApproved><MunicipalOnboarding /></ProtectedRoute>} />
+              <Route path="/municipal/dashboard"              element={<ProtectedRoute requireApproved><MunicipalPartnerDashboard /></ProtectedRoute>} />
+              <Route path="/admin/municipal-onboarding"       element={<ProtectedRoute requireApproved><AdminMunicipalOnboarding /></ProtectedRoute>} />
               {/* Phase MG.4 — Compliance document review + management documents */}
               <Route path="/admin/document-review"            element={<ProtectedRoute requireApproved><AdminDocumentReview /></ProtectedRoute>} />
               <Route path="/management/documents"             element={<ProtectedRoute requireApproved><ManagementDocuments /></ProtectedRoute>} />

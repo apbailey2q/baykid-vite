@@ -61,6 +61,11 @@ const ROLE_LABELS: Record<Role, string> = {
   municipal_viewer:    'Municipal Viewer',
   municipal_manager:   'Municipal Manager',
   city_admin:          'City Admin',
+  // MU.1 — new government partner roles
+  county_admin:              'County Admin',
+  public_works_director:     'Public Works Director',
+  sustainability_director:   'Sustainability Director',
+  procurement_officer:       'Procurement Officer',
   executive:           'Executive',
   investor_viewer:     'Investor Viewer',
   regional_admin:      'Regional Admin',

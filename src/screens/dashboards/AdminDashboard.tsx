@@ -146,6 +146,15 @@ export default function AdminDashboard() {
         >
           🏢 Management Oversight
         </Link>
+        {/* MU.1 — Municipal Partner Onboarding */}
+        <Link
+          to="/admin/municipal-onboarding"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', color: '#00c8ff', textDecoration: 'none' }}
+          title="Review municipal onboarding, compliance, and agency approvals."
+        >
+          🏛 Municipal Partners
+        </Link>
         <Link
           to="/admin/document-review"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"

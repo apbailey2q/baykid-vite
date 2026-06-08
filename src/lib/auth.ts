@@ -75,6 +75,9 @@ export function normalizeRole(role: string | null | undefined): Role | null {
     // Phase MG.1 — management personnel onboarding tiers.
     'operations_manager', 'compliance_manager',
     'community_fundraising_manager', 'municipal_relations_manager',
+    // MU.1 — municipal/government partner roles.
+    'county_admin', 'public_works_director',
+    'sustainability_director', 'procurement_officer',
   ]
   return VALID.includes(r) ? r : null
 }
@@ -130,6 +133,11 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
     case 'municipal_viewer':
     case 'municipal_manager':
     case 'city_admin':          return '/dashboard/municipal'
+    // MU.1 — new government partner roles land on the MU.1 onboarding dashboard.
+    case 'county_admin':
+    case 'public_works_director':
+    case 'sustainability_director':
+    case 'procurement_officer':   return '/municipal/dashboard'
     case 'executive':           return '/dashboard/executive'
     case 'investor_viewer':     return '/dashboard/admin/investor'
     case 'regional_admin':

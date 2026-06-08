@@ -33,6 +33,12 @@ const MANAGEMENT_ROLES: Role[] = [
   'operations_manager', 'warehouse_manager', 'compliance_manager',
   'community_fundraising_manager', 'municipal_relations_manager', 'executive',
 ]
+// MU.1 — all municipal/government partner roles (mirrors MUNICIPAL_ROLES from types/index.ts).
+const MUNICIPAL_ROLES: Role[] = [
+  'municipal_viewer', 'municipal_manager', 'city_admin',
+  'county_admin', 'public_works_director',
+  'sustainability_director', 'procurement_officer',
+]
 
 export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Admin — top-level ──────────────────────────────────────────────────────
@@ -261,6 +267,11 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/commercial/contracts/sign':       ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
   // CO.5 — Commercial contract print/PDF view (commercial users + admin)
   '/commercial/contracts/print':      ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+
+  // MU.1 — Municipal/Government Partner Onboarding system
+  '/municipal/onboarding':            ['admin', ...MUNICIPAL_ROLES],
+  '/municipal/dashboard':             ['admin', ...MUNICIPAL_ROLES],
+  '/admin/municipal-onboarding':      ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

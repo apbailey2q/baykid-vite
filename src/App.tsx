@@ -111,6 +111,7 @@ const DriverScanInspect        = lazy(() => import('./screens/driver/DriverScanI
 // L.2 H4 — legacy DriverOnboarding wizard archived. /dashboard/driver/onboarding redirects to /driver/compliance (the canonical Phase G.1 wizard).
 const DriverComplianceWizard   = lazy(() => import('./screens/driver/DriverComplianceWizard'))
 const EarningsDashboardPage    = lazy(() => import('./screens/EarningsDashboardPage'))
+const PayoutWalletPage         = lazy(() => import('./screens/wallet/PayoutWalletPage'))
 const DriverRoutesPage         = lazy(() => import('./screens/DriverRoutesPage'))
 
 // ─ Warehouse ──────────────────────────────────────────────────────────────────
@@ -389,6 +390,7 @@ function App() {
               <Route path="/dashboard/partner"            element={<ProtectedRoute requireApproved><PartnerDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/admin"              element={<ProtectedRoute requireApproved><AdminDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/fundraiser"         element={<ProtectedRoute requireApproved><FundraiserDashboard /></ProtectedRoute>} />
+              <Route path="/dashboard/fundraiser/wallet" element={<ProtectedRoute requireApproved><PayoutWalletPage /></ProtectedRoute>} />
 
               {/* Commercial customer routes */}
               <Route path="/dashboard/commercial"          element={<ProtectedRoute requireApproved><CommercialDashboard /></ProtectedRoute>} />
@@ -507,6 +509,8 @@ function App() {
               <Route path="/dashboard/driver/dispatch-messages"     element={<ProtectedRoute requireApproved><DriverDispatchMessages /></ProtectedRoute>} />
               <Route path="/dashboard/driver/scan"                  element={<ProtectedRoute requireApproved><DriverScanScreen /></ProtectedRoute>} />
               <Route path="/dashboard/driver/earnings"              element={<ProtectedRoute requireApproved><DriverEarnings /></ProtectedRoute>} />
+              {/* Payout wallet — 1099 and commercial drivers; also accessible to admins */}
+              <Route path="/dashboard/driver/wallet"              element={<ProtectedRoute requireApproved><PayoutWalletPage /></ProtectedRoute>} />
 
               {/* Bag lifecycle */}
               {/* Phase G.7 — /scan was a mock preview screen; redirect to the Supabase-backed /live-scan */}

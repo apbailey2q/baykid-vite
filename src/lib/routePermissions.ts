@@ -109,6 +109,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/driver/route-map':                     ['admin', 'driver'],
   '/dashboard/driver/scan':                          ['admin', 'driver'],
   '/dashboard/driver/earnings':                      ['admin', 'driver'],
+  '/dashboard/driver/wallet':                        ['admin', 'driver'],
   '/dashboard/driver/warehouse-checkin':             ['admin', 'driver'],
   '/dashboard/driver/hybrid-routes':                 ['admin', 'driver'],
   '/dashboard/driver/onboarding':                    ['admin', 'driver'],
@@ -140,6 +141,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // fundraiser_admin has its own /live-fundraiser-dashboard landing (gated
   // by RequireRole at App.tsx, not routePermissions).
   '/dashboard/fundraiser':                           ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
+  '/dashboard/fundraiser/wallet':                    ['admin', 'fundraiser', ...FUNDRAISER_SUB_ROLES],
 
   // ── Municipal ──────────────────────────────────────────────────────────────
   '/dashboard/municipal':                            ['admin', 'municipal_viewer', 'municipal_manager', 'city_admin'],

@@ -164,6 +164,8 @@ const AdminDriverPayouts             = lazy(() => import('./screens/admin/AdminD
 const AdminWarehouseAnalytics        = lazy(() => import('./screens/admin/AdminWarehouseAnalytics'))
 // Phase WH.1 — admin oversight of warehouse staff onboarding (safe-fail when tables absent)
 const AdminWarehouseOnboarding       = lazy(() => import('./screens/admin/AdminWarehouseOnboarding'))
+// Apple Sprint A — admin review queue for in-app account deletion requests
+const AdminAccountDeletionReview     = lazy(() => import('./screens/admin/AdminAccountDeletionReview'))
 const AdminRecyclingAnalytics        = lazy(() => import('./screens/admin/AdminRecyclingAnalytics'))
 const InvestorDashboard              = lazy(() => import('./screens/admin/InvestorDashboard'))
 const DispatcherLiveMap              = lazy(() => import('./screens/admin/DispatcherLiveMap'))
@@ -431,6 +433,7 @@ function App() {
               <Route path="/dashboard/admin/driver-payouts"          element={<ProtectedRoute requireApproved><AdminDriverPayouts /></ProtectedRoute>} />
               <Route path="/dashboard/admin/warehouse-analytics"     element={<ProtectedRoute requireApproved><AdminWarehouseAnalytics /></ProtectedRoute>} />
               <Route path="/dashboard/admin/warehouse-onboarding"    element={<ProtectedRoute requireApproved><AdminWarehouseOnboarding /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/account-deletion-requests" element={<ProtectedRoute requireApproved><AdminAccountDeletionReview /></ProtectedRoute>} />
               <Route path="/dashboard/admin/analytics"              element={<ProtectedRoute requireApproved><AdminRecyclingAnalytics /></ProtectedRoute>} />
               <Route path="/dashboard/admin/investor"              element={<ProtectedRoute requireApproved><InvestorDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/admin/dispatch-map"          element={<ProtectedRoute requireApproved><DispatcherLiveMap /></ProtectedRoute>} />

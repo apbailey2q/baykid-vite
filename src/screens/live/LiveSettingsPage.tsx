@@ -427,6 +427,52 @@ export default function LiveSettingsPage() {
             </SectionCard>
           </div>
 
+          {/* ── 6. Account & Privacy ─────────────────────────────── */}
+          <div style={fade(240)}>
+            <SectionCard title="Account & Privacy" icon="🔐">
+              <Link
+                to="/legal/privacy-policy"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 0', textDecoration: 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  color: 'inherit',
+                }}
+              >
+                <span style={{ fontSize: 13, color: '#fff' }}>📄 Privacy Policy</span>
+                <span style={{ fontSize: 13, color: 'rgba(0,200,255,0.6)' }}>→</span>
+              </Link>
+              <Link
+                to="/legal/terms-of-service"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 0', textDecoration: 'none',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  color: 'inherit',
+                }}
+              >
+                <span style={{ fontSize: 13, color: '#fff' }}>📜 Terms of Service</span>
+                <span style={{ fontSize: 13, color: 'rgba(0,200,255,0.6)' }}>→</span>
+              </Link>
+              <Link
+                to="/legal/data-deletion"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 0', textDecoration: 'none',
+                  color: 'inherit',
+                }}
+              >
+                <span>
+                  <span style={{ fontSize: 13, color: '#f87171', fontWeight: 600 }}>🗑️ Delete my account</span>
+                  <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                    Permanent, requires admin review.
+                  </span>
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(248,113,113,0.6)' }}>→</span>
+              </Link>
+            </SectionCard>
+          </div>
+
           {/* ── Save ─────────────────────────────────────────────── */}
           <div className="flex flex-col gap-3" style={fade(260)}>
             <button

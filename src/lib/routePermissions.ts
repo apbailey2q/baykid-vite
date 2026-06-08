@@ -190,6 +190,8 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/onboarding/warehouse':                           ['admin', ...WAREHOUSE_ROLES],
   // Admin oversight of warehouse onboarding (mock-data-friendly fallback)
   '/dashboard/admin/warehouse-onboarding':           ['admin', 'warehouse_admin', 'warehouse_manager'],
+  // Apple Sprint A — admin review of account deletion requests
+  '/dashboard/admin/account-deletion-requests':      ['admin', 'compliance_manager'],
 
   // ── Management Onboarding System — Phase MG.1 ────────────────────────────
   // These three paths are the primary entry points for management personnel.

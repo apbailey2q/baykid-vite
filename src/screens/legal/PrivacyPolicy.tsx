@@ -89,10 +89,10 @@ export default function PrivacyPolicy() {
             ]} />
             <p className="mt-3" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Location Data</p>
             <Ul items={[
-              'GPS coordinates collected from drivers during active commercial route sessions.',
-              'Location is used for route tracking, stop sequencing, and estimated arrival times.',
-              'Location collection stops when a driver goes offline or completes their route.',
-              "Consumer location is never collected by this platform.",
+              'Approximate driver location is captured only while a driver is on an active route session, and only to sequence stops and provide estimated arrival windows.',
+              'Location collection stops automatically when a driver goes offline or completes their route. Drivers are not located off-duty or between shifts.',
+              'Consumer location is never collected by this platform.',
+              'Commercial customer facility addresses are stored as part of the service agreement — these are static addresses, not live location data.',
             ]} />
             <p className="mt-3" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Inspection & Scan Photos</p>
             <Ul items={[
@@ -105,7 +105,7 @@ export default function PrivacyPolicy() {
               'Consumer wallet earning records and payout history.',
               'Commercial account invoice records and payment status.',
               'Driver earning records per route and per bag.',
-              'Card numbers and full payment details are handled by Stripe and are never stored on our servers.',
+              'Payouts are issued manually outside of the application; we record the payment method (check, cash, Zelle, Cash App, bank transfer, other) and a reference identifier after the fact. We do not store card numbers, CVV codes, bank account numbers, or routing numbers, and we do not operate or integrate any payment processor.',
             ]} />
             <p className="mt-3" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Device & Notification Data</p>
             <Ul items={[
@@ -135,16 +135,16 @@ export default function PrivacyPolicy() {
             <p className="mt-3">We do not use your data for advertising or sell it to third parties for marketing purposes.</p>
           </Section>
 
-          {/* 4. GPS Tracking Disclosure */}
-          <Section title="4. GPS Tracking Disclosure" delay={150} a={a}>
+          {/* 4. Driver Location Disclosure */}
+          <Section title="4. Driver Location Disclosure" delay={150} a={a}>
             <p>
-              GPS location data is collected from commercial route drivers only. Location tracking is active only while a driver is online and has an active route session. Tracking stops automatically when the driver marks themselves offline or completes their assigned route.
+              Approximate driver location is captured only while a driver is on an active route session and only to sequence stops and provide arrival windows. There is no continuous location tracking, no off-duty tracking, and no historical location feed.
             </p>
             <p className="mt-2">
-              Drivers are not tracked off-duty, between shifts, or while navigating outside of an active route session. Location data is stored per route session and is used solely for route management, stop sequencing, and estimated arrival time calculation.
+              Location capture stops automatically when a driver goes offline or completes the assigned route. Drivers are not located between shifts or while navigating outside of an active session. Location data is stored on a per-route-session basis and used solely for route management and arrival-time calculation.
             </p>
             <p className="mt-2">
-              Consumer users are never subject to location tracking by this platform. Commercial customers' facility addresses are stored as part of their service agreement — not live location data.
+              Consumer users are never subject to location capture by this platform. Commercial customer facility addresses are stored as part of the service agreement — these are static addresses, not live location data.
             </p>
           </Section>
 
@@ -180,13 +180,13 @@ export default function PrivacyPolicy() {
             </p>
           </Section>
 
-          {/* 7. Payment Processing */}
-          <Section title="7. Payment Processing" delay={240} a={a}>
+          {/* 7. Payouts */}
+          <Section title="7. Payouts" delay={240} a={a}>
             <p>
-              Payments and payouts on the Cyan's Brooklynn platform are processed by <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Stripe</strong>, a PCI-compliant payment processor. Cyan's Brooklynn Recycling Enterprise does not store, transmit, or have access to your full card number, CVV, or bank account credentials.
+              Cyan's Brooklynn Recycling Enterprise does <strong style={{ color: 'rgba(255,255,255,0.8)' }}>not</strong> process payments inside the application. We do not collect or store card numbers, CVV codes, bank account numbers, or routing numbers, and we do not integrate any payment processor.
             </p>
             <p className="mt-2">
-              Stripe's collection and use of payment data is governed by the <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#00c8ff', textDecoration: 'none' }}>Stripe Privacy Policy</a>. Invoice records, payout totals, and payment status are stored in our platform for billing and compliance purposes.
+              Approved payouts are issued manually <strong style={{ color: 'rgba(255,255,255,0.8)' }}>outside</strong> of the application — for example by check, cash, Zelle, Cash App, or bank transfer arranged separately. The platform records the payout amount, payment method, and a reference identifier after the fact for bookkeeping and audit purposes only. The Internal Wallet and Manual Payout Ledger you see in the app reflect those records.
             </p>
           </Section>
 
@@ -194,7 +194,6 @@ export default function PrivacyPolicy() {
           <Section title="8. Data Sharing" delay={270} a={a}>
             <p>We share your data only in the following limited circumstances:</p>
             <Ul items={[
-              'With Stripe for payment processing.',
               'With cloud infrastructure providers (Supabase) who store data on our behalf under data processing agreements.',
               'With AI analysis providers for inspection image classification, under strict data handling terms.',
               'With law enforcement or regulatory authorities when required by applicable law.',

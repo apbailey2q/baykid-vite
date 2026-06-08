@@ -147,7 +147,7 @@ export default function TermsOfService() {
               'Operate vehicles safely and in compliance with all traffic laws.',
               'Complete load inspections as required by the platform and by company policy.',
               'Refuse loads that present an immediate safety risk, regardless of AI result.',
-              'Allow GPS location tracking while online and on an active route session.',
+              'Allow approximate location capture while online and on an active route session, used solely for stop sequencing and arrival times.',
               'Comply with all CB Recycling driver safety guidelines.',
               'Report all safety incidents, near-misses, and refusals in the app on the same day.',
               'Not divert loads to unauthorized locations.',
@@ -200,9 +200,9 @@ export default function TermsOfService() {
             <p>
               Driver earnings are calculated per stop and per bag weight as specified in the driver agreement. Payouts are processed through the app on the applicable payment schedule. Earnings may be adjusted for cancelled stops, contamination refusals, or fraudulent activity.
             </p>
-            <p className="mt-3" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Payment Processing</p>
+            <p className="mt-3" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Payouts</p>
             <p>
-              All payment processing is handled by Stripe. We do not store card numbers or banking credentials. By using payment features, you also agree to Stripe's Terms of Service.
+              Cyan's Brooklynn Recycling Enterprise does not process payments inside the application. We do not collect or store card numbers, CVV codes, bank account numbers, or routing numbers, and we do not integrate any payment processor. Approved payouts are issued manually outside of the application (for example by check, cash, Zelle, Cash App, or bank transfer) and the platform records the amount, method, and a reference identifier after the fact for bookkeeping and audit purposes only.
             </p>
           </Section>
 
@@ -235,7 +235,7 @@ export default function TermsOfService() {
               'Route delays or missed pickups caused by traffic, safety conditions, or driver availability.',
               'Contamination disputes where the commercial account submitted prohibited materials.',
               'Loss of earnings caused by account suspension for policy violations.',
-              'Actions or omissions of third-party services including Stripe, OSRM routing, or AI providers.',
+              'Actions or omissions of third-party infrastructure or service providers (for example: hosting, mapping/routing, or AI analysis providers).',
               'Indirect, incidental, consequential, or punitive damages.',
             ]} />
             <p className="mt-2">

@@ -80,6 +80,13 @@ export default function AdminDashboard() {
         >
           🏢 Management Oversight
         </Link>
+        <Link
+          to="/dashboard/admin/account-deletion-requests"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.32)', color: '#f87171', textDecoration: 'none' }}
+        >
+          🗑️ Deletion Requests
+        </Link>
       </div>
       <div
         className="flex overflow-x-auto mb-4 -mx-4 px-4 sm:mx-0 sm:px-0"

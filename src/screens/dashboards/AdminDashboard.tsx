@@ -81,11 +81,26 @@ export default function AdminDashboard() {
           🏢 Management Oversight
         </Link>
         <Link
+          to="/admin/document-review"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.28)', color: '#f97316', textDecoration: 'none' }}
+          title="Review uploaded documents, expiration alerts, missing requirements, and temporary deactivation countdowns."
+        >
+          📋 Document Review
+        </Link>
+        <Link
           to="/dashboard/admin/account-deletion-requests"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
           style={{ background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.32)', color: '#f87171', textDecoration: 'none' }}
         >
           🗑️ Deletion Requests
+        </Link>
+        <Link
+          to="/dashboard/admin/route-alerts"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.32)', color: '#fbbf24', textDecoration: 'none' }}
+        >
+          ⚠️ Route & Driver Alerts
         </Link>
       </div>
       <div

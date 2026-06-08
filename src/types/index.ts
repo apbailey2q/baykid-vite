@@ -805,3 +805,98 @@ export interface ManagementAdminAction {
   metadata:              Record<string, unknown>
   created_at:            string
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase MG.4 — Compliance Notification System
+// Reusable across management, driver, warehouse, commercial, fundraiser,
+// partner, and consumer owner types.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OwnerType =
+  | 'management'
+  | 'driver'
+  | 'warehouse'
+  | 'commercial'
+  | 'fundraiser'
+  | 'partner'
+  | 'consumer'
+
+export type ComplianceDocumentStatus =
+  | 'missing'
+  | 'pending_review'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
+  | 'expiring_soon'
+
+export type ComplianceNotificationType =
+  | 'document_missing'
+  | 'document_expiring'
+  | 'document_expired'
+  | 'document_rejected'
+  | 'countdown_started'
+  | 'temporary_deactivation'
+  | 'reactivation'
+  | 'route_not_completed'
+  | 'drivers_needed'
+  | 'admin_review_required'
+
+export type ComplianceSeverity =
+  | 'info'
+  | 'warning'
+  | 'urgent'
+  | 'critical'
+
+export interface ComplianceDocument {
+  id:                                string
+  owner_user_id:                     string
+  owner_type:                        OwnerType
+  owner_profile_id?:                 string | null
+  document_type:                     string
+  document_title:                    string
+  status:                            ComplianceDocumentStatus
+  file_url?:                         string | null
+  file_name?:                        string | null
+  issued_date?:                      string | null
+  expiration_date?:                  string | null
+  reviewed_by?:                      string | null
+  reviewed_at?:                      string | null
+  review_notes?:                     string | null
+  deactivation_countdown_started_at?: string | null
+  temporary_deactivation_at?:        string | null
+  reactivated_at?:                   string | null
+  created_at:                        string
+  updated_at:                        string
+}
+
+export interface ComplianceNotification {
+  id:                   string
+  recipient_user_id:    string
+  owner_type:           OwnerType
+  owner_profile_id?:    string | null
+  notification_type:    ComplianceNotificationType
+  severity:             ComplianceSeverity
+  title:                string
+  message:              string
+  related_document_id?: string | null
+  is_read:              boolean
+  read_at?:             string | null
+  action_required:      boolean
+  action_url?:          string | null
+  created_at:           string
+}
+
+export interface ComplianceDeactivationEvent {
+  id:                        string
+  owner_user_id:             string
+  owner_type:                OwnerType
+  owner_profile_id?:         string | null
+  reason:                    string
+  trigger_document_id?:      string | null
+  status:                    'active' | 'resolved' | 'cancelled'
+  started_at:                string
+  temporary_deactivation_at?: string | null
+  resolved_at?:              string | null
+  created_by?:               string | null
+  created_at:                string
+}

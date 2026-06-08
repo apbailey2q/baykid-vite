@@ -89,6 +89,12 @@ const ManagementTrainingCenter        = lazy(() => import('./screens/management/
 const ManagementAgreementCompliance   = lazy(() => import('./screens/management/ManagementAgreementCompliance'))
 // Phase MG.3 — Admin management roster with approval controls
 const AdminManagementOnboarding       = lazy(() => import('./screens/admin/AdminManagementOnboarding'))
+// Phase MG.4 — Compliance document review + management documents
+const AdminDocumentReview             = lazy(() => import('./screens/admin/AdminDocumentReview'))
+const ManagementDocuments             = lazy(() => import('./screens/management/ManagementDocuments'))
+// Apple Sprint B — user-facing Document Center + admin route/driver-need alerts
+const DocumentCenter                  = lazy(() => import('./screens/compliance/DocumentCenter'))
+const AdminRouteAlertsCenter          = lazy(() => import('./screens/admin/AdminRouteAlertsCenter'))
 const ConsumerPickupRequest    = lazy(() => import('./screens/consumer/ConsumerPickupRequest'))
 const QRScanPage               = lazy(() => import('./screens/fundraisers/QRScanPage'))
 // L.2 C5 — ScanResultPage was a hardcoded PREVIEW_SCAN mock; /scan-result redirects to /live-scan.
@@ -471,6 +477,12 @@ function App() {
               <Route path="/management/agreement-compliance"  element={<ProtectedRoute requireApproved><ManagementAgreementCompliance /></ProtectedRoute>} />
               {/* Phase MG.3 — Admin management roster with approval controls */}
               <Route path="/admin/management-onboarding"      element={<ProtectedRoute requireApproved><AdminManagementOnboarding /></ProtectedRoute>} />
+              {/* Phase MG.4 — Compliance document review + management documents */}
+              <Route path="/admin/document-review"            element={<ProtectedRoute requireApproved><AdminDocumentReview /></ProtectedRoute>} />
+              <Route path="/management/documents"             element={<ProtectedRoute requireApproved><ManagementDocuments /></ProtectedRoute>} />
+              {/* Apple Sprint B — user-facing Document Center for non-management roles */}
+              <Route path="/compliance/documents"             element={<ProtectedRoute><DocumentCenter /></ProtectedRoute>} />
+              <Route path="/dashboard/admin/route-alerts"     element={<ProtectedRoute requireApproved><AdminRouteAlertsCenter /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 

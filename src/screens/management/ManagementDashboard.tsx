@@ -1,11 +1,13 @@
 // ManagementDashboard.tsx — Management Dashboard
 //
+// Phase MG.4 update: adds Compliance Notification Center, document status card,
+//   expiration alert card, temporary deactivation countdown card, and link to
+//   /management/documents. Loads compliance_documents for expiration and countdown
+//   state. MG.3 snapshot cards are preserved intact.
+//
 // Phase MG.3 update: replaces 6 placeholder snapshot cards with live data:
 //   Management Status · Agreement Completion · Training Completion ·
 //   Certification Status · Open Retraining Requirement · Permission Level
-//
-// Also loads management_training_completions and management_permissions in
-// parallel with existing agreement acceptances load.
 //
 // Phase MG.2 update: agreement compliance section showing per-agreement
 // acceptance status. For admins, shows link to /management/agreement-compliance.
@@ -16,13 +18,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import type { ManagementProfile } from '../../types'
+import type { ManagementProfile, ComplianceDocument } from '../../types'
 import {
   MANAGEMENT_AGREEMENT_VERSION,
   WIZARD_AGREEMENT_ORDER,
   REQUIRED_AGREEMENT_CODES,
   getAgreementByCode,
 } from '../../data/managementAgreementData'
+import {
+  getDaysUntilExpiration,
+  getCountdownLabel,
+} from '../../lib/documentExpiration'
+import ComplianceNotificationCenter from '../../components/notifications/ComplianceNotificationCenter'
 
 const BRAND        = '#00c8ff'
 const BRAND_DIM    = 'rgba(0,200,255,0.08)'
@@ -73,6 +80,8 @@ export default function ManagementDashboard() {
   const [acceptances,  setAcceptances]  = useState<AcceptanceRow[]>([])
   const [snapshot,     setSnapshot]     = useState<LiveSnapshot | null>(null)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
+  // Phase MG.4 — compliance documents
+  const [complianceDocs, setComplianceDocs] = useState<ComplianceDocument[]>([])
 
   // ── Load profile + redirect ────────────────────────────────────────────────
   useEffect(() => {
@@ -103,7 +112,7 @@ export default function ManagementDashboard() {
   const loadSnapshot = useCallback(async (mp: ManagementProfile) => {
     setSnapshotLoading(true)
     try {
-      const [acceptResult, trainResult, permResult] = await Promise.all([
+      const [acceptResult, trainResult, permResult, compResult] = await Promise.all([
         supabase
           .from('management_agreement_acceptances')
           .select('agreement_code, agreement_version, accepted, signature_name, accepted_at')
@@ -121,10 +130,20 @@ export default function ManagementDashboard() {
           .select('*')
           .eq('management_profile_id', mp.id)
           .maybeSingle(),
+
+        // Phase MG.4 — compliance documents for this user
+        supabase
+          .from('compliance_documents')
+          .select('*')
+          .eq('owner_user_id', mp.user_id)
+          .eq('owner_type', 'management'),
       ])
 
       const acceptRows = (acceptResult.data ?? []) as AcceptanceRow[]
       setAcceptances(acceptRows)
+
+      // Phase MG.4
+      setComplianceDocs((compResult.data ?? []) as ComplianceDocument[])
 
       const acceptedCount    = acceptRows.filter(a => a.accepted).length
       const trainingCompleted = (trainResult.data ?? []).length
@@ -451,6 +470,81 @@ export default function ManagementDashboard() {
               Go to Training Center →
             </Link>
           </div>
+        )}
+
+        {/* ── Phase MG.4 — Compliance Document Cards ── */}
+        {profile && complianceDocs.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                DOCUMENT STATUS
+              </h2>
+              <Link to="/management/documents"
+                className="text-xs font-semibold transition-all"
+                style={{ color: BRAND, textDecoration: 'none' }}>
+                View All →
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {complianceDocs.filter(d =>
+                d.status !== 'approved' || d.deactivation_countdown_started_at || d.temporary_deactivation_at
+              ).slice(0, 4).map(doc => {
+                const isDeact    = !!doc.temporary_deactivation_at && !doc.reactivated_at
+                const inCountdown = !!doc.deactivation_countdown_started_at && !doc.temporary_deactivation_at
+                const daysLeft   = doc.expiration_date ? getDaysUntilExpiration(doc.expiration_date) : null
+                const sColor     = isDeact ? DANGER : inCountdown ? '#f97316' : doc.status === 'expiring_soon' ? WARN : doc.status === 'expired' ? DANGER : WARN
+                return (
+                  <div key={doc.id} className="flex items-start gap-3 px-4 py-3 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid rgba(255,255,255,0.07)` }}>
+                    <span className="text-base shrink-0 mt-0.5">
+                      {isDeact ? '🚫' : inCountdown ? '⏱️' : doc.status === 'expiring_soon' ? '⏰' : doc.status === 'expired' ? '⚠️' : '📄'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{doc.document_title}</p>
+                      <p className="text-xs" style={{ color: sColor }}>
+                        {isDeact        ? 'Temporarily Deactivated' :
+                         inCountdown    ? getCountdownLabel(doc) :
+                         daysLeft !== null && daysLeft < 0 ? `Expired ${Math.abs(daysLeft)}d ago` :
+                         daysLeft !== null ? `Expires in ${daysLeft}d` :
+                         doc.status.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {complianceDocs.filter(d =>
+              d.status !== 'approved' || d.deactivation_countdown_started_at || d.temporary_deactivation_at
+            ).length === 0 && (
+              <div className="px-4 py-3 rounded-xl text-sm" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)', color: SUCCESS }}>
+                ✅ All compliance documents are current.
+              </div>
+            )}
+            <Link to="/management/documents"
+              className="inline-block mt-3 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.25)', color: BRAND, textDecoration: 'none' }}>
+              📂 View All Documents
+            </Link>
+          </section>
+        )}
+
+        {/* ── Phase MG.4 — Compliance Notifications ── */}
+        {user && (
+          <section>
+            <h2 className="text-sm font-bold tracking-widest mb-4" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              COMPLIANCE NOTIFICATIONS
+            </h2>
+            <ComplianceNotificationCenter
+              userId={user.id}
+              compact
+              maxItems={5}
+            />
+            <Link to="/management/documents"
+              className="inline-block mt-3 text-xs transition-all"
+              style={{ color: 'rgba(0,200,255,0.6)', textDecoration: 'none' }}>
+              View all documents →
+            </Link>
+          </section>
         )}
 
         {/* Footer */}

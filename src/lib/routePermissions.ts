@@ -192,6 +192,16 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/warehouse-onboarding':           ['admin', 'warehouse_admin', 'warehouse_manager'],
   // Apple Sprint A — admin review of account deletion requests
   '/dashboard/admin/account-deletion-requests':      ['admin', 'compliance_manager'],
+  // Apple Sprint B — user-facing Document Center (any authenticated user with documents to manage)
+  '/compliance/documents': [
+    'admin','consumer','commercial','driver',
+    ...WAREHOUSE_ROLES, ...MANAGEMENT_ROLES,
+    'partner','fundraiser', ...FUNDRAISER_SUB_ROLES, ...COMMERCIAL_CUSTOMER_ROLES,
+    'municipal_viewer','municipal_manager','city_admin',
+    'investor_viewer','regional_admin','city_manager',
+  ],
+  // Apple Sprint B — admin route + driver-need alerts center
+  '/dashboard/admin/route-alerts':                   ['admin', 'operations_manager', 'compliance_manager'],
 
   // ── Management Onboarding System — Phase MG.1 ────────────────────────────
   // These three paths are the primary entry points for management personnel.
@@ -204,6 +214,10 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/management/agreement-compliance': ['admin'],
   // Phase MG.3 — admin management roster (admin only)
   '/admin/management-onboarding':     ['admin'],
+  // Phase MG.4 — compliance document review (admin only)
+  '/admin/document-review':           ['admin'],
+  // Phase MG.4 — management documents (management roles + admin)
+  '/management/documents':            ['admin', ...MANAGEMENT_ROLES],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

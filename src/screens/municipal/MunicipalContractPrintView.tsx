@@ -46,7 +46,12 @@ export default function MunicipalContractPrintView() {
 
   useEffect(() => {
     let cancelled = false
-    if (!contractId) { setError('Missing contract ID.'); setLoading(false); return }
+    if (!contractId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError('Missing contract ID.')
+      setLoading(false)
+      return
+    }
     ;(async () => {
       setLoading(true)
       try {

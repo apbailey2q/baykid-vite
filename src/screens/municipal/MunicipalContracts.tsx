@@ -111,6 +111,7 @@ export default function MunicipalContracts() {
   useEffect(() => {
     let cancelled = false
     if (!selected || selected.signature_status !== 'signed') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSignature(null)
       return
     }

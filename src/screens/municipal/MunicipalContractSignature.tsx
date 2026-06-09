@@ -86,6 +86,7 @@ export default function MunicipalContractSignature() {
   useEffect(() => {
     let cancelled = false
     if (!contractId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadError('Contract ID missing in URL.')
       setLoading(false)
       return

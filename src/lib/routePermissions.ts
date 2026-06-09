@@ -306,6 +306,10 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Driver Compliance Pack V1 wizard (pre-approval) ───────────────────────
   '/driver/compliance':                              ['admin', 'driver'],
 
+  // ── Accident / Incident Report (driver-facing wizard + admin view) ─────────
+  '/driver/accident-report':                         ['admin', 'driver'],
+  '/dashboard/admin/accident-reports':               ['admin', 'compliance_manager', 'operations_manager'],
+
   // ── Driver mode flow (post-login, mode selector + landings + scans) ──────
   '/driver/mode':                                    ['admin', 'driver'],
   '/driver/residential':                             ['admin', 'driver'],

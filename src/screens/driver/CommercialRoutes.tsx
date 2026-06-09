@@ -1100,6 +1100,13 @@ export default function CommercialRoutes() {
           </button>
           <NotificationBell role="driver" onClick={() => setShowNotif(true)} />
           <button
+            onClick={() => navigate('/driver/accident-report', { state: { driverType: 'commercial' } })}
+            className="rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all hover:brightness-110"
+            style={{ background: 'rgba(255,107,53,0.12)', border: '1px solid rgba(255,107,53,0.40)', color: '#ff6b35', cursor: 'pointer' }}
+          >
+            🛡️ Report
+          </button>
+          <button
             onClick={() => showToast('Emergency dispatch contacted')}
             className="rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all hover:brightness-110"
             style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', color: '#f87171', cursor: 'pointer' }}

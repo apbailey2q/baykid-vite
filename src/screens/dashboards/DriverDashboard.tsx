@@ -1464,6 +1464,29 @@ export default function DriverDashboard() {
               </div>
             </div>
 
+            {/* Accident / Incident Report button */}
+            <button
+              onClick={() => navigate('/driver/accident-report')}
+              className="w-full rounded-2xl py-4 text-sm font-bold flex items-center justify-between gap-3"
+              style={{
+                background: 'rgba(255,107,53,0.10)',
+                border: '2px solid rgba(255,107,53,0.40)',
+                color: '#ff6b35',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 20, flexShrink: 0 }}>🚨</span>
+              <span className="flex-1">
+                <span style={{ display: 'block', fontWeight: 800, fontSize: 14 }}>Report Accident / Incident</span>
+                <span style={{ display: 'block', fontWeight: 400, fontSize: 11, color: 'rgba(255,107,53,0.7)', marginTop: 1 }}>
+                  Tap immediately after any accident, injury, or road incident
+                </span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,107,53,0.6)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+
             {/* Sign out */}
             <button
               onClick={handleSignOut}

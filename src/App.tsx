@@ -141,6 +141,9 @@ const DriverModeLanding        = lazy(() => import('./screens/driver/DriverModeL
 const DriverScanInspect        = lazy(() => import('./screens/driver/DriverScanInspect'))
 // L.2 H4 — legacy DriverOnboarding wizard archived. /dashboard/driver/onboarding redirects to /driver/compliance (the canonical Phase G.1 wizard).
 const DriverComplianceWizard   = lazy(() => import('./screens/driver/DriverComplianceWizard'))
+// Accident / Incident Report wizard (driver-facing) + admin review list
+const AccidentReportWizard     = lazy(() => import('./screens/driver/AccidentReportWizard'))
+const AdminAccidentReports     = lazy(() => import('./screens/admin/AdminAccidentReports'))
 const EarningsDashboardPage    = lazy(() => import('./screens/EarningsDashboardPage'))
 const PayoutWalletPage         = lazy(() => import('./screens/wallet/PayoutWalletPage'))
 const DriverRoutesPage         = lazy(() => import('./screens/DriverRoutesPage'))
@@ -563,6 +566,8 @@ function App() {
               <Route path="/safety/report"                      element={<ProtectedRoute><ReportSafetyIssue /></ProtectedRoute>} />
               <Route path="/dashboard/admin/safety-center"      element={<ProtectedRoute requireApproved><AdminSafetyCenter /></ProtectedRoute>} />
               <Route path="/dashboard/admin/risk"               element={<ProtectedRoute requireApproved><AdminRiskDashboard /></ProtectedRoute>} />
+              {/* Accident / Incident Reports — admin review list */}
+              <Route path="/dashboard/admin/accident-reports"   element={<ProtectedRoute requireApproved><AdminAccidentReports /></ProtectedRoute>} />
               <Route path="/waitlist"                        element={<WaitlistScreen />} />
               <Route path="/welcome-back"                    element={<ProtectedRoute><WelcomeBack /></ProtectedRoute>} />
 
@@ -576,6 +581,8 @@ function App() {
               <Route path="/driver/scan"             element={<ProtectedRoute requireApproved><DriverScanInspect mode="residential" /></ProtectedRoute>} />
               <Route path="/driver/commercial-scan"  element={<ProtectedRoute requireApproved><DriverScanInspect mode="commercial"  /></ProtectedRoute>} />
               <Route path="/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckin /></ProtectedRoute>} />
+              {/* Accident / Incident Report wizard — all approved drivers */}
+              <Route path="/driver/accident-report"  element={<ProtectedRoute requireApproved><AccidentReportWizard /></ProtectedRoute>} />
 
               {/* SaaS billing */}
               <Route path="/admin/billing/plans" element={<ProtectedRoute requireApproved><PricingPage /></ProtectedRoute>} />

@@ -277,6 +277,9 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/municipal/reporting':             ['admin', ...MUNICIPAL_ROLES],
   '/admin/municipal-contracts':       ['admin'],
   '/admin/municipal-reporting':       ['admin'],
+  // MU.4 — Municipal Compliance, Service Holds, and Admin Reactivation
+  '/municipal/documents':             ['admin', ...MUNICIPAL_ROLES],
+  '/admin/municipal-compliance':      ['admin'],
 
   // ── Welcome Back (returning completed consumers; admins allowed for QA) ──
   '/welcome-back':                                   ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES, 'partner', 'fundraiser'],

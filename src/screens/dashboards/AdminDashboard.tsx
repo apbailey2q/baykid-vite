@@ -173,6 +173,15 @@ export default function AdminDashboard() {
         >
           📊 Municipal Reporting
         </Link>
+        {/* MU.4 — Municipal Compliance */}
+        <Link
+          to="/admin/municipal-compliance"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.22)', color: '#7ec8e3', textDecoration: 'none' }}
+          title="Review agency compliance documents, service holds, and reactivation requests."
+        >
+          🏛 Municipal Compliance
+        </Link>
         <Link
           to="/admin/document-review"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"

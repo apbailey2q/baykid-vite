@@ -440,6 +440,20 @@ export default function MunicipalPartnerDashboard() {
               </div>
             </div>
 
+            {/* MU.4 — Compliance Documents */}
+            <div style={CARD}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: 0 }}>🗂 Compliance Documents</h3>
+                <Link to="/municipal/documents" style={{ fontSize: '0.78rem', color: '#7ec8e3', textDecoration: 'none', fontWeight: 600 }}>View →</Link>
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 8 }}>
+                Review your required compliance documents, track submission status, and respond to expiration notices.
+              </div>
+              <div style={{ color: '#64748b', fontSize: '0.78rem' }}>
+                Missing or expired documents may result in a service hold.
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -451,6 +465,7 @@ export default function MunicipalPartnerDashboard() {
           <QuickLink to="/support/contact" icon="💬" label="Contact Support" />
           {isApproved && <QuickLink to="/municipal/contracts" icon="📄" label="Contracts" />}
           {isApproved && <QuickLink to="/municipal/reporting" icon="📊" label="Reporting" />}
+          {isApproved && <QuickLink to="/municipal/documents" icon="🗂" label="Documents" />}
         </div>
 
       </div>

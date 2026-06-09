@@ -364,18 +364,93 @@ export default function MunicipalPartnerDashboard() {
 
         </div>
 
+        {/* MU.2 — Contract & Reporting cards (shown when approved) */}
+        {isApproved && (
+          <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+
+            {/* Municipal Contracts */}
+            <div style={CARD}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: 0 }}>📄 Municipal Contracts</h3>
+                <Link to="/municipal/contracts" style={{ fontSize: '0.78rem', color: '#7ec8e3', textDecoration: 'none', fontWeight: 600 }}>View →</Link>
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 8 }}>
+                View your service agreement, program type, reporting obligations, and covered zones.
+              </div>
+              <div style={{ color: '#64748b', fontSize: '0.78rem' }}>
+                Records service terms and reporting requirements only. Does not process payments.
+              </div>
+            </div>
+
+            {/* Municipal Reporting */}
+            <div style={CARD}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: 0 }}>📊 Municipal Reporting</h3>
+                <Link to="/municipal/reporting" style={{ fontSize: '0.78rem', color: '#7ec8e3', textDecoration: 'none', fontWeight: 600 }}>View →</Link>
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 8 }}>
+                Track your reporting schedule — council reports, grant reports, diversion summaries, and upcoming due dates.
+              </div>
+              <div style={{ color: '#64748b', fontSize: '0.78rem' }}>
+                Live program metrics will be available in a future update.
+              </div>
+            </div>
+
+            {/* Contract Renewal Status */}
+            <div style={CARD}>
+              <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: '0 0 0.6rem 0' }}>🔄 Contract Renewal Status</h3>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 6 }}>
+                Renewal date and end-date reminders will appear here when your contract is within 30 days of renewal.
+              </div>
+              <Link to="/municipal/contracts" style={{ fontSize: '0.82rem', color: '#00c8ff', textDecoration: 'none', fontWeight: 600 }}>
+                View Contract →
+              </Link>
+            </div>
+
+            {/* Upcoming Reports */}
+            <div style={CARD}>
+              <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: '0 0 0.6rem 0' }}>📅 Upcoming Reports</h3>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 6 }}>
+                Reports due in the next 30 days will be listed here with their due dates and submission status.
+              </div>
+              <Link to="/municipal/reporting" style={{ fontSize: '0.82rem', color: '#00c8ff', textDecoration: 'none', fontWeight: 600 }}>
+                View Reporting Schedule →
+              </Link>
+            </div>
+
+            {/* Service Zones */}
+            <div style={CARD}>
+              <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: '0 0 0.6rem 0' }}>🗺 Service Zones</h3>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 6 }}>
+                Covered service zones and pickup locations defined in your contract.
+              </div>
+              <Link to="/municipal/contracts" style={{ fontSize: '0.82rem', color: '#00c8ff', textDecoration: 'none', fontWeight: 600 }}>
+                View Zones →
+              </Link>
+            </div>
+
+            {/* Program Metrics placeholder */}
+            <div style={CARD}>
+              <h3 style={{ color: '#00c8ff', fontWeight: 700, fontSize: '0.95rem', margin: '0 0 0.6rem 0' }}>📈 Program Metrics</h3>
+              <div style={{ color: '#94a3b8', fontSize: '0.84rem', marginBottom: 6 }}>
+                Total diverted, diversion rate, contamination rate, participation rate, and CO₂ reduction.
+              </div>
+              <div style={{ color: '#64748b', fontSize: '0.78rem', fontStyle: 'italic' }}>
+                Live data available in a future update.
+              </div>
+            </div>
+
+          </div>
+        )}
+
         {/* Quick links */}
         <div style={{ marginTop: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
           <QuickLink to="/municipal/onboarding" icon="📋" label="Onboarding" />
           <QuickLink to="/compliance/documents" icon="📁" label="Compliance Documents" />
           <QuickLink to="/compliance/notifications" icon="🔔" label="Notifications" />
           <QuickLink to="/support/contact" icon="💬" label="Contact Support" />
-          <div style={{ padding: '0.5rem 1rem', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: '0.82rem', fontStyle: 'italic' }}>
-            📊 Reports — Coming Soon
-          </div>
-          <div style={{ padding: '0.5rem 1rem', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: '0.82rem', fontStyle: 'italic' }}>
-            📄 Contracts — Coming Soon
-          </div>
+          {isApproved && <QuickLink to="/municipal/contracts" icon="📄" label="Contracts" />}
+          {isApproved && <QuickLink to="/municipal/reporting" icon="📊" label="Reporting" />}
         </div>
 
       </div>

@@ -221,9 +221,14 @@ const ReportsCenterPage              = lazy(() => import('./screens/ReportsCente
 const MunicipalDashboard       = lazy(() => import('./screens/municipal/MunicipalDashboard'))
 const MunicipalReports         = lazy(() => import('./screens/municipal/MunicipalReports'))
 // MU.1 — Municipal/Government Partner Onboarding system
-const MunicipalOnboarding      = lazy(() => import('./screens/municipal/MunicipalOnboarding'))
+const MunicipalOnboarding       = lazy(() => import('./screens/municipal/MunicipalOnboarding'))
 const MunicipalPartnerDashboard = lazy(() => import('./screens/municipal/MunicipalPartnerDashboard'))
-const AdminMunicipalOnboarding = lazy(() => import('./screens/admin/AdminMunicipalOnboarding'))
+const AdminMunicipalOnboarding  = lazy(() => import('./screens/admin/AdminMunicipalOnboarding'))
+// MU.2 — Municipal Contracts & Reporting screens
+const MunicipalContracts        = lazy(() => import('./screens/municipal/MunicipalContracts'))
+const MunicipalReporting        = lazy(() => import('./screens/municipal/MunicipalReporting'))
+const AdminMunicipalContracts   = lazy(() => import('./screens/admin/AdminMunicipalContracts'))
+const AdminMunicipalReporting   = lazy(() => import('./screens/admin/AdminMunicipalReporting'))
 const ExecutiveDashboard       = lazy(() => import('./screens/executive/ExecutiveDashboard'))
 
 // ─ Billing ────────────────────────────────────────────────────────────────────
@@ -520,6 +525,11 @@ function App() {
               <Route path="/municipal/onboarding"             element={<ProtectedRoute requireApproved><MunicipalOnboarding /></ProtectedRoute>} />
               <Route path="/municipal/dashboard"              element={<ProtectedRoute requireApproved><MunicipalPartnerDashboard /></ProtectedRoute>} />
               <Route path="/admin/municipal-onboarding"       element={<ProtectedRoute requireApproved><AdminMunicipalOnboarding /></ProtectedRoute>} />
+              {/* MU.2 — Municipal Contracts & Reporting */}
+              <Route path="/municipal/contracts"              element={<ProtectedRoute requireApproved><MunicipalContracts /></ProtectedRoute>} />
+              <Route path="/municipal/reporting"              element={<ProtectedRoute requireApproved><MunicipalReporting /></ProtectedRoute>} />
+              <Route path="/admin/municipal-contracts"        element={<ProtectedRoute requireApproved><AdminMunicipalContracts /></ProtectedRoute>} />
+              <Route path="/admin/municipal-reporting"        element={<ProtectedRoute requireApproved><AdminMunicipalReporting /></ProtectedRoute>} />
               {/* Phase MG.4 — Compliance document review + management documents */}
               <Route path="/admin/document-review"            element={<ProtectedRoute requireApproved><AdminDocumentReview /></ProtectedRoute>} />
               <Route path="/management/documents"             element={<ProtectedRoute requireApproved><ManagementDocuments /></ProtectedRoute>} />

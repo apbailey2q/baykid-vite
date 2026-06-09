@@ -981,3 +981,109 @@ export interface OperationalNotificationEvent {
   created_at:         string
   updated_at:         string
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MU.2 — Municipal Contracts & Reporting
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type MunicipalContractServiceLevel =
+  | 'standard'
+  | 'expanded'
+  | 'pilot_program'
+  | 'grant_funded'
+  | 'municipal_wide'
+  | 'custom'
+
+export type MunicipalProgramType =
+  | 'recycling_collection'
+  | 'education_outreach'
+  | 'public_works_support'
+  | 'waste_reduction'
+  | 'grant_reporting'
+  | 'custom'
+
+export type MunicipalReportingFrequency =
+  | 'monthly'
+  | 'quarterly'
+  | 'semiannual'
+  | 'annual'
+  | 'custom'
+
+export type MunicipalContractStatus =
+  | 'draft'
+  | 'pending_review'
+  | 'active'
+  | 'expired'
+  | 'cancelled'
+  | 'needs_review'
+
+export type MunicipalReportType =
+  | 'council_report'
+  | 'sustainability_report'
+  | 'grant_report'
+  | 'diversion_report'
+  | 'contamination_report'
+  | 'public_works_report'
+  | 'custom'
+
+export type MunicipalReportingStatus =
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'cancelled'
+
+export interface MunicipalContract {
+  id:                              string
+  municipal_profile_id:            string
+  contract_title:                  string
+  agency_name:                     string | null
+  agency_type:                     string | null
+  service_level:                   MunicipalContractServiceLevel
+  program_type:                    MunicipalProgramType
+  service_zones:                   string[]
+  covered_locations:               string[]
+  reporting_frequency:             MunicipalReportingFrequency
+  council_reporting_required:      boolean
+  grant_reporting_required:        boolean
+  public_education_required:       boolean
+  contamination_threshold_percent: number | null
+  start_date:                      string | null
+  end_date:                        string | null
+  renewal_date:                    string | null
+  status:                          MunicipalContractStatus
+  estimated_monthly_volume_lbs:    number | null
+  estimated_annual_diversion_lbs:  number | null
+  notes:                           string | null
+  created_by:                      string | null
+  updated_by:                      string | null
+  created_at:                      string
+  updated_at:                      string
+}
+
+export interface MunicipalContractHistory {
+  id:                   string
+  contract_id:          string
+  municipal_profile_id: string | null
+  action_type:          'created' | 'updated' | 'status_changed' | 'renewed' | 'cancelled' | 'expired' | 'note_added'
+  previous_status:      string | null
+  new_status:           string | null
+  change_summary:       string | null
+  metadata:             Record<string, unknown>
+  changed_by:           string | null
+  created_at:           string
+}
+
+export interface MunicipalReportingRequirement {
+  id:                   string
+  municipal_profile_id: string
+  contract_id:          string | null
+  report_title:         string
+  report_type:          MunicipalReportType
+  frequency:            MunicipalReportingFrequency
+  next_due_date:        string | null
+  status:               MunicipalReportingStatus
+  required_metrics:     string[]
+  notes:                string | null
+  created_at:           string
+  updated_at:           string
+}

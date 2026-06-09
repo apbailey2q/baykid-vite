@@ -155,6 +155,24 @@ export default function AdminDashboard() {
         >
           🏛 Municipal Partners
         </Link>
+        {/* MU.2 — Municipal Contracts */}
+        <Link
+          to="/admin/municipal-contracts"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.22)', color: '#7ec8e3', textDecoration: 'none' }}
+          title="Create, edit, renew, and manage municipal service contracts."
+        >
+          📄 Municipal Contracts
+        </Link>
+        {/* MU.2 — Municipal Reporting */}
+        <Link
+          to="/admin/municipal-reporting"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.07)', border: '1px solid rgba(0,200,255,0.22)', color: '#7ec8e3', textDecoration: 'none' }}
+          title="Create and manage municipal reporting requirements across agencies."
+        >
+          📊 Municipal Reporting
+        </Link>
         <Link
           to="/admin/document-review"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"

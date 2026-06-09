@@ -99,7 +99,7 @@ This training program is your foundation. Completing it earns your Management Ce
       {
         question: 'What is the public brand name customers and partners see?',
         options: [
-          'BayKid Platform',
+          'Green Community App',
           'Cyan\'s Brooklynn Recycling',
           'CBR Enterprise',
           'Green Community LLC',

@@ -46,7 +46,7 @@ function AccessDenied({ role }: { role: Role }) {
 }
 
 // Paths under /dashboard/ that require commercial service capability
-// (driver_service_type ∈ {commercial_only, hybrid}). consumer_only
+// (driver_service_type ∈ {commercial_only, hybrid_driver}). driver_1099
 // is blocked at the client AND server (RLS) layers.
 const COMMERCIAL_DRIVER_PATHS = [
   '/dashboard/driver/commercial-routes',
@@ -171,14 +171,14 @@ export function ProtectedRoute({ children, requireApproved = false }: Props) {
 
   // Driver service-type enforcement
   if (isDriverAccount && profile) {
-    const dst = profile.driver_service_type ?? 'hybrid'
+    const dst = profile.driver_service_type ?? 'hybrid_driver'
 
     const isCommercialDriverPath = COMMERCIAL_DRIVER_PATHS.some(
       p => pathname === p || pathname.startsWith(p + '/')
     )
     const isConsumerDriverPath = pathname === '/dashboard/driver/consumer-routes'
 
-    if (isCommercialDriverPath && dst === 'consumer_only') {
+    if (isCommercialDriverPath && dst === 'driver_1099') {
       return <AccessDenied role={role} />
     }
 

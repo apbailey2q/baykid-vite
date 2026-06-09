@@ -17,10 +17,10 @@ export const AUTO_APPROVED_ROLES: Role[] = [
 
 // ── Driver subtype access helpers ────────────────────────────────────────────
 // Spec mapping (user terminology ↔ schema). DB CHECK on profiles.driver_service_type:
-//   ('consumer_only','commercial_only','hybrid') — see migration 20260625000001.
-//   "driver_1099"     ≡ role='driver' AND driver_service_type='consumer_only'
+//   ('driver_1099','commercial_only','hybrid_driver') — see migration 20260701000001.
+//   "driver_1099"     ≡ role='driver' AND driver_service_type='driver_1099'
 //   "commercial_only" ≡ role='driver' AND driver_service_type='commercial_only'
-//   "hybrid driver"   ≡ role='driver' AND driver_service_type='hybrid'
+//   "hybrid_driver"   ≡ role='driver' AND driver_service_type='hybrid_driver'
 //
 // These wrap the rule so every client check stays consistent. Server-side the
 // same rule is encoded in public.is_commercial_capable_driver() (RLS).
@@ -33,14 +33,14 @@ interface DriverGateInput {
 export function is1099Driver(p: DriverGateInput | null | undefined): boolean {
   if (!p) return false
   if (p.role !== 'driver') return false
-  return p.driver_service_type === 'consumer_only'
+  return p.driver_service_type === 'driver_1099'
 }
 
 export function canAccessCommercialDriver(p: DriverGateInput | null | undefined): boolean {
   if (!p) return false
   if (p.role === 'admin') return true
   if (p.role !== 'driver') return false
-  return p.driver_service_type === 'hybrid' || p.driver_service_type === 'commercial_only'
+  return p.driver_service_type === 'hybrid_driver' || p.driver_service_type === 'commercial_only'
 }
 
 /**
@@ -106,9 +106,9 @@ export function getRoleDashboardPath(profileOrRole: ProfileLike | Role): string 
   // whose profiles.role column is 'consumer' but were provisioned as drivers — the
   // driver_service_type column is the authoritative indicator of a driver account).
   if (role === 'driver' || (driverServiceType != null && driverServiceType !== '')) {
-    if (driverServiceType === 'consumer_only')   return '/dashboard/driver'
+    if (driverServiceType === 'driver_1099')     return '/dashboard/driver'
     if (driverServiceType === 'commercial_only') return '/dashboard/commercial-driver'
-    if (driverServiceType === 'hybrid')          return '/driver-mode-select'
+    if (driverServiceType === 'hybrid_driver')   return '/driver-mode-select'
     // unset — show mode-select screen (hybrid by default for safety)
     return '/driver-mode-select'
   }

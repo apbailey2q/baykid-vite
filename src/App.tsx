@@ -351,10 +351,10 @@ function HomeRedirect() {
   // Driver routing by service type
   if (normalized === 'driver') {
     const dst = profile?.driver_service_type
-    if (dst === 'consumer_only')   return <Navigate to="/dashboard/driver" replace />
+    if (dst === 'driver_1099')     return <Navigate to="/dashboard/driver" replace />
     if (dst === 'commercial_only') return <Navigate to="/dashboard/commercial-driver" replace />
-    if (dst === 'hybrid')          return <Navigate to="/driver-mode-select" replace />
-    // unset — show mode-select screen (treat as hybrid for safety)
+    if (dst === 'hybrid_driver')   return <Navigate to="/driver-mode-select" replace />
+    // unset — show mode-select screen (treat as hybrid_driver for safety)
     return <Navigate to="/driver-mode-select" replace />
   }
 
@@ -712,6 +712,8 @@ function App() {
               <Route path="/consent" element={<ConsentPage />} />
               <Route path="/legal"                    element={<LegalHubPage />} />
               <Route path="/legal/data-deletion"      element={<DataDeletionPage />} />
+              {/* OP.2 Phase 9 — canonical user-facing deletion path (Apple/Google requirement) */}
+              <Route path="/account-deletion"         element={<Navigate to="/legal/data-deletion" replace />} />
               <Route path="/legal/contact"            element={<ContactSupportPage />} />
               <Route path="/legal/safety"             element={<SafetyPolicyPage />} />
               <Route path="/legal/driver-safety"      element={<DriverSafetyPage />} />

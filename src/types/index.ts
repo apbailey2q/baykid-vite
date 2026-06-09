@@ -109,15 +109,15 @@ export function isMunicipalRole(role: string | null | undefined): boolean {
 
 // ── Commercial ───────────────────────────────────────────────────────────────
 
-// DB CHECK on profiles.driver_service_type: ('consumer_only','commercial_only','hybrid')
-// (see supabase/migrations/20260625000001_driver_service_type_production.sql)
-// consumer_only   — 1099 independent contractor, consumer pickups only
+// DB CHECK on profiles.driver_service_type: ('driver_1099','commercial_only','hybrid_driver')
+// (see supabase/migrations/20260701000001_commercial_driver_access_model.sql)
+// driver_1099     — 1099 independent contractor, consumer pickups only
 // commercial_only — Commercial employee (company vehicles/equipment only)
-// hybrid          — Approved for both commercial AND consumer routes
-export type DriverServiceType = 'consumer_only' | 'commercial_only' | 'hybrid'
+// hybrid_driver   — Approved for both commercial AND consumer routes
+export type DriverServiceType = 'driver_1099' | 'commercial_only' | 'hybrid_driver'
 
 // Admin-set access type for commercial drivers — stored for audit trail
-export type DriverAccessType = 'commercial_only' | 'hybrid'
+export type DriverAccessType = 'commercial_only' | 'hybrid_driver'
 
 export type CommercialPickupStatus = 'requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
 export type CommercialBinType = 'qr_bin' | 'qr_dumpster' | 'qr_compactor' | 'qr_pallet'

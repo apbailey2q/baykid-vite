@@ -164,13 +164,13 @@ export function navigateFromNotification(
 
   // Driver service-type check — mirrors ProtectedRoute logic
   if (role === 'driver') {
-    const dst = profile.driver_service_type ?? 'hybrid'
+    const dst = profile.driver_service_type ?? 'hybrid_driver'
     const isCommercialPath = COMMERCIAL_DRIVER_PATHS.some(
       p => target === p || target.startsWith(p + '/')
     )
     const isConsumerPath = target === '/dashboard/driver/consumer-routes'
 
-    if (isCommercialPath && dst === 'consumer_only') {
+    if (isCommercialPath && dst === 'driver_1099') {
       navigate(getRoleDashboardPath(profile))
       return
     }

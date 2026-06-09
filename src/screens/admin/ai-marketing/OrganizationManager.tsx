@@ -419,6 +419,7 @@ function OrgSettingsTab() {
   const [settings, setSettings] = useState<OrganizationSettings>(activeOrg?.settings ?? DEFAULT_ORG_SETTINGS)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [deleteInfoShown, setDeleteInfoShown] = useState(false)
 
   const handleSave = async () => {
     setSaving(true)
@@ -515,11 +516,20 @@ function OrgSettingsTab() {
             Deleting the organization is permanent and cannot be undone.
           </p>
           <button
-            onClick={() => window.alert('Organization deletion requires contacting support.')}
+            onClick={() => setDeleteInfoShown(true)}
             style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 8, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
           >
             Delete Organization
           </button>
+          {deleteInfoShown && (
+            <p style={{ marginTop: 10, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}
+               role="status" aria-live="polite">
+              ℹ️ Organization deletion requires contacting support at{' '}
+              <a href="mailto:support@cbrecycling.org" style={{ color: '#7ec8e3', textDecoration: 'underline' }}>
+                support@cbrecycling.org
+              </a>
+            </p>
+          )}
         </div>
       )}
     </div>

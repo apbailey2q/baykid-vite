@@ -390,19 +390,26 @@ export async function createMunicipalComplianceNotification(
   input: MunicipalNotificationInput,
 ): Promise<MunicipalComplianceResult<void>> {
   try {
+    // OP.2 Phase 8 — Dedup: skip if an unread notification of the same type
+    // already exists for this recipient (relies on the unique partial index
+    // compliance_notifications_active_dedup). Use upsert with ignoreDuplicates
+    // so the caller never fails on a dupe; we just skip silently.
     const { error } = await supabase
       .from('compliance_notifications')
-      .insert({
-        recipient_user_id:   input.userId,
-        owner_type:          'municipal',
-        notification_type:   input.notificationType,
-        severity:            input.severity,
-        title:               input.title,
-        message:             input.message,
-        related_document_id: input.relatedDocumentId ?? null,
-        action_required:     input.severity === 'urgent' || input.severity === 'critical',
-        action_url:          input.actionUrl ?? '/municipal/documents',
-      })
+      .upsert(
+        {
+          recipient_user_id:   input.userId,
+          owner_type:          'municipal',
+          notification_type:   input.notificationType,
+          severity:            input.severity,
+          title:               input.title,
+          message:             input.message,
+          related_document_id: input.relatedDocumentId ?? null,
+          action_required:     input.severity === 'urgent' || input.severity === 'critical',
+          action_url:          input.actionUrl ?? '/municipal/documents',
+        },
+        { onConflict: 'recipient_user_id,notification_type,owner_type', ignoreDuplicates: true },
+      )
 
     if (error) return { ok: false, error: error.message }
     return { ok: true }

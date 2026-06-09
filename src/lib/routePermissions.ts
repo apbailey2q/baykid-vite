@@ -135,10 +135,17 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
 
   // ── Commercial Driver (Phase G.5 alias) ────────────────────────────────────
   // Sits outside /dashboard/driver/* but ProtectedRoute.COMMERCIAL_DRIVER_PATHS
-  // enforces driver_service_type ∈ {commercial_only, hybrid} so driver_1099
-  // (consumer_only) is still blocked at the client. Server-side RLS on the
-  // backing tables uses public.is_commercial_capable_driver().
+  // enforces driver_service_type ∈ {commercial_only, hybrid_driver} so driver_1099
+  // is still blocked at the client. Server-side RLS on the backing tables uses
+  // public.is_commercial_capable_driver().
   '/dashboard/commercial-driver':                    ['admin', 'driver'],
+
+  // ── Driver mode select + warehouse checkin (OP.2 Phase 2) ─────────────────
+  // /driver-mode-select — shown only to hybrid_driver after login; role guard
+  //   allows all drivers (service-type gate is in ProtectedRoute + DriverModeSelect).
+  '/driver-mode-select':                             ['admin', 'driver'],
+  // /driver/warehouse-checkin — driver QR/NFC check-in at warehouse drop-off.
+  '/driver/warehouse-checkin':                       ['admin', 'driver'],
 
   // ── Warehouse ──────────────────────────────────────────────────────────────
   '/dashboard/warehouse-supervisor':                 ['admin', 'warehouse_supervisor', 'warehouse_manager', 'warehouse_admin'],
@@ -305,6 +312,16 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/driver/commercial':                              ['admin', 'driver'],
   '/driver/scan':                                    ['admin', 'driver'],
   '/driver/commercial-scan':                         ['admin', 'driver'],
+
+  // ── Account deletion (OP.2 Phase 9 — Apple/Google Store requirement) ──────
+  // /account-deletion redirects to /legal/data-deletion (public). Listed here
+  // so authenticated users reach it without an Access Denied page.
+  '/account-deletion': [
+    'admin','consumer','commercial','driver','warehouse_employee',
+    'warehouse_supervisor','partner','fundraiser','municipal_viewer',
+    'municipal_manager','city_admin','executive','investor_viewer',
+    'regional_admin','city_manager', ...MANAGEMENT_ROLES, ...MUNICIPAL_ROLES,
+  ],
 
   // ── Settings (all authenticated roles) ────────────────────────────────────
   '/settings/notifications': [

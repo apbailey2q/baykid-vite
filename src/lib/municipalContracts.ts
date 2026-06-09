@@ -444,6 +444,19 @@ export async function createMunicipalContractRenewalAlert(
   if (days === null) return
 
   try {
+    // OP.2 Phase 8 — Dedup: skip if an open renewal alert for this contract
+    // already exists (status='open'). Prevents duplicate admin inbox entries
+    // when renew actions are triggered multiple times in quick succession.
+    const { data: existing } = await supabase
+      .from('operational_notification_events')
+      .select('id')
+      .eq('source_table', 'municipal_contracts')
+      .eq('source_id', contract.id)
+      .eq('event_type', 'admin_review_required')
+      .eq('status', 'open')
+      .maybeSingle()
+    if (existing) return // already have an open alert for this contract
+
     await supabase.from('operational_notification_events').insert({
       event_type:   'admin_review_required',
       severity:     days <= 14 ? 'high' : 'medium',

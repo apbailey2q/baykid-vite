@@ -443,7 +443,7 @@ export default function ManagementDocuments() {
                           }}
                           onClick={() => {
                             // Upload flow handled in future phase
-                            alert('Document upload will be available in the next update.')
+                            setReactivationFlash({ text: 'Document upload will be available in the next update.', ok: true })
                           }}
                         >
                           {complianceRecord ? '↑ Replace' : '↑ Upload'}

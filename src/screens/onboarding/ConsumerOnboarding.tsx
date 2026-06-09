@@ -765,6 +765,7 @@ function StepAvatar({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const hasUpload = !!avatarFile && !!avatarPreview
+  const [fileSizeError, setFileSizeError] = useState<string | null>(null)
 
   return (
     <div>
@@ -824,10 +825,11 @@ function StepAvatar({
           const f = e.target.files?.[0] ?? null
           if (f && f.size > 5 * 1024 * 1024) {
             console.warn('[onboarding] avatar: file too large', f.size)
-            alert('Image must be 5MB or smaller.')
+            setFileSizeError('Image must be 5 MB or smaller.')
             e.target.value = ''
             return
           }
+          setFileSizeError(null)
           onPickFile(f)
           e.target.value = ''
         }}
@@ -858,6 +860,12 @@ function StepAvatar({
           </button>
         )}
       </div>
+
+      {fileSizeError && (
+        <p role="alert" style={{ fontSize: 13, color: '#f87171', marginBottom: 14, marginTop: -10 }}>
+          ⚠️ {fileSizeError}
+        </p>
+      )}
 
       <NavRow onBack={onBack} onContinue={onContinue} />
     </div>

@@ -89,7 +89,7 @@ interface AssessmentQuestion {
 
 const ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
   { id: 1,  question: 'What is the public brand name used with customers and partners?',
-    options: ["BayKid Platform", "Cyan's Brooklynn Recycling", "CBR Enterprise", "Green Community LLC"], correct: 1 },
+    options: ["Green Community App", "Cyan's Brooklynn Recycling", "CBR Enterprise", "Green Community LLC"], correct: 1 },
   { id: 2,  question: 'Which of the following payment integrations is PROHIBITED without founder approval?',
     options: ['Check payments recorded manually', 'Cash payments recorded manually', 'Stripe Connect / ACH / routing numbers', 'Zelle payments recorded manually'], correct: 2 },
   { id: 3,  question: 'Under OSHA, a workplace fatality must be reported within:',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { AppShell } from '../../components/ui/AppShell'
@@ -345,6 +345,23 @@ export default function NotificationPreferences() {
             {saving ? 'Saving…' : dirty ? 'Save Preferences' : 'Saved'}
           </PrimaryButton>
         )}
+
+        {/* ── Privacy & Account ── */}
+        <div style={{ marginTop: 16, padding: '14px 18px',
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 16 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+            Privacy &amp; Account
+          </p>
+          <Link
+            to="/account-deletion"
+            style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none',
+                     color: '#f87171', fontSize: 13, fontWeight: 600, padding: '6px 0' }}
+          >
+            <span>🗑️</span>
+            <span>Delete My Account</span>
+          </Link>
+        </div>
       </div>
 
       {/* ── Toast ── */}

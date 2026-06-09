@@ -257,11 +257,11 @@ export default function DriverComplianceWizard() {
   const driverId  = user?.id ?? null
 
   // Determine driver type from profile.driver_service_type.
-  // 'commercial_only' and 'hybrid' are commercial employees.
-  // 'consumer_only' collects personal vehicle / insurance.
+  // 'commercial_only' and 'hybrid_driver' are commercial employees.
+  // 'driver_1099' collects personal vehicle / insurance.
   // Unset defaults to consumer for safety (more complete criteria).
   const dst = profile?.driver_service_type ?? null
-  const isCommercialDriver = dst === 'commercial_only' || dst === 'hybrid'
+  const isCommercialDriver = dst === 'commercial_only' || dst === 'hybrid_driver'
   const steps = isCommercialDriver ? COMMERCIAL_STEPS : CONSUMER_STEPS
   const totalSteps = steps.length
 

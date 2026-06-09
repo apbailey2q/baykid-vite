@@ -362,7 +362,16 @@ async function notifyAdminsOfReactivationRequest(
       action_url:        '/admin/commercial-compliance',
     }))
 
-    await supabase.from('compliance_notifications').insert(inserts)
+    // Upsert with ignoreDuplicates — prevents duplicate admin alerts when multiple
+    // reactivation triggers fire for the same account before an admin reads them.
+    // Relies on partial unique index: compliance_notifications_active_dedup
+    //   (recipient_user_id, notification_type, owner_type) WHERE (is_read = false)
+    await supabase
+      .from('compliance_notifications')
+      .upsert(inserts, {
+        onConflict:       'recipient_user_id,notification_type,owner_type',
+        ignoreDuplicates: true,
+      })
   } catch {
     // fire-and-forget; silently ignore
   }
@@ -389,19 +398,27 @@ export async function createCommercialComplianceNotification(
     const userId = await resolveOwnerUserId(input.accountId)
     if (!userId) return { ok: false, error: 'Account not found' }
 
+    // Upsert with ignoreDuplicates — relies on partial unique index:
+    //   compliance_notifications_active_dedup
+    //   ON (recipient_user_id, notification_type, owner_type) WHERE (is_read = false)
+    // (migration 20260722000003_compliance_notification_dedup_index.sql)
+    // Once an active notification is read, a new one can fire for repeat events.
     const { error } = await supabase
       .from('compliance_notifications')
-      .insert({
-        recipient_user_id:   userId,
-        owner_type:          'commercial',
-        notification_type:   input.notificationType,
-        severity:            input.severity,
-        title:               input.title,
-        message:             input.message,
-        related_document_id: input.relatedDocumentId ?? null,
-        action_required:     input.severity === 'urgent' || input.severity === 'critical',
-        action_url:          input.actionUrl ?? '/commercial/documents',
-      })
+      .upsert(
+        {
+          recipient_user_id:   userId,
+          owner_type:          'commercial',
+          notification_type:   input.notificationType,
+          severity:            input.severity,
+          title:               input.title,
+          message:             input.message,
+          related_document_id: input.relatedDocumentId ?? null,
+          action_required:     input.severity === 'urgent' || input.severity === 'critical',
+          action_url:          input.actionUrl ?? '/commercial/documents',
+        },
+        { onConflict: 'recipient_user_id,notification_type,owner_type', ignoreDuplicates: true },
+      )
 
     if (error) return { ok: false, error: error.message }
     return { ok: true }

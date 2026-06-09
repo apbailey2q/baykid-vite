@@ -50,25 +50,34 @@ export async function createComplianceNotification({
   actionUrl?:         string
 }): Promise<ComplianceResult> {
   try {
+    // ── Upsert with ignoreDuplicates to prevent active-notification spam ──────
+    // Relies on the partial unique index: compliance_notifications_active_dedup
+    //   ON (recipient_user_id, notification_type, owner_type) WHERE (is_read = false)
+    // (created in migration 20260722000003_compliance_notification_dedup_index.sql)
+    // Once a notification is read (is_read = true), a new one can be created for
+    // the same event — ensuring repeat events are tracked correctly.
     const { data, error } = await supabase
       .from('compliance_notifications')
-      .insert({
-        recipient_user_id:   recipientUserId,
-        owner_type:          ownerType,
-        owner_profile_id:    ownerProfileId ?? null,
-        notification_type:   notificationType,
-        severity,
-        title,
-        message,
-        related_document_id: relatedDocumentId ?? null,
-        action_required:     actionRequired,
-        action_url:          actionUrl ?? null,
-      })
+      .upsert(
+        {
+          recipient_user_id:   recipientUserId,
+          owner_type:          ownerType,
+          owner_profile_id:    ownerProfileId ?? null,
+          notification_type:   notificationType,
+          severity,
+          title,
+          message,
+          related_document_id: relatedDocumentId ?? null,
+          action_required:     actionRequired,
+          action_url:          actionUrl ?? null,
+        },
+        { onConflict: 'recipient_user_id,notification_type,owner_type', ignoreDuplicates: true },
+      )
       .select('id')
-      .single()
+      .maybeSingle()   // returns null if duplicate was silently ignored
 
     if (error) return { ok: false, error: error.message }
-    return { ok: true, id: data.id as string }
+    return { ok: true, id: data?.id as string | undefined }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }

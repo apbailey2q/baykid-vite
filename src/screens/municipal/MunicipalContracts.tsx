@@ -13,10 +13,19 @@
 //   No "BayKid" in user-facing text
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { supabase } from '../../lib/supabaseClient'
-import type { MunicipalContract, MunicipalContractHistory, MunicipalReportingRequirement } from '../../types'
+import type {
+  MunicipalContract, MunicipalContractHistory, MunicipalReportingRequirement,
+  MunicipalContractSignature,
+} from '../../types'
+// MU.3 — signature certificate + exports
+import { getLatestMunicipalContractSignature } from '../../lib/municipalContractSignatures'
+import {
+  copyMunicipalContractSummary, downloadMunicipalContractSummary,
+} from '../../lib/municipalContractExports'
+import MunicipalSignatureCertificate from '../../components/municipal/MunicipalSignatureCertificate'
 import {
   SERVICE_LEVEL_LABELS, PROGRAM_TYPE_LABELS, REPORTING_FREQUENCY_LABELS,
   CONTRACT_STATUS_LABELS, CONTRACT_STATUS_COLORS,
@@ -45,6 +54,10 @@ export default function MunicipalContracts() {
   const [reports, setReports]       = useState<MunicipalReportingRequirement[]>([])
   const [loading, setLoading]       = useState(true)
   const [showHistory, setShowHistory] = useState(false)
+  // MU.3 — signature lookup for the selected contract + certificate visibility
+  const [signature, setSignature]     = useState<MunicipalContractSignature | null>(null)
+  const [showCertificate, setShowCertificate] = useState(false)
+  const [copyToast, setCopyToast]     = useState('')
 
   useEffect(() => {
     if (!user?.id) return
@@ -91,6 +104,35 @@ export default function MunicipalContracts() {
     setSelected(c)
     setShowHistory(false)
     setHistory([])
+    setShowCertificate(false)
+  }
+
+  // MU.3 — refresh signature row when the selected contract changes
+  useEffect(() => {
+    let cancelled = false
+    if (!selected || selected.signature_status !== 'signed') {
+      setSignature(null)
+      return
+    }
+    ;(async () => {
+      const sig = await getLatestMunicipalContractSignature(selected.id)
+      if (!cancelled) setSignature(sig)
+    })()
+    return () => { cancelled = true }
+  }, [selected?.id, selected?.signature_status, selected])
+
+  const handleCopy = async () => {
+    if (!selected) return
+    const r = await copyMunicipalContractSummary(selected, signature)
+    setCopyToast(r.ok ? 'Summary copied to clipboard.' : `Copy failed: ${r.error}`)
+    setTimeout(() => setCopyToast(''), 3000)
+  }
+
+  const handleDownload = () => {
+    if (!selected) return
+    downloadMunicipalContractSummary(selected, signature)
+    setCopyToast('Summary downloaded.')
+    setTimeout(() => setCopyToast(''), 3000)
   }
 
   if (loading) {
@@ -195,11 +237,94 @@ export default function MunicipalContracts() {
                 <StatusBadge status={selected.status} />
               </div>
 
+              {/* MU.3 — Signature status row */}
+              <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#7ec8e3', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Signature:
+                </span>
+                <span style={{
+                  fontSize: '0.78rem', fontWeight: 600, padding: '2px 10px', borderRadius: 20,
+                  ...sigBadgeStyle(selected.signature_status),
+                }}>
+                  {sigStatusLabel(selected.signature_status)}
+                </span>
+                {selected.signed_at && (
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    on {new Date(selected.signed_at).toLocaleDateString()}
+                  </span>
+                )}
+                {signature?.signer_name && (
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    by {signature.signer_name}
+                  </span>
+                )}
+              </div>
+
+              {/* MU.3 — Pending signature banner */}
+              {selected.signature_status === 'pending_signature' && (
+                <div style={{
+                  marginTop: 12, padding: '0.8rem 1rem', background: 'rgba(251,191,36,0.08)',
+                  border: '1px solid rgba(251,191,36,0.35)', borderRadius: 8,
+                  display: 'flex', gap: 10, alignItems: 'center',
+                }}>
+                  <span style={{ fontSize: '1.2rem' }}>✍️</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.9rem' }}>
+                      Awaiting your signature
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
+                      An administrator has requested your signature on this agreement. Review the terms and sign when ready.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MU.3 — Action buttons */}
+              <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {selected.signature_status === 'pending_signature' && (
+                  <Link to={`/municipal/contracts/sign/${selected.id}`}
+                        style={partnerBtnStyle('primary')}>
+                    ✍ Review & Sign Contract
+                  </Link>
+                )}
+                <Link to={`/municipal/contracts/print/${selected.id}`}
+                      style={partnerBtnStyle('secondary')}>
+                  🖨 Print Contract
+                </Link>
+                <button onClick={handleCopy} style={partnerBtnStyle('secondary')}>
+                  📋 Copy Summary
+                </button>
+                <button onClick={handleDownload} style={partnerBtnStyle('secondary')}>
+                  ⬇ Download Summary
+                </button>
+                {selected.signature_status === 'signed' && signature && (
+                  <button onClick={() => setShowCertificate(s => !s)}
+                          style={partnerBtnStyle('secondary')}>
+                    📜 {showCertificate ? 'Hide' : 'View'} Signature Certificate
+                  </button>
+                )}
+              </div>
+
+              {copyToast && (
+                <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(0,200,255,0.08)',
+                              border: '1px solid rgba(0,200,255,0.25)', borderRadius: 6,
+                              fontSize: '0.78rem', color: '#00c8ff' }}>
+                  {copyToast}
+                </div>
+              )}
+
               {/* Disclaimer */}
               <div style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(0,200,255,0.05)', border: '1px solid rgba(0,200,255,0.12)', borderRadius: 6, fontSize: '0.78rem', color: '#7ec8e3' }}>
                 This record documents service terms and reporting requirements only.
                 It does not process payments. Cyan's Brooklynn Recycling Enterprise LLC does not provide legal advice regarding contract enforceability.
               </div>
+
+              {/* MU.3 — Inline signature certificate */}
+              {showCertificate && signature && (
+                <div style={{ marginTop: '1rem' }}>
+                  <MunicipalSignatureCertificate contract={selected} signature={signature} />
+                </div>
+              )}
             </div>
 
             {/* Service terms */}
@@ -395,6 +520,41 @@ function StatusBadge({ status }: { status: MunicipalContract['status'] }) {
       {CONTRACT_STATUS_LABELS[status]}
     </span>
   )
+}
+
+// MU.3 — Signature badge + button styling helpers ───────────────────────────
+
+function sigBadgeStyle(status: MunicipalContract['signature_status']): React.CSSProperties {
+  const map: Record<MunicipalContract['signature_status'], { color: string; bg: string }> = {
+    not_requested:     { color: '#94a3b8', bg: 'rgba(148,163,184,0.10)' },
+    pending_signature: { color: '#fbbf24', bg: 'rgba(251,191,36,0.10)' },
+    signed:            { color: '#4ade80', bg: 'rgba(74,222,128,0.10)' },
+    declined:          { color: '#f87171', bg: 'rgba(248,113,113,0.10)' },
+    expired:           { color: '#c084fc', bg: 'rgba(168,85,247,0.10)' },
+  }
+  const m = map[status] ?? map.not_requested
+  return { color: m.color, background: m.bg, border: `1px solid ${m.color}44` }
+}
+
+function sigStatusLabel(status: MunicipalContract['signature_status']): string {
+  switch (status) {
+    case 'not_requested':     return 'Not requested'
+    case 'pending_signature': return 'Pending signature'
+    case 'signed':            return 'Signed'
+    case 'declined':          return 'Declined'
+    case 'expired':           return 'Expired'
+  }
+}
+
+function partnerBtnStyle(variant: 'primary' | 'secondary'): React.CSSProperties {
+  const base: React.CSSProperties = {
+    padding: '0.5rem 0.9rem', borderRadius: 8, fontSize: '0.82rem', fontWeight: 700,
+    cursor: 'pointer', textDecoration: 'none', display: 'inline-block', border: '1px solid',
+  }
+  if (variant === 'primary') {
+    return { ...base, background: 'rgba(0,200,255,0.15)', borderColor: 'rgba(0,200,255,0.4)', color: '#00c8ff' }
+  }
+  return { ...base, background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)', color: '#e0f7ff' }
 }
 
 function DueBadge({ dueDate }: { dueDate: string }) {

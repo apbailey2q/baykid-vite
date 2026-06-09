@@ -1032,6 +1032,14 @@ export type MunicipalReportingStatus =
   | 'completed'
   | 'cancelled'
 
+// MU.3 — Municipal Contract Signature Status
+export type MunicipalContractSignatureStatus =
+  | 'not_requested'
+  | 'pending_signature'
+  | 'signed'
+  | 'declined'
+  | 'expired'
+
 export interface MunicipalContract {
   id:                              string
   municipal_profile_id:            string
@@ -1058,6 +1066,29 @@ export interface MunicipalContract {
   updated_by:                      string | null
   created_at:                      string
   updated_at:                      string
+  // MU.3 — Signature lifecycle (added 2026-07-21)
+  signature_status:                MunicipalContractSignatureStatus
+  signature_requested_at:          string | null
+  signature_requested_by:          string | null
+  signed_at:                       string | null
+  signed_by:                       string | null
+}
+
+// MU.3 — Typed signature record. Immutable per RLS (no UPDATE/DELETE for
+// non-admins). One row per sign event; latest by signed_at is canonical.
+export interface MunicipalContractSignature {
+  id:                   string
+  contract_id:          string
+  municipal_profile_id: string
+  signer_user_id:       string | null
+  signer_name:          string
+  signer_title:         string | null
+  signer_email:         string | null
+  signature_text:       string
+  contract_version:     string
+  contract_snapshot:    Record<string, unknown>
+  signed_at:            string
+  created_at:           string
 }
 
 export interface MunicipalContractHistory {

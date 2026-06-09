@@ -274,6 +274,9 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/admin/municipal-onboarding':      ['admin'],
   // MU.2 — Municipal Contracts & Reporting
   '/municipal/contracts':             ['admin', ...MUNICIPAL_ROLES],
+  // MU.3 — sign + print routes (longest-prefix match catches /:contractId)
+  '/municipal/contracts/sign':        ['admin', ...MUNICIPAL_ROLES],
+  '/municipal/contracts/print':       ['admin', ...MUNICIPAL_ROLES],
   '/municipal/reporting':             ['admin', ...MUNICIPAL_ROLES],
   '/admin/municipal-contracts':       ['admin'],
   '/admin/municipal-reporting':       ['admin'],

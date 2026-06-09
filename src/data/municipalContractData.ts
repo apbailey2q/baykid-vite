@@ -141,6 +141,12 @@ export function emptyMunicipalContract(profileId: string): Omit<MunicipalContrac
     notes:                           null,
     created_by:                      null,
     updated_by:                      null,
+    // MU.3 — Signature lifecycle defaults
+    signature_status:                'not_requested',
+    signature_requested_at:          null,
+    signature_requested_by:          null,
+    signed_at:                       null,
+    signed_by:                       null,
   }
 }
 

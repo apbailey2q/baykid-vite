@@ -21,7 +21,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuthStore } from '../../store/authStore'
-import type { MunicipalContract, MunicipalContractHistory, MunicipalContractStatus } from '../../types'
+import { Link } from 'react-router-dom'
+import type {
+  MunicipalContract, MunicipalContractHistory, MunicipalContractStatus,
+  MunicipalContractSignature,
+} from '../../types'
+// MU.3 — signature workflow + exports
+import {
+  requestMunicipalContractSignature,
+  getLatestMunicipalContractSignature,
+} from '../../lib/municipalContractSignatures'
+import {
+  copyMunicipalContractSummary,
+  downloadMunicipalContractSummary,
+  downloadMunicipalRenewalAuditReport,
+} from '../../lib/municipalContractExports'
+import MunicipalSignatureCertificate from '../../components/municipal/MunicipalSignatureCertificate'
 import {
   SERVICE_LEVEL_LABELS, PROGRAM_TYPE_LABELS, REPORTING_FREQUENCY_LABELS,
   CONTRACT_STATUS_LABELS, CONTRACT_STATUS_COLORS,
@@ -41,7 +56,7 @@ interface MunicipalProfileOption {
   agency_type: string | null
 }
 
-type Tab = 'all' | 'draft' | 'pending_review' | 'active' | 'expiring_soon' | 'expired' | 'cancelled' | 'needs_review'
+type Tab = 'all' | 'draft' | 'pending_review' | 'active' | 'expiring_soon' | 'expired' | 'cancelled' | 'needs_review' | 'pending_signature'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -99,6 +114,12 @@ function emptyForm(profileId = ''): Omit<MunicipalContract, 'id' | 'created_at' 
     estimated_annual_diversion_lbs:  null,
     notes:                           null,
     created_by:                      null, updated_by: null,
+    // MU.3 — Signature lifecycle defaults
+    signature_status:                'not_requested',
+    signature_requested_at:          null,
+    signature_requested_by:          null,
+    signed_at:                       null,
+    signed_by:                       null,
   }
 }
 
@@ -123,6 +144,10 @@ export default function AdminMunicipalContracts() {
   const [newEndDate, setNewEndDate] = useState('')
   const [zoneInput, setZoneInput]   = useState('')
   const [locationInput, setLocationInput] = useState('')
+  // MU.3 — certificate modal (when admin clicks "View Signature Certificate")
+  const [certForContract, setCertForContract] = useState<MunicipalContract | null>(null)
+  const [certSignature, setCertSignature]     = useState<MunicipalContractSignature | null>(null)
+  const [certLoading, setCertLoading]         = useState(false)
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -150,16 +175,18 @@ export default function AdminMunicipalContracts() {
 
   const filterByTab = (c: MunicipalContract): boolean => {
     if (search && ![c.contract_title, c.agency_name, c.status].some(f => f?.toLowerCase().includes(search.toLowerCase()))) return false
-    if (tab === 'all')          return true
-    if (tab === 'expiring_soon') return isMunicipalContractExpiringSoon(c)
+    if (tab === 'all')               return true
+    if (tab === 'expiring_soon')     return isMunicipalContractExpiringSoon(c)
+    if (tab === 'pending_signature') return c.signature_status === 'pending_signature'
     return c.status === tab
   }
 
   const filtered = contracts.filter(filterByTab)
 
   const tabCount = (t: Tab) => {
-    if (t === 'expiring_soon') return contracts.filter(c => isMunicipalContractExpiringSoon(c)).length
-    if (t === 'all')           return contracts.length
+    if (t === 'expiring_soon')     return contracts.filter(c => isMunicipalContractExpiringSoon(c)).length
+    if (t === 'pending_signature') return contracts.filter(c => c.signature_status === 'pending_signature').length
+    if (t === 'all')               return contracts.length
     return contracts.filter(c => c.status === t).length
   }
 
@@ -272,15 +299,68 @@ export default function AdminMunicipalContracts() {
   const addLocation = () => { if (locationInput.trim()) { setForm(f => ({ ...f, covered_locations: [...f.covered_locations, locationInput.trim()] })); setLocationInput('') } }
   const removeLocation = (l: string) => setForm(f => ({ ...f, covered_locations: f.covered_locations.filter(x => x !== l) }))
 
+  // ── MU.3 — Signature + export actions ─────────────────────────────────────
+
+  const handleSendForSignature = async (contract: MunicipalContract) => {
+    const r = await requestMunicipalContractSignature(contract.id)
+    if (!r.ok) { showToast(`Send failed: ${r.error}`); return }
+    showToast('Signature requested.')
+    await loadAll()
+  }
+
+  const handleViewCertificate = async (contract: MunicipalContract) => {
+    setCertForContract(contract)
+    setCertSignature(null)
+    setCertLoading(true)
+    try {
+      const sig = await getLatestMunicipalContractSignature(contract.id)
+      setCertSignature(sig)
+    } finally {
+      setCertLoading(false)
+    }
+  }
+
+  const handleCopySummary = async (contract: MunicipalContract) => {
+    const sig = await getLatestMunicipalContractSignature(contract.id)
+    const r = await copyMunicipalContractSummary(contract, sig)
+    showToast(r.ok ? 'Summary copied to clipboard.' : `Copy failed: ${r.error ?? 'unknown'}`)
+  }
+
+  const handleDownloadSummary = async (contract: MunicipalContract) => {
+    const sig = await getLatestMunicipalContractSignature(contract.id)
+    downloadMunicipalContractSummary(contract, sig)
+    showToast('Summary downloaded.')
+  }
+
+  const signatureBadge = (status: MunicipalContract['signature_status']) => {
+    const map: Record<MunicipalContract['signature_status'], { bg: string; color: string; label: string }> = {
+      not_requested:     { bg: 'rgba(148,163,184,0.10)', color: '#94a3b8', label: 'sig: not requested' },
+      pending_signature: { bg: 'rgba(251,191,36,0.10)', color: '#fbbf24', label: 'sig: pending' },
+      signed:            { bg: 'rgba(74,222,128,0.10)', color: '#4ade80', label: 'sig: signed' },
+      declined:          { bg: 'rgba(248,113,113,0.10)', color: '#f87171', label: 'sig: declined' },
+      expired:           { bg: 'rgba(168,85,247,0.10)', color: '#c084fc', label: 'sig: expired' },
+    }
+    const m = map[status] ?? map.not_requested
+    return (
+      <span style={{
+        fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+        color: m.color, background: m.bg, border: `1px solid ${m.color}44`,
+      }}>
+        {m.label}
+      </span>
+    )
+  }
+
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'all',           label: 'All' },
-    { key: 'draft',         label: 'Draft' },
-    { key: 'pending_review',label: 'Pending Review' },
-    { key: 'active',        label: 'Active' },
-    { key: 'expiring_soon', label: 'Expiring Soon' },
-    { key: 'expired',       label: 'Expired' },
-    { key: 'cancelled',     label: 'Cancelled' },
-    { key: 'needs_review',  label: 'Needs Review' },
+    { key: 'all',               label: 'All' },
+    { key: 'draft',             label: 'Draft' },
+    { key: 'pending_review',    label: 'Pending Review' },
+    { key: 'pending_signature', label: 'Pending Signature' },
+    { key: 'active',            label: 'Active' },
+    { key: 'expiring_soon',     label: 'Expiring Soon' },
+    { key: 'expired',           label: 'Expired' },
+    { key: 'cancelled',         label: 'Cancelled' },
+    { key: 'needs_review',      label: 'Needs Review' },
   ]
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -310,6 +390,9 @@ export default function AdminMunicipalContracts() {
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={runRenewalCheck} style={BTN_SECONDARY}>🔍 Run Renewal Check</button>
+            <button onClick={() => downloadMunicipalRenewalAuditReport(contracts)} style={BTN_SECONDARY}>
+              ⬇ Download Renewal Audit
+            </button>
             <button onClick={openNew} style={BTN_PRIMARY}>+ New Contract</button>
           </div>
         </div>
@@ -525,6 +608,7 @@ export default function AdminMunicipalContracts() {
                       <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: st.color, background: st.bg, border: `1px solid ${st.color}44` }}>
                         {CONTRACT_STATUS_LABELS[contract.status]}
                       </span>
+                      {signatureBadge(contract.signature_status)}
                       {expiring && <span style={{ fontSize: '0.72rem', color: '#FFD600', background: 'rgba(255,214,0,0.1)', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(255,214,0,0.3)' }}>⚠ Expiring Soon</span>}
                     </div>
                     <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>
@@ -534,6 +618,11 @@ export default function AdminMunicipalContracts() {
                       {contract.start_date ?? '?'} → {contract.end_date ?? '?'}
                       {days !== null && ` · ${days >= 0 ? `${days}d remaining` : `${Math.abs(days)}d past end`}`}
                     </div>
+                    {contract.signed_at && (
+                      <div style={{ color: '#4ade80', fontSize: '0.78rem', marginTop: 2 }}>
+                        ✓ Signed {new Date(contract.signed_at).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action buttons */}
@@ -541,6 +630,14 @@ export default function AdminMunicipalContracts() {
                     <ABtn label="✏️ Edit"    color="#00c8ff"  onClick={() => openEdit(contract)} />
                     {contract.status === 'draft'          && <ABtn label="→ Review"  color="#a78bfa" onClick={() => changeStatus(contract.id, 'pending_review')} />}
                     {contract.status === 'pending_review' && <ABtn label="✓ Activate" color="#4ade80" onClick={() => changeStatus(contract.id, 'active')} />}
+                    {/* MU.3 — signature workflow actions */}
+                    {(contract.signature_status === 'not_requested' || contract.signature_status === 'declined' || contract.signature_status === 'expired') &&
+                      <ABtn label="✍ Send for Signature" color="#fbbf24" onClick={() => handleSendForSignature(contract)} />}
+                    {contract.signature_status === 'signed' &&
+                      <ABtn label="📜 Certificate" color="#4ade80" onClick={() => handleViewCertificate(contract)} />}
+                    <ABtn label="🖨 Print" color="#7ec8e3" onClick={() => window.open(`/municipal/contracts/print/${contract.id}`, '_blank')} />
+                    <ABtn label="📋 Copy" color="#7ec8e3" onClick={() => handleCopySummary(contract)} />
+                    <ABtn label="⬇ Download" color="#7ec8e3" onClick={() => handleDownloadSummary(contract)} />
                     {contract.status === 'active'         && <ABtn label="↺ Renew"   color="#4ade80" onClick={() => { setRenewId(contract.id); setRenewDate(''); setNewEndDate('') }} />}
                     {contract.status === 'active'         && <ABtn label="⚠ Review"  color="#fb923c" onClick={() => changeStatus(contract.id, 'needs_review')} />}
                     {contract.status !== 'cancelled'      && <ABtn label="✕ Cancel"  color="#f87171" onClick={() => changeStatus(contract.id, 'cancelled', 'Cancelled by admin.')} />}
@@ -571,6 +668,41 @@ export default function AdminMunicipalContracts() {
               </div>
             )
           })
+        )}
+
+        {/* MU.3 — Signature certificate modal */}
+        {certForContract && (
+          <div role="dialog" aria-modal="true"
+               onClick={() => setCertForContract(null)}
+               style={{
+                 position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+                 zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                 padding: 16, overflow: 'auto',
+               }}>
+            <div onClick={e => e.stopPropagation()}
+                 style={{ background: '#060e24', border: '1px solid rgba(0,200,255,0.25)', borderRadius: 14, padding: 18, maxWidth: 760, width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
+                <strong style={{ color: '#fff', fontSize: 14 }}>Signature certificate</strong>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Link to={`/municipal/contracts/print/${certForContract.id}`} target="_blank"
+                        style={{ background: 'rgba(0,200,255,0.15)', border: '1px solid rgba(0,200,255,0.4)', color: '#00c8ff', textDecoration: 'none', padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
+                    🖨 Print
+                  </Link>
+                  <button onClick={() => setCertForContract(null)}
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    Close
+                  </button>
+                </div>
+              </div>
+              {certLoading && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Loading signature…</p>}
+              {!certLoading && !certSignature && (
+                <p style={{ color: '#fca5a5' }}>No signature record found for this contract.</p>
+              )}
+              {!certLoading && certSignature && (
+                <MunicipalSignatureCertificate contract={certForContract} signature={certSignature} />
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

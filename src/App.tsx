@@ -229,6 +229,9 @@ const MunicipalContracts        = lazy(() => import('./screens/municipal/Municip
 const MunicipalReporting        = lazy(() => import('./screens/municipal/MunicipalReporting'))
 const AdminMunicipalContracts   = lazy(() => import('./screens/admin/AdminMunicipalContracts'))
 const AdminMunicipalReporting   = lazy(() => import('./screens/admin/AdminMunicipalReporting'))
+// MU.3 — Municipal contract signature + print view
+const MunicipalContractSignature = lazy(() => import('./screens/municipal/MunicipalContractSignature'))
+const MunicipalContractPrintView = lazy(() => import('./screens/municipal/MunicipalContractPrintView'))
 // MU.4 — Municipal Compliance, Service Holds, and Admin Reactivation
 const MunicipalDocuments        = lazy(() => import('./screens/municipal/MunicipalDocuments'))
 const AdminMunicipalCompliance  = lazy(() => import('./screens/admin/AdminMunicipalCompliance'))
@@ -533,6 +536,9 @@ function App() {
               <Route path="/municipal/reporting"              element={<ProtectedRoute requireApproved><MunicipalReporting /></ProtectedRoute>} />
               <Route path="/admin/municipal-contracts"        element={<ProtectedRoute requireApproved><AdminMunicipalContracts /></ProtectedRoute>} />
               <Route path="/admin/municipal-reporting"        element={<ProtectedRoute requireApproved><AdminMunicipalReporting /></ProtectedRoute>} />
+              {/* MU.3 — signature + print */}
+              <Route path="/municipal/contracts/sign/:contractId"  element={<ProtectedRoute requireApproved><MunicipalContractSignature /></ProtectedRoute>} />
+              <Route path="/municipal/contracts/print/:contractId" element={<ProtectedRoute requireApproved><MunicipalContractPrintView /></ProtectedRoute>} />
               {/* MU.4 — Municipal Compliance, Service Holds, and Admin Reactivation */}
               <Route path="/municipal/documents"              element={<ProtectedRoute requireApproved><MunicipalDocuments /></ProtectedRoute>} />
               <Route path="/admin/municipal-compliance"       element={<ProtectedRoute requireApproved><AdminMunicipalCompliance /></ProtectedRoute>} />

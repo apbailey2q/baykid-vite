@@ -293,6 +293,15 @@ export default function AdminDashboard() {
         >
           🏢 Commercial Compliance
         </Link>
+        {/* Carbon Footprint Controls */}
+        <Link
+          to="/admin/carbon-controls"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)', color: '#4ade80', textDecoration: 'none' }}
+          title="Manage CO₂ calculation factors, badge levels, report visibility, and export aggregate ESG data."
+        >
+          🌿 Carbon Controls
+        </Link>
         {/* CO.3 — Commercial Contracts tile */}
         <Link
           to="/admin/commercial-contracts"

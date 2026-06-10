@@ -310,6 +310,13 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/driver/accident-report':                         ['admin', 'driver'],
   '/dashboard/admin/accident-reports':               ['admin', 'compliance_manager', 'operations_manager'],
 
+  // ── Carbon Footprint Impact Center ──────────────────────────────────────────
+  '/consumer/impact':                                ['admin', 'consumer'],
+  '/commercial/impact':                              ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/commercial/impact/ranking':                      ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/commercial/vendors':                             ['admin', 'commercial', ...COMMERCIAL_CUSTOMER_ROLES],
+  '/admin/carbon-controls':                          ['admin'],
+
   // ── Driver mode flow (post-login, mode selector + landings + scans) ──────
   '/driver/mode':                                    ['admin', 'driver'],
   '/driver/residential':                             ['admin', 'driver'],

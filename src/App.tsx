@@ -144,6 +144,12 @@ const DriverComplianceWizard   = lazy(() => import('./screens/driver/DriverCompl
 // Accident / Incident Report wizard (driver-facing) + admin review list
 const AccidentReportWizard     = lazy(() => import('./screens/driver/AccidentReportWizard'))
 const AdminAccidentReports     = lazy(() => import('./screens/admin/AdminAccidentReports'))
+// Carbon Footprint Impact Center
+const ConsumerImpactCenter     = lazy(() => import('./screens/consumer/ConsumerImpactCenter'))
+const CommercialImpactCenter   = lazy(() => import('./screens/commercial/CommercialImpactCenter'))
+const CommercialImpactRanking  = lazy(() => import('./screens/commercial/CommercialImpactRanking'))
+const VendorSustainabilityTracker = lazy(() => import('./screens/commercial/VendorSustainabilityTracker'))
+const AdminCarbonControls      = lazy(() => import('./screens/admin/AdminCarbonControls'))
 const EarningsDashboardPage    = lazy(() => import('./screens/EarningsDashboardPage'))
 const PayoutWalletPage         = lazy(() => import('./screens/wallet/PayoutWalletPage'))
 const DriverRoutesPage         = lazy(() => import('./screens/DriverRoutesPage'))
@@ -583,6 +589,13 @@ function App() {
               <Route path="/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckin /></ProtectedRoute>} />
               {/* Accident / Incident Report wizard — all approved drivers */}
               <Route path="/driver/accident-report"  element={<ProtectedRoute requireApproved><AccidentReportWizard /></ProtectedRoute>} />
+
+              {/* Carbon Footprint Impact Center */}
+              <Route path="/consumer/impact"              element={<ProtectedRoute requireApproved><ConsumerImpactCenter /></ProtectedRoute>} />
+              <Route path="/commercial/impact"            element={<ProtectedRoute requireApproved><CommercialImpactCenter /></ProtectedRoute>} />
+              <Route path="/commercial/impact/ranking"    element={<ProtectedRoute requireApproved><CommercialImpactRanking /></ProtectedRoute>} />
+              <Route path="/commercial/vendors"           element={<ProtectedRoute requireApproved><VendorSustainabilityTracker /></ProtectedRoute>} />
+              <Route path="/admin/carbon-controls"        element={<ProtectedRoute requireApproved><AdminCarbonControls /></ProtectedRoute>} />
 
               {/* SaaS billing */}
               <Route path="/admin/billing/plans" element={<ProtectedRoute requireApproved><PricingPage /></ProtectedRoute>} />

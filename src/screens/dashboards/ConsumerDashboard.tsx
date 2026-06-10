@@ -1289,6 +1289,15 @@ export default function ConsumerDashboard() {
             {/* MY IMPACT */}
             <div className="px-5 mb-4">
               <SectionLabel title="My Impact" accent={ACCENT} />
+              <button onClick={() => navigate('/consumer/impact')}
+                className="w-full flex items-center gap-4 py-3 transition-opacity hover:opacity-75 active:opacity-60">
+                <span style={{ fontSize: 23, width: 28, textAlign: 'center', filter: 'drop-shadow(0 0 7px rgba(74,222,128,0.6))', flexShrink: 0 }}>🌿</span>
+                <div className="flex-1 min-w-0 text-left">
+                  <p style={{ fontSize: 13, color: '#ffffff', fontWeight: 600 }}>Impact Center</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>Badges, CO₂ savings & monthly chart</p>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+              </button>
               {[
                 { icon: '🌍', label: 'CO₂ Impact',    sub: `You saved ${co2Saved} lbs of CO₂`, glow: 'rgba(91,255,176,0.55)'  },
                 { icon: '♻️', label: 'Waste Reduced', sub: `${lbsDiverted} lbs recycled`,       glow: 'rgba(0,217,255,0.55)'  },

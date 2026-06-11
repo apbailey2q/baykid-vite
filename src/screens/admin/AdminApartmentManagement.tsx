@@ -1,9 +1,15 @@
 // AdminApartmentManagement — /dashboard/admin/apartment
 // Apartment acquisition pipeline: properties, managers, residents, full funnel.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getAdminProperties, type PropertyWithStats } from '../../lib/apartment'
+import {
+  inviteLink,
+  managerEmailTemplate,
+  residentEmailTemplate,
+  smsTemplate,
+} from '../../lib/apartmentInviteTemplates'
 
 function pct(num: number, den: number): string {
   if (den === 0) return '—'
@@ -48,6 +54,138 @@ function StatusBadge({ status }: { status: string }) {
     >
       {status}
     </span>
+  )
+}
+
+// ── Copy button ──────────────────────────────────────────────────────────────
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard API unavailable (non-HTTPS / old browser)
+      try {
+        const el = document.createElement('textarea')
+        el.value = text
+        el.style.position = 'fixed'
+        el.style.opacity = '0'
+        document.body.appendChild(el)
+        el.select()
+        document.execCommand('copy')
+        document.body.removeChild(el)
+        setCopied(true)
+        if (timerRef.current) clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setCopied(false), 2000)
+      } catch { /* silently ignore */ }
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(0,200,255,0.08)',
+        border: copied ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(0,200,255,0.25)',
+        color: copied ? '#4ade80' : '#00c8ff',
+        borderRadius: 10,
+        padding: '8px 14px',
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        whiteSpace: 'nowrap',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+      }}
+    >
+      {copied ? '✓ Copied!' : `📋 ${label}`}
+    </button>
+  )
+}
+
+// ── Invite toolkit ────────────────────────────────────────────────────────────
+
+function InviteToolkit({ property }: { property: PropertyWithStats }) {
+  if (!property.invite) return null
+
+  const slug = property.invite.landing_page
+  const link = inviteLink(slug)
+  const mgrEmail  = managerEmailTemplate(property.property_name, link)
+  const resEmail  = residentEmailTemplate(property.property_name, link)
+  const sms       = smsTemplate(property.property_name, link)
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        background: 'rgba(0,200,255,0.03)',
+        border: '1px solid rgba(0,200,255,0.1)',
+        borderRadius: 12,
+        padding: '16px 18px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
+          Invite Toolkit
+        </p>
+        <Link
+          to={`/dashboard/admin/apartment/flyer/${slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            background: 'rgba(0,200,255,0.08)',
+            border: '1px solid rgba(0,200,255,0.25)',
+            color: '#00c8ff',
+            borderRadius: 10,
+            padding: '7px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          🖨 Print Flyer
+        </Link>
+      </div>
+
+      {/* Invite link row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', flexShrink: 0, minWidth: 120 }}>Invite Link</span>
+        <code
+          style={{
+            flex: 1,
+            fontSize: 11,
+            color: '#5eead4',
+            background: 'rgba(94,234,212,0.06)',
+            border: '1px solid rgba(94,234,212,0.15)',
+            borderRadius: 6,
+            padding: '4px 10px',
+            wordBreak: 'break-all',
+            minWidth: 0,
+          }}
+        >
+          {link}
+        </code>
+        <CopyButton text={link} label="Copy Link" />
+      </div>
+
+      {/* Template buttons */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <CopyButton text={mgrEmail}   label="Manager Email" />
+        <CopyButton text={resEmail}   label="Resident Email" />
+        <CopyButton text={sms}        label="SMS Template" />
+      </div>
+    </div>
   )
 }
 
@@ -359,6 +497,9 @@ export default function AdminApartmentManagement() {
                     </span>
                   ))}
                 </div>
+
+                {/* AP.3C — Invite toolkit */}
+                <InviteToolkit property={p} />
               </div>
             ))}
           </div>

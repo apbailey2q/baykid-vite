@@ -112,6 +112,11 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Consumer ───────────────────────────────────────────────────────────────
   '/dashboard/consumer':                             ['admin', 'consumer'],
 
+  // ── Consumer bag detail + inspection ─────────────────────────────────────
+  // Dynamic routes /bag/:bagId and /bag/:bagId/inspect. The /inspect suffix
+  // also triggers a special-case check in canAccessRoute() for warehouse roles.
+  '/bag':                                            ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES],
+
   // ── Driver ─────────────────────────────────────────────────────────────────
   '/dashboard/driver':                               ['admin', 'driver'],
   '/dashboard/driver/hybrid':                        ['admin', 'driver'],

@@ -138,7 +138,7 @@ Deno.serve(async (req: Request) => {
           currency:     'usd',
           unit_amount:  amountCents,
           product_data: {
-            name:        'BayKid Commercial Invoice',
+            name:        "Cyan's Brooklynn Recycling Commercial Invoice",
             description: `Invoice #${invoice.id.slice(0, 8).toUpperCase()}`,
           },
         },

@@ -6,6 +6,84 @@ Read it before making any changes to auth, routing, payments, or user roles.
 ---
 
 ## ════════════════════════════════════════════════════════
+## APARTMENT ONBOARDING SYSTEM (Phase AP.1 — 2026-07-11)
+## ════════════════════════════════════════════════════════
+
+### Public Website Routes
+
+| Path | Component | Purpose |
+|------|-----------|---------|
+| `/` | `PublicHome` | Main landing — 3 verticals (resident/business/org) + property manager CTA |
+| `/consumer` | `ConsumerLandingPage` | Resident recycling explanation + download CTA |
+| `/commercial` | `CommercialLandingPage` | Business types + managed pickup benefits |
+| `/fundraiser` | `FundraiserLandingPage` | Organization types + how fundraising works |
+| `/download` | `DownloadPage` | App Store / Play Store (Coming Soon) + waitlist |
+| `/join` | `PropertyManagerJoin` | Property manager registration form |
+| `/join/:slug` | `ResidentEnrollment` | 5-step resident enrollment flow |
+
+### HomeRedirect Behavior Change
+
+As of Phase AP.1: unauthenticated visitors at `/` are rendered `<PublicHome />` directly (no redirect to `/marketing`). The `/marketing` route still exists for the AI Marketing Center SaaS pitch.
+
+### Apartment Enrollment Flow (5 steps at /join/:slug)
+
+| Step | Name | What Happens |
+|------|------|-------------|
+| 1 | Verify | Name, Email, Unit Number, Phone → creates `resident_pre_registrations` row |
+| 2 | Password | Supabase Auth signUp → consumer profile + links pre-registration via `user_id` |
+| 3 | Video | Mandatory watch; no-skip; marks `video_started`, `video_completed` |
+| 4 | Terms | 3 checkboxes (ToS + Privacy + Recycling Agreement); marks `terms_accepted` |
+| 5 | Download | App Store / Play Store links + web sign-in button |
+
+**Critical Rules:**
+- DO NOT create a second Supabase account for the same email
+- Video gate is enforced: resident cannot advance to Terms until video ends
+- ConsumerOnboarding wizard blocks entry if `video_completed=false`
+
+### ConsumerOnboarding Wizard (Modified in AP.1)
+
+On mount:
+1. Calls `getResidentPreRegistration(userId)` from `src/lib/apartment.ts`
+2. If pre-registration found and `video_completed=false`: renders enrollment gate screen (not the wizard)
+3. If `video_completed=true && terms_accepted=true`: preloads `full_name`, `phone`, `address`, `apartment_unit`, `city`, `state`, `zip_code` from the pre-registration + property record
+4. On completion (`commitToSupabase`): also calls `markConsumerOnboardingCompleted(userId)` to set `resident_pre_registrations.consumer_app_onboarding_completed=true`
+
+### Database Migration: `20260711000001_apartment_onboarding.sql`
+
+Applied to remote 2026-07-11. Three new tables with RLS (`public.is_admin()` pattern):
+
+| Table | Purpose |
+|-------|---------|
+| `properties` | Property manager registrations (name, address, units, status) |
+| `property_invites` | One invite per property; `landing_page` column = /join/:slug |
+| `resident_pre_registrations` | Per-resident enrollment state; linked to `auth.users` after Step 2 |
+
+**RLS on `property_invites`:** anon + authenticated can SELECT active invites (enables slug resolution in enrollment flow without auth).
+**RLS on `resident_pre_registrations`:** anon can INSERT (Step 1 before account created); authenticated users can SELECT/UPDATE their own row; admins can do everything.
+
+### Admin Route
+
+`/dashboard/admin/apartment` → `AdminApartmentManagement` (admin only)
+Shows: property list, enrollment link, resident count, video/terms/app-onboarded funnel rates per property.
+
+### Key Files — Apartment Onboarding System
+
+| File | Purpose |
+|------|---------|
+| `src/lib/apartment.ts` | All CRUD for properties, invites, pre-registrations |
+| `src/screens/marketing/PublicHome.tsx` | Main / public home |
+| `src/screens/marketing/ConsumerLandingPage.tsx` | /consumer |
+| `src/screens/marketing/CommercialLandingPage.tsx` | /commercial |
+| `src/screens/marketing/FundraiserLandingPage.tsx` | /fundraiser |
+| `src/screens/marketing/DownloadPage.tsx` | /download |
+| `src/screens/apartment/PropertyManagerJoin.tsx` | /join property registration |
+| `src/screens/apartment/ResidentEnrollment.tsx` | /join/:slug 5-step enrollment |
+| `src/screens/admin/AdminApartmentManagement.tsx` | /dashboard/admin/apartment |
+| `supabase/migrations/20260711000001_apartment_onboarding.sql` | 3 new tables |
+
+---
+
+## ════════════════════════════════════════════════════════
 ## MANAGEMENT ONBOARDING SYSTEM (Phase MG.1 — 2026-06-08)
 ## ════════════════════════════════════════════════════════
 

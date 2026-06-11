@@ -586,7 +586,8 @@ function App() {
               <Route path="/driver/commercial"       element={<ProtectedRoute requireApproved><DriverModeLanding mode="commercial"  /></ProtectedRoute>} />
               <Route path="/driver/scan"             element={<ProtectedRoute requireApproved><DriverScanInspect mode="residential" /></ProtectedRoute>} />
               <Route path="/driver/commercial-scan"  element={<ProtectedRoute requireApproved><DriverScanInspect mode="commercial"  /></ProtectedRoute>} />
-              <Route path="/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckin /></ProtectedRoute>} />
+              <Route path="/driver/warehouse-checkin"           element={<ProtectedRoute requireApproved><WarehouseCheckin /></ProtectedRoute>} />
+              <Route path="/dashboard/driver/warehouse-checkin" element={<ProtectedRoute requireApproved><WarehouseCheckin /></ProtectedRoute>} />
               {/* Accident / Incident Report wizard — all approved drivers */}
               <Route path="/driver/accident-report"  element={<ProtectedRoute requireApproved><AccidentReportWizard /></ProtectedRoute>} />
 

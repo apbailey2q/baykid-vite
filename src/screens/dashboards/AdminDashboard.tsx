@@ -140,6 +140,22 @@ export default function AdminDashboard() {
           🏭 Warehouse Onboarding
         </Link>
         <Link
+          to="/dashboard/admin/apartment"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.28)', color: '#00c8ff', textDecoration: 'none' }}
+          title="View apartment properties, resident enrollment funnel, and invite toolkit."
+        >
+          🏠 Apartment Management
+        </Link>
+        <Link
+          to="/dashboard/admin/apartment/video"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
+          style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.28)', color: '#c084fc', textDecoration: 'none' }}
+          title="Upload and manage the orientation video shown to residents at enrollment Step 3."
+        >
+          🎬 Video Management
+        </Link>
+        <Link
           to="/admin/management-onboarding"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:brightness-110"
           style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)', color: '#fbbf24', textDecoration: 'none' }}

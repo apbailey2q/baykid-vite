@@ -10,6 +10,7 @@ import {
   getConsumerBags,
   getBroadcastsForRole,
 } from '../../lib/points'
+import { trackFirstAppLogin, markActiveUser } from '../../lib/apartment'
 import { useBroadcastAlerts } from '../../hooks/useBroadcastAlerts'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -401,6 +402,17 @@ export default function ConsumerDashboard() {
   useEffect(() => () => {
     if (demoRafRef.current !== null) cancelAnimationFrame(demoRafRef.current)
   }, [])
+
+  // AP.3B — Apartment funnel tracking (fire-and-forget, non-fatal)
+  // Sets first_app_login_at and active_user_at on first dashboard visit.
+  // Both updates are no-ops if already stamped (WHERE IS NULL guard in the query).
+  // Skipped in demo mode and if no user is loaded yet.
+  useEffect(() => {
+    if (!user?.id || inDemoMode) return
+    const uid = user.id
+    trackFirstAppLogin(uid).catch(() => {})
+    markActiveUser(uid).catch(() => {})
+  }, [user?.id, inDemoMode])
 
   // ── Bag scan logic (real users) ───────────────────────────────────────────
   async function handleConsumerScan(rawCode: string) {

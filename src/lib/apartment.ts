@@ -44,15 +44,26 @@ export interface ResidentPreRegistration {
   terms_accepted_at: string | null
   account_created: boolean
   consumer_app_onboarding_completed: boolean
+  // AP.3B funnel tracking
+  app_download_clicked: boolean
+  app_download_clicked_at: string | null
+  app_platform: 'ios' | 'android' | null
+  first_app_login_at: string | null
+  consumer_app_onboarding_completed_at: string | null
+  active_user_at: string | null
   created_at: string
 }
 
 export interface PropertyWithStats extends Property {
   invite?: PropertyInvite
   total_residents: number
+  accounts_created_count: number
   video_completed_count: number
   terms_accepted_count: number
+  download_clicked_count: number
+  first_login_count: number
   app_onboarded_count: number
+  active_user_count: number
 }
 
 // ── Property operations ───────────────────────────────────────────────────────
@@ -110,7 +121,10 @@ export async function getAdminProperties(): Promise<PropertyWithStats[]> {
     supabase.from('property_invites').select('*').eq('active', true),
     supabase
       .from('resident_pre_registrations')
-      .select('property_id, video_completed, terms_accepted, consumer_app_onboarding_completed'),
+      .select(
+        'property_id, account_created, video_completed, terms_accepted, ' +
+        'app_download_clicked, first_app_login_at, consumer_app_onboarding_completed, active_user_at',
+      ),
   ])
 
   const invitesByPropId = new Map<string, PropertyInvite>()
@@ -118,25 +132,49 @@ export async function getAdminProperties(): Promise<PropertyWithStats[]> {
     invitesByPropId.set(inv.property_id, inv)
   }
 
-  const statsByPropId = new Map<string, { total: number; video: number; terms: number; app: number }>()
-  for (const row of statsResult.data ?? []) {
-    const s = statsByPropId.get(row.property_id) ?? { total: 0, video: 0, terms: 0, app: 0 }
+  type StatRow = {
+    property_id: string
+    account_created: boolean
+    video_completed: boolean
+    terms_accepted: boolean
+    app_download_clicked: boolean
+    first_app_login_at: string | null
+    consumer_app_onboarding_completed: boolean
+    active_user_at: string | null
+  }
+  type RowStats = {
+    total: number; accounts: number; video: number; terms: number
+    download: number; login: number; app: number; active: number
+  }
+  const statsByPropId = new Map<string, RowStats>()
+  for (const row of ((statsResult.data ?? []) as unknown as StatRow[])) {
+    const s = statsByPropId.get(row.property_id)
+      ?? { total: 0, accounts: 0, video: 0, terms: 0, download: 0, login: 0, app: 0, active: 0 }
     s.total++
-    if (row.video_completed) s.video++
-    if (row.terms_accepted) s.terms++
+    if (row.account_created)                  s.accounts++
+    if (row.video_completed)                  s.video++
+    if (row.terms_accepted)                   s.terms++
+    if (row.app_download_clicked)             s.download++
+    if (row.first_app_login_at != null)       s.login++
     if (row.consumer_app_onboarding_completed) s.app++
+    if (row.active_user_at != null)           s.active++
     statsByPropId.set(row.property_id, s)
   }
 
   return (props ?? []).map(p => {
-    const s = statsByPropId.get(p.id) ?? { total: 0, video: 0, terms: 0, app: 0 }
+    const s = statsByPropId.get(p.id)
+      ?? { total: 0, accounts: 0, video: 0, terms: 0, download: 0, login: 0, app: 0, active: 0 }
     return {
       ...p,
-      invite:                invitesByPropId.get(p.id),
-      total_residents:       s.total,
-      video_completed_count: s.video,
-      terms_accepted_count:  s.terms,
-      app_onboarded_count:   s.app,
+      invite:                 invitesByPropId.get(p.id),
+      total_residents:        s.total,
+      accounts_created_count: s.accounts,
+      video_completed_count:  s.video,
+      terms_accepted_count:   s.terms,
+      download_clicked_count: s.download,
+      first_login_count:      s.login,
+      app_onboarded_count:    s.app,
+      active_user_count:      s.active,
     }
   })
 }
@@ -232,8 +270,53 @@ export async function markTermsAccepted(preRegId: string): Promise<void> {
 export async function markConsumerOnboardingCompleted(userId: string): Promise<void> {
   const { error } = await supabase
     .from('resident_pre_registrations')
-    .update({ consumer_app_onboarding_completed: true })
+    .update({
+      consumer_app_onboarding_completed:    true,
+      consumer_app_onboarding_completed_at: new Date().toISOString(),
+    })
     .eq('user_id', userId)
+
+  if (error) throw error
+}
+
+// AP.3B — Download click tracking ─────────────────────────────────────────────
+
+export async function trackAppDownload(
+  preRegId: string,
+  platform: 'ios' | 'android',
+): Promise<void> {
+  const { error } = await supabase
+    .from('resident_pre_registrations')
+    .update({
+      app_download_clicked:    true,
+      app_download_clicked_at: new Date().toISOString(),
+      app_platform:            platform,
+    })
+    .eq('id', preRegId)
+
+  if (error) throw error
+}
+
+// AP.3B — First app login (set once; no-op if already stamped) ────────────────
+
+export async function trackFirstAppLogin(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('resident_pre_registrations')
+    .update({ first_app_login_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('first_app_login_at', null)
+
+  if (error) throw error
+}
+
+// AP.3B — Active user (set once when resident first reaches their dashboard) ───
+
+export async function markActiveUser(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('resident_pre_registrations')
+    .update({ active_user_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('active_user_at', null)
 
   if (error) throw error
 }

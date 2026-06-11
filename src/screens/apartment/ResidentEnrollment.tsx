@@ -22,9 +22,11 @@ import {
   markVideoStarted,
   markVideoCompleted,
   markTermsAccepted,
+  trackAppDownload,
   type Property,
   type ResidentPreRegistration,
 } from '../../lib/apartment'
+import { APPLE_APP_STORE_URL, GOOGLE_PLAY_URL } from '../../lib/appConfig'
 
 const INPUT: React.CSSProperties = {
   width: '100%',
@@ -606,7 +608,82 @@ function Step4Terms({
 
 // ── Step 5: Download ──────────────────────────────────────────────────────────
 
-function Step5Download() {
+function Step5Download({ preRegId }: { preRegId: string | null }) {
+  const [iosFeedback,     setIosFeedback]     = useState<'idle' | 'clicked' | 'coming-soon'>('idle')
+  const [androidFeedback, setAndroidFeedback] = useState<'idle' | 'clicked' | 'coming-soon'>('idle')
+
+  async function handleDownload(platform: 'ios' | 'android') {
+    const url = platform === 'ios' ? APPLE_APP_STORE_URL : GOOGLE_PLAY_URL
+    const setFeedback = platform === 'ios' ? setIosFeedback : setAndroidFeedback
+
+    // Fire-and-forget tracking — never blocks the user
+    if (preRegId) {
+      trackAppDownload(preRegId, platform).catch(e =>
+        console.warn('[enrollment] trackAppDownload failed (non-fatal):', e),
+      )
+    }
+
+    if (url) {
+      setFeedback('clicked')
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } else {
+      setFeedback('coming-soon')
+    }
+  }
+
+  function DownloadButton({
+    platform,
+    emoji,
+    label,
+    feedback,
+  }: {
+    platform: 'ios' | 'android'
+    emoji: string
+    label: string
+    feedback: 'idle' | 'clicked' | 'coming-soon'
+  }) {
+    const hasUrl = platform === 'ios' ? !!APPLE_APP_STORE_URL : !!GOOGLE_PLAY_URL
+    const sublabel =
+      feedback === 'clicked'      ? 'Opening store…' :
+      feedback === 'coming-soon'  ? 'Coming Soon'    :
+      hasUrl                      ? 'Download now'   : 'Coming Soon'
+
+    return (
+      <button
+        onClick={() => handleDownload(platform)}
+        style={{
+          background: hasUrl ? 'rgba(0,200,255,0.1)' : 'rgba(255,255,255,0.05)',
+          border: hasUrl
+            ? '1px solid rgba(0,200,255,0.35)'
+            : '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 14,
+          padding: '14px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          color: '#fff',
+          minWidth: 160,
+        }}
+      >
+        <span style={{ fontSize: 28 }}>{emoji}</span>
+        <div style={{ textAlign: 'left' }}>
+          <p style={{
+            fontSize: 10,
+            color: hasUrl ? 'rgba(0,200,255,0.8)' : 'rgba(255,255,255,0.5)',
+            margin: '0 0 2px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}>
+            {sublabel}
+          </p>
+          <p style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{label}</p>
+        </div>
+      </button>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 20 }}>
       <span style={{ fontSize: 64 }}>🎉</span>
@@ -617,42 +694,18 @@ function Step5Download() {
       </p>
 
       <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 14,
-            padding: '14px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            opacity: 0.7,
-          }}
-        >
-          <span style={{ fontSize: 28 }}>🍎</span>
-          <div style={{ textAlign: 'left' }}>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Coming Soon</p>
-            <p style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>App Store</p>
-          </div>
-        </div>
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 14,
-            padding: '14px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            opacity: 0.7,
-          }}
-        >
-          <span style={{ fontSize: 28 }}>🤖</span>
-          <div style={{ textAlign: 'left' }}>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Coming Soon</p>
-            <p style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Google Play</p>
-          </div>
-        </div>
+        <DownloadButton
+          platform="ios"
+          emoji="🍎"
+          label="App Store"
+          feedback={iosFeedback}
+        />
+        <DownloadButton
+          platform="android"
+          emoji="🤖"
+          label="Google Play"
+          feedback={androidFeedback}
+        />
       </div>
 
       <div
@@ -814,7 +867,7 @@ export default function ResidentEnrollment() {
             <Step4Terms preRegId={preRegId} onNext={() => setStep(5)} />
           )}
           {step === 5 && (
-            <Step5Download />
+            <Step5Download preRegId={preRegId} />
           )}
         </div>
       </main>

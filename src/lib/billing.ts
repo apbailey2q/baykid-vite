@@ -2,17 +2,19 @@
 // Billing — Client SDK for BayKid SaaS billing
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Responsibilities:
+// PAYMENT PROCESSORS DISABLED BY FOUNDER DIRECTIVE.
+// Do not enable Stripe, ACH, billing portals, checkout sessions, routing numbers,
+// bank accounts, or third-party payment processors unless explicitly authorized.
+//
+// Responsibilities (active):
 //   • Mirror the seeded plan catalog so UI can render before any DB call.
 //   • Fetch the current org's subscription + usage from Supabase.
 //   • Check plan limits client-side (gating logic for Pricing / Usage UI).
-//   • Call the three Stripe Edge Functions:
-//       - stripe-create-checkout  → returns a Stripe Checkout URL
-//       - stripe-create-portal    → returns a Stripe Customer Portal URL
-//       (stripe-webhook is server-only; never called from client.)
-//   • Mock mode: when VITE_STRIPE_PUBLISHABLE_KEY is unset, redirect calls
-//     short-circuit to console + return demo URLs so UI dev can proceed
-//     without a Stripe account.
+//
+// Responsibilities (DISABLED — founder directive):
+//   • createCheckoutSession  — calls stripe-create-checkout Edge Function
+//   • createPortalSession    — calls stripe-create-portal Edge Function
+//   (stripe-webhook is server-only; Edge Function file left dormant.)
 //
 // Server-side enforcement (DB triggers etc.) is intentionally NOT done here
 // per the chosen "client-side limits only for now" scope. When we tighten,
@@ -310,81 +312,43 @@ export async function checkAndIncrementUsage(
   return data as { allowed: boolean; used: number; limit: number | null; reason?: string }
 }
 
-// ── Stripe Edge Function calls ───────────────────────────────────────────────
-// We use supabase.functions.invoke() so the auth.uid() of the caller is
-// forwarded to the Edge Function automatically (RLS-aware).
+// ── Stripe Edge Function calls — DISABLED BY FOUNDER DIRECTIVE ───────────────
+// Payment processors are disabled by founder directive.
+// Do not enable Stripe, ACH, billing portals, checkout sessions, routing
+// numbers, bank accounts, or third-party payment processors unless explicitly
+// authorized. The stripe-create-checkout and stripe-create-portal Edge Function
+// files are left dormant for future review.
 
 /**
- * Start a Stripe Checkout flow. The Edge Function returns a hosted Stripe
- * URL; the caller is responsible for `window.location.assign(url)`.
- *
- * In mock mode (no publishable key configured), returns a synthetic URL so
- * the UI flow can be exercised end-to-end without a Stripe account.
+ * DISABLED — Stripe checkout is disabled by founder directive.
+ * Plans are shown for future SaaS packaging only.
+ * Contact administration to discuss plan access.
  */
-export async function createCheckoutSession(input: {
+export async function createCheckoutSession(_input: {
   planCode: PlanCode
   cycle:    BillingCycle
   orgId:    string
-  returnPath?: string                                  // app-side redirect target after success
+  returnPath?: string
 }): Promise<{ url: string; mock: boolean }> {
-  if (!isStripeConfigured()) {
-    console.warn('[billing] Stripe not configured — returning mock checkout URL.')
-    return {
-      url: `${window.location.origin}/admin/billing/usage?mock_checkout=1&plan=${input.planCode}`,
-      mock: true,
-    }
-  }
-
-  const { data, error } = await supabase.functions.invoke<{ url: string }>(
-    'stripe-create-checkout',
-    {
-      body: {
-        plan_code:   input.planCode,
-        cycle:       input.cycle,
-        org_id:      input.orgId,
-        return_path: input.returnPath ?? '/admin/billing/usage',
-        success_url: `${window.location.origin}/admin/billing/usage?stripe_session={CHECKOUT_SESSION_ID}`,
-        cancel_url:  `${window.location.origin}/admin/billing/plans?canceled=1`,
-      },
-    },
+  throw new Error(
+    'Billing activation is currently disabled by founder directive. ' +
+    'Contact administration to discuss plan access.',
   )
-
-  if (error || !data?.url) {
-    throw new Error(`Checkout session failed: ${error?.message ?? 'no url returned'}`)
-  }
-  return { url: data.url, mock: false }
 }
 
 /**
- * Open the Stripe Customer Portal. Used for: change card, view invoices,
- * cancel subscription, change billing email.
+ * DISABLED — Stripe Customer Portal is disabled by founder directive.
+ * Plans are shown for future SaaS packaging only.
+ * Contact administration to discuss plan access.
  */
-export async function createPortalSession(input: {
+export async function createPortalSession(_input: {
   orgId: string
   returnPath?: string
 }): Promise<{ url: string; mock: boolean }> {
-  if (!isStripeConfigured()) {
-    console.warn('[billing] Stripe not configured — returning mock portal URL.')
-    return {
-      url: `${window.location.origin}/admin/billing/usage?mock_portal=1`,
-      mock: true,
-    }
-  }
-
-  const { data, error } = await supabase.functions.invoke<{ url: string }>(
-    'stripe-create-portal',
-    {
-      body: {
-        org_id:     input.orgId,
-        return_url: `${window.location.origin}${input.returnPath ?? '/admin/billing/usage'}`,
-      },
-    },
+  throw new Error(
+    'Billing activation is currently disabled by founder directive. ' +
+    'Contact administration to discuss plan access.',
   )
-
-  if (error || !data?.url) {
-    throw new Error(`Portal session failed: ${error?.message ?? 'no url returned'}`)
-  }
-  return { url: data.url, mock: false }
 }
 
 // ── Formatting helpers (small + UI-shared) ───────────────────────────────────

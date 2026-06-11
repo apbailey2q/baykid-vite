@@ -1,33 +1,31 @@
 // PricingPage — `/admin/billing/plans`
 //
-// Renders the four plans (Free, Starter, Pro, Enterprise) as cards. Highlights
-// the org's current plan with an "Active" badge and swaps the CTA for "Manage
-// billing". Other plans get a "Choose <plan>" button that calls Stripe Checkout
-// via the stripe-create-checkout Edge Function and redirects to the hosted URL.
+// PAYMENT PROCESSORS DISABLED BY FOUNDER DIRECTIVE.
+// Do not enable Stripe, ACH, billing portals, checkout sessions, routing numbers,
+// bank accounts, or third-party payment processors unless explicitly authorized.
 //
-// Cycle toggle (Monthly / Yearly) applies to the price display + the price ID
-// sent to Checkout.
+// Plans are shown for future SaaS packaging only.
+// Billing activation requires explicit founder authorization.
+// Contact administration to discuss plan access.
+//
+// Previously: plan cards called stripe-create-checkout via createCheckoutSession().
+// Now: plan cards show directive notice; all display (pricing, limits, features) preserved.
 
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   PLAN_CATALOG, findStaticPlan, fetchCurrentSubscription,
-  createCheckoutSession, formatPriceCents, formatLimit, getActiveOrgId,
-  isStripeConfigured,
+  formatPriceCents, formatLimit, getActiveOrgId,
 } from '../../lib/billing'
-import type { PlanCode, BillingCycle, SubscriptionWithPlan } from '../../types/billing'
-import { BillingPortalButton } from '../../components/billing/BillingPortalButton'
+import type { BillingCycle, SubscriptionWithPlan } from '../../types/billing'
 
 export default function PricingPage() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
 
-  const [orgId,    setOrgId]    = useState<string | null>(null)
-  const [sub,      setSub]      = useState<SubscriptionWithPlan | null>(null)
-  const [cycle,    setCycle]    = useState<BillingCycle>('monthly')
-  const [busyPlan, setBusyPlan] = useState<PlanCode | null>(null)
-  const [error,    setError]    = useState<string | null>(null)
-  const canceled = params.get('canceled') === '1'
+  const [_orgId, setOrgId] = useState<string | null>(null)
+  const [sub,    setSub]   = useState<SubscriptionWithPlan | null>(null)
+  const [cycle, setCycle] = useState<BillingCycle>('monthly')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -46,19 +44,6 @@ export default function PricingPage() {
     return () => { mounted = false }
   }, [])
 
-  async function chooseplan(planCode: PlanCode) {
-    if (!orgId) return
-    setBusyPlan(planCode)
-    setError(null)
-    try {
-      const { url } = await createCheckoutSession({ planCode, cycle, orgId })
-      window.location.assign(url)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start checkout')
-      setBusyPlan(null)
-    }
-  }
-
   const currentPlanCode = sub?.plan?.code ?? null
 
   return (
@@ -69,38 +54,41 @@ export default function PricingPage() {
       <div style={{ maxWidth: 1180, margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
-          <div>
-            <button
-              onClick={() => navigate(-1)}
-              style={{
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                color: 'rgba(255,255,255,0.6)', borderRadius: 8, padding: '4px 10px',
-                fontSize: 11, cursor: 'pointer', marginBottom: 10,
-              }}
-            >
-              ‹ Back
-            </button>
-            <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: 0 }}>
-              Choose your plan
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 6 }}>
-              Cancel or change anytime. Yearly saves ~17%.
-            </p>
-            {!isStripeConfigured() && (
-              <p style={{ color: '#fbbf24', fontSize: 12, marginTop: 8 }}>
-                ⚠️ Stripe not configured — clicking a plan will redirect to a mock URL.
-                Set <code>VITE_STRIPE_PUBLISHABLE_KEY</code> and deploy the Edge Functions to go live.
-              </p>
-            )}
-          </div>
-
-          {sub && sub.stripe_customer_id && orgId && (
-            <BillingPortalButton orgId={orgId} returnPath="/admin/billing/plans" />
-          )}
+        <div style={{ marginBottom: 24 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(255,255,255,0.6)', borderRadius: 8, padding: '4px 10px',
+              fontSize: 11, cursor: 'pointer', marginBottom: 10,
+            }}
+          >
+            ‹ Back
+          </button>
+          <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: 0 }}>
+            Plan Overview
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 6 }}>
+            Plans are shown for future SaaS packaging only. Billing activation is currently disabled.
+          </p>
         </div>
 
-        {/* Cycle toggle */}
+        {/* Directive notice */}
+        <div style={{
+          padding: '12px 16px', borderRadius: 12, marginBottom: 24,
+          background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)',
+        }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>
+            🔒 Billing activation is currently disabled by founder directive.
+          </p>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.55 }}>
+            Plans are shown for future SaaS packaging only. To discuss plan access, contact administration directly.
+          </p>
+        </div>
+
+        {error && <Notice tone="error">{error}</Notice>}
+
+        {/* Cycle toggle — kept for display accuracy */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 3 }}>
             {(['monthly', 'yearly'] as const).map((c) => (
@@ -121,21 +109,14 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {canceled && (
-          <Notice tone="warn">Checkout canceled. Pick a plan when you're ready.</Notice>
-        )}
-        {error && (
-          <Notice tone="error">{error}</Notice>
-        )}
-
-        {/* Plan grid */}
+        {/* Plan grid — display only; no checkout wiring */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           gap: 16,
         }}>
           {PLAN_CATALOG.map((plan) => {
-            const isCurrent = currentPlanCode === plan.code
+            const isCurrent  = currentPlanCode === plan.code
             const priceCents = cycle === 'yearly' ? plan.priceYearlyCents : plan.priceMonthlyCents
             return (
               <PlanCard
@@ -144,9 +125,6 @@ export default function PricingPage() {
                 cycle={cycle}
                 priceLabel={formatPriceCents(priceCents)}
                 isCurrent={isCurrent}
-                busy={busyPlan === plan.code}
-                disabled={busyPlan !== null && busyPlan !== plan.code}
-                onChoose={() => chooseplan(plan.code)}
               />
             )
           })}
@@ -171,15 +149,12 @@ export default function PricingPage() {
 // ── PlanCard ─────────────────────────────────────────────────────────────────
 
 function PlanCard({
-  plan, cycle, priceLabel, isCurrent, busy, disabled, onChoose,
+  plan, cycle, priceLabel, isCurrent,
 }: {
   plan: ReturnType<typeof findStaticPlan>
   cycle: BillingCycle
   priceLabel: string
   isCurrent: boolean
-  busy: boolean
-  disabled: boolean
-  onChoose: () => void
 }) {
   return (
     <div
@@ -229,11 +204,11 @@ function PlanCard({
 
       {/* Limits summary */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <LimitRow label="AI generations"  v={plan.limits.ai_generations_per_month}  suffix=" / mo" />
-        <LimitRow label="Scheduled posts" v={plan.limits.scheduled_posts_per_month} suffix=" / mo" />
+        <LimitRow label="AI generations"    v={plan.limits.ai_generations_per_month}  suffix=" / mo" />
+        <LimitRow label="Scheduled posts"   v={plan.limits.scheduled_posts_per_month} suffix=" / mo" />
         <LimitRow label="Connected accounts" v={plan.limits.connected_accounts} />
-        <LimitRow label="Team members"    v={plan.limits.team_members} />
-        <LimitRow label="Automation rules" v={plan.limits.automation_rules} />
+        <LimitRow label="Team members"       v={plan.limits.team_members} />
+        <LimitRow label="Automation rules"   v={plan.limits.automation_rules} />
       </div>
 
       {/* Features */}
@@ -246,26 +221,21 @@ function PlanCard({
         ))}
       </ul>
 
+      {/* CTA — disabled; shows directive notice */}
       <div style={{ marginTop: 'auto' }}>
         <button
-          onClick={onChoose}
-          disabled={isCurrent || busy || disabled}
+          disabled
+          title="Billing activation is currently disabled by founder directive. Contact administration to discuss plan access."
           style={{
             width: '100%',
-            background: isCurrent
-              ? 'rgba(34,197,94,0.1)'
-              : plan.highlight
-                ? 'linear-gradient(135deg,#0057e7,#00c8ff)'
-                : 'rgba(255,255,255,0.08)',
-            border: isCurrent ? '1px solid rgba(34,197,94,0.4)' : 'none',
-            color: isCurrent ? '#22c55e' : '#fff',
+            background: isCurrent ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)',
+            border: isCurrent ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            color: isCurrent ? '#22c55e' : 'rgba(255,255,255,0.3)',
             borderRadius: 10, padding: '10px 14px',
-            fontWeight: 700, fontSize: 13,
-            cursor: isCurrent || busy || disabled ? 'not-allowed' : 'pointer',
-            opacity: disabled ? 0.5 : 1,
+            fontWeight: 700, fontSize: 13, cursor: 'not-allowed',
           }}
         >
-          {isCurrent ? 'Current Plan' : busy ? 'Opening Checkout…' : `Choose ${plan.name}`}
+          {isCurrent ? 'Current Plan' : 'Contact Administration'}
         </button>
       </div>
     </div>
@@ -282,8 +252,6 @@ function LimitRow({ label, v, suffix }: { label: string; v: number | null; suffi
     </div>
   )
 }
-
-// ── Notice ───────────────────────────────────────────────────────────────────
 
 function Notice({ tone, children }: { tone: 'warn' | 'error'; children: React.ReactNode }) {
   const colorMap = {

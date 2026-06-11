@@ -1,72 +1,39 @@
-// BillingPortalButton — opens the Stripe Customer Portal in a new tab.
-// Hides itself if the user has no Stripe customer id yet (i.e. has never
-// subscribed). In mock mode (Stripe not configured) it logs and redirects to
-// a synthetic URL so the click handler is still exercised in dev.
-
-import { useState } from 'react'
-import { createPortalSession, isStripeConfigured } from '../../lib/billing'
+// PAYMENT PROCESSORS DISABLED BY FOUNDER DIRECTIVE.
+// Do not enable Stripe, ACH, billing portals, checkout sessions, routing numbers,
+// bank accounts, or third-party payment processors unless explicitly authorized.
+//
+// This component previously opened the Stripe Customer Portal.
+// It now shows a static directive notice in place of the portal button.
 
 interface Props {
-  orgId: string
+  orgId:       string
   returnPath?: string
-  label?: string
-  variant?: 'primary' | 'ghost'
+  label?:      string
+  variant?:    'primary' | 'ghost'
 }
 
-export function BillingPortalButton({
-  orgId,
-  returnPath,
-  label = 'Manage billing',
-  variant = 'ghost',
-}: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
-
-  async function open() {
-    setError(null)
-    setLoading(true)
-    try {
-      const { url } = await createPortalSession({ orgId, returnPath })
-      window.location.assign(url)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not open portal')
-      setLoading(false)
-    }
-  }
-
-  const style: React.CSSProperties = variant === 'primary'
-    ? {
-        background: 'linear-gradient(135deg,#0057e7,#00c8ff)',
-        color: '#fff', border: 'none', boxShadow: '0 2px 12px rgba(0,190,255,0.35)',
-      }
-    : {
-        background: 'rgba(255,255,255,0.06)',
-        color: 'rgba(255,255,255,0.85)',
-        border: '1px solid rgba(255,255,255,0.15)',
-      }
-
+// orgId / returnPath / label / variant retained so call-sites compile without changes.
+export function BillingPortalButton({ label = 'Manage billing' }: Props) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
       <button
-        onClick={open}
-        disabled={loading}
+        disabled
+        title="Billing activation is currently disabled by founder directive."
         style={{
-          ...style,
+          background: 'rgba(255,255,255,0.04)',
+          color: 'rgba(255,255,255,0.3)',
+          border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 10, padding: '8px 16px',
-          fontWeight: 700, fontSize: 13, cursor: loading ? 'wait' : 'pointer',
-          opacity: loading ? 0.6 : 1,
+          fontWeight: 700, fontSize: 13, cursor: 'not-allowed',
+          opacity: 0.6,
         }}
       >
-        {loading ? 'Opening…' : label}
+        {label}
       </button>
-      {!isStripeConfigured() && (
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Mock mode — set VITE_STRIPE_PUBLISHABLE_KEY to enable
-        </span>
-      )}
-      {error && (
-        <span style={{ fontSize: 11, color: '#f87171' }}>{error}</span>
-      )}
+      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'right', maxWidth: 220, lineHeight: 1.4 }}>
+        Billing activation is currently disabled by founder directive.
+        Contact administration to discuss plan access.
+      </span>
     </div>
   )
 }

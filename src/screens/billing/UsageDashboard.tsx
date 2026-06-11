@@ -1,5 +1,13 @@
 // UsageDashboard — `/admin/billing/usage`
 //
+// PAYMENT PROCESSORS DISABLED BY FOUNDER DIRECTIVE.
+// Do not enable Stripe, ACH, billing portals, checkout sessions, routing numbers,
+// bank accounts, or third-party payment processors unless explicitly authorized.
+//
+// Stripe Customer Portal button (BillingPortalButton) and stripe_session / mock_checkout
+// param handling have been removed. Plan display, usage metrics, and subscription
+// tier labels are fully preserved.
+//
 // Shows the active plan, current-period usage for all 5 metrics, and current
 // subscription status. Each metric renders a progress bar with the limit; bars
 // turn yellow at 80% and red at 100%. "Unlimited" metrics show ∞ and no bar.
@@ -9,7 +17,7 @@
 // to free-plan limits so the UI never crashes.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   fetchCurrentSubscription, fetchUsage, getActiveOrgId, checkLimit,
   findStaticPlan, formatLimit, fetchSubscriptionSummary, formatPriceCents,
@@ -18,7 +26,6 @@ import type {
   SubscriptionWithPlan, BillingUsageRow, UsageMetric, LimitCheckResult,
 } from '../../types/billing'
 import type { SubscriptionSummary } from '../../lib/billing'
-import { BillingPortalButton } from '../../components/billing/BillingPortalButton'
 
 interface MetricView {
   key:    UsageMetric
@@ -36,17 +43,14 @@ const METRIC_LABELS: Record<UsageMetric, { label: string; icon: string }> = {
 }
 
 export default function UsageDashboard() {
-  const navigate    = useNavigate()
-  const [params]    = useSearchParams()
+  const navigate = useNavigate()
 
-  const [orgId,   setOrgId]   = useState<string | null>(null)
+  const [_orgId,  setOrgId]   = useState<string | null>(null)
   const [sub,     setSub]     = useState<SubscriptionWithPlan | null>(null)
   const [summary, setSummary] = useState<SubscriptionSummary | null>(null)
   const [usage,   setUsage]   = useState<Record<UsageMetric, BillingUsageRow | null> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState<string | null>(null)
-  const justSubscribed = params.get('stripe_session') !== null
-  const mockMode       = params.get('mock_checkout') === '1' || params.get('mock_portal') === '1'
 
   useEffect(() => {
     let mounted = true
@@ -115,21 +119,13 @@ export default function UsageDashboard() {
               Track usage against your plan limits. Counters reset at the start of each billing period.
             </p>
           </div>
-          {orgId && sub?.stripe_customer_id && (
-            <BillingPortalButton orgId={orgId} returnPath="/admin/billing/usage" variant="primary" />
-          )}
+          {/* Billing portal disabled by founder directive */}
         </div>
 
-        {justSubscribed && !mockMode && (
-          <Notice tone="success">
-            🎉 Subscription updated. It may take up to a minute for usage limits to refresh.
-          </Notice>
-        )}
-        {mockMode && (
-          <Notice tone="warn">
-            Mock mode active — no real Stripe call was made. Configure Stripe to enable live billing.
-          </Notice>
-        )}
+        <Notice tone="warn">
+          🔒 Billing activation is currently disabled by founder directive.
+          Plans are shown for future SaaS packaging only. Contact administration to discuss plan access.
+        </Notice>
         {error && <Notice tone="error">{error}</Notice>}
 
         {/* Plan summary card */}
@@ -156,7 +152,7 @@ export default function UsageDashboard() {
           </div>
         )}
 
-        {/* Upgrade CTA when any limit is reached */}
+        {/* Plan limit reached — contact admin notice (billing activation disabled) */}
         {!loading && metrics.some((m) => !m.check.ok) && (
           <div style={{
             marginTop: 24, padding: 18, borderRadius: 12,
@@ -166,15 +162,17 @@ export default function UsageDashboard() {
               ⚠️ You've hit a plan limit
             </h3>
             <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.55, marginTop: 6 }}>
-              Upgrade to keep your team unblocked. Changes prorate automatically.
+              Billing activation is currently disabled by founder directive.
+              Contact administration to discuss plan access.
             </p>
             <Link to="/admin/billing/plans" style={{
               display: 'inline-block', marginTop: 10,
-              background: 'linear-gradient(135deg,#0057e7,#00c8ff)', color: '#fff',
+              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
+              border: '1px solid rgba(255,255,255,0.12)',
               padding: '8px 14px', borderRadius: 8, textDecoration: 'none',
               fontSize: 12, fontWeight: 700,
             }}>
-              See plans →
+              View plans →
             </Link>
           </div>
         )}
@@ -192,9 +190,8 @@ function PlanCard({
   summary: SubscriptionSummary  | null
   loading: boolean
 }) {
-  const planName   = summary?.plan_name ?? sub?.plan?.name ?? 'Free'
-  const planCode   = summary?.plan_code ?? sub?.plan?.code ?? 'free'
-  const status     = (summary?.status ?? sub?.status ?? 'active') as SubscriptionWithPlan['status']
+  const planName = summary?.plan_name ?? sub?.plan?.name ?? 'Free'
+  const status   = (summary?.status ?? sub?.status ?? 'active') as SubscriptionWithPlan['status']
   const cancelSoon = summary?.cancel_at_period_end ?? sub?.cancel_at_period_end ?? false
   const renewalDate = (summary?.current_period_end ?? sub?.current_period_end)
     ? new Date((summary?.current_period_end ?? sub?.current_period_end)!).toLocaleDateString(
@@ -234,9 +231,9 @@ function PlanCard({
         )}
         <Link to="/admin/billing/plans" style={{
           display: 'inline-block', marginTop: 10,
-          color: '#00c8ff', fontSize: 12, fontWeight: 700, textDecoration: 'none',
+          color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 700, textDecoration: 'none',
         }}>
-          {planCode === 'free' ? 'Upgrade →' : 'Change plan →'}
+          View plans →
         </Link>
       </div>
     </div>

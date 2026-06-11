@@ -1,4 +1,11 @@
+// PAYMENT PROCESSORS DISABLED BY FOUNDER DIRECTIVE.
+// Do not enable Stripe, ACH, or third-party processors unless explicitly authorized.
+// The platform records payments after the fact only. Invoice status is updated
+// manually by admin/billing staff via the Admin Commercial dashboard.
+// See: CLAUDE.md → "OFFICIAL PAYOUT SYSTEM DIRECTIVE"
+
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CommercialLayout } from './CommercialLayout'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -67,16 +74,42 @@ function SectionLabel({ children }: { children: string }) {
   )
 }
 
+// ── Manual payment info banner ────────────────────────────────────────────────
+// Shown in place of Stripe checkout. Guides the customer to contact billing.
+function PaymentInfoBanner({ invoiceId, amount }: { invoiceId: string; amount: number }) {
+  return (
+    <div style={{
+      padding: '14px 16px', borderRadius: 16, marginTop: 12,
+      background: 'rgba(251,191,36,0.08)',
+      border: '1px solid rgba(251,191,36,0.25)',
+    }}>
+      <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 6 }}>
+        💳 How to Pay This Invoice
+      </p>
+      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55, marginBottom: 8 }}>
+        Payments are processed by our billing team. Contact your account manager or
+        reach out via Support to arrange payment for{' '}
+        <span style={{ color: '#fff', fontWeight: 600 }}>{formatAmount(amount)}</span>.
+      </p>
+      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+        Invoice ref: {invoiceId.slice(0, 12).toUpperCase()}
+      </p>
+    </div>
+  )
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function CommercialInvoices() {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
 
-  const [pageState,     setPageState]     = useState<PageState>('loading')
-  const [invoices,      setInvoices]      = useState<InvoiceRow[]>([])
-  const [toast,         setToast]         = useState<string | null>(null)
-  const [toastVariant,  setToastVariant]  = useState<ToastVariant>('info')
-  const [payingId,      setPayingId]      = useState<string | null>(null)
+  const [pageState,    setPageState]    = useState<PageState>('loading')
+  const [invoices,     setInvoices]     = useState<InvoiceRow[]>([])
+  const [toast,        setToast]        = useState<string | null>(null)
+  const [toastVariant, setToastVariant] = useState<ToastVariant>('info')
+  // Tracks which unpaid invoice's payment info panel is expanded
+  const [expandedId,   setExpandedId]   = useState<string | null>(null)
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -106,15 +139,11 @@ export default function CommercialInvoices() {
 
   useEffect(() => { loadInvoices() }, [loadInvoices])
 
-  // Handle Stripe return URLs: ?payment=success | ?payment=cancelled
+  // Clean up any leftover ?payment= query params from old Stripe redirects
+  // without showing Stripe-specific messages (processor is now disabled).
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('payment')
-    if (param === 'success') {
-      showToast('Payment processing. Your invoice will update shortly.', 'success')
-      window.history.replaceState({}, '', window.location.pathname)
-      void loadInvoices()
-    } else if (param === 'cancelled') {
-      showToast('Payment was cancelled. You can try again anytime.', 'warning')
+    if (param) {
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
@@ -127,53 +156,10 @@ export default function CommercialInvoices() {
     setTimeout(() => setToast(null), variant === 'success' || variant === 'warning' ? 4000 : 2800)
   }
 
-  // ── Pay ───────────────────────────────────────────────────────────────────
-
-  async function payInvoice(invoiceId: string, currentStatus: InvoiceStatus) {
-    if (payingId) return
-
-    // Client-side guard: don't attempt checkout on a paid invoice
-    if (currentStatus === 'paid') {
-      showToast('This invoice is already paid.', 'info')
-      return
-    }
-
-    setPayingId(invoiceId)
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        'create-commercial-checkout',
-        { body: { invoice_id: invoiceId } },
-      )
-
-      // Parse Edge Function errors into user-friendly messages
-      if (error) {
-        const msg = error.message ?? ''
-        if (msg.includes('already paid'))     showToast('This invoice has already been paid.', 'info')
-        else if (msg.includes('not found'))   showToast('Invoice not found — refresh and try again.', 'error')
-        else if (msg.includes('Forbidden'))   showToast('You do not have permission to pay this invoice.', 'error')
-        else if (msg.includes('unavailable')) showToast('Payment provider is temporarily unavailable. Try again shortly.', 'error')
-        else                                  showToast('Checkout failed — check your connection and try again.', 'error')
-        return
-      }
-
-      if (!data?.url) {
-        showToast('No checkout URL returned — try again.', 'error')
-        return
-      }
-
-      // Redirect to Stripe Checkout — setPayingId stays set intentionally
-      // (spinner remains while the browser navigates away)
-      window.location.href = data.url as string
-    } catch {
-      showToast('Network error — check your connection and try again.', 'error')
-      setPayingId(null)
-    }
-  }
-
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const unpaidInvoice = invoices.find(i => i.status !== 'paid') ?? null
-  const currentMonth  = (() => {
+  const unpaidInvoice  = invoices.find(i => i.status !== 'paid') ?? null
+  const currentMonth   = (() => {
     const n = new Date()
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
   })()
@@ -253,7 +239,7 @@ export default function CommercialInvoices() {
             Commercial Invoices
           </p>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
-            Billing, payments, and service charges
+            Billing history and service charges
           </p>
         </div>
 
@@ -277,8 +263,8 @@ export default function CommercialInvoices() {
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 mb-4">
             {[
-              { label: 'Due Date',     value: unpaidInvoice ? formatDate(unpaidInvoice.due_date) : '—' },
-              { label: 'Billing',      value: unpaidInvoice?.billing_period ?? currentInvoice?.billing_period ?? '—' },
+              { label: 'Due Date', value: unpaidInvoice ? formatDate(unpaidInvoice.due_date) : '—' },
+              { label: 'Billing',  value: unpaidInvoice?.billing_period ?? currentInvoice?.billing_period ?? '—' },
             ].map(row => (
               <div key={row.label}>
                 <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -291,22 +277,42 @@ export default function CommercialInvoices() {
             ))}
           </div>
 
-          <div className="flex gap-2.5">
-            <div className="flex-1">
-              <PrimaryButton
-                fullWidth size="md"
-                disabled={!unpaidInvoice || !!payingId}
-                onClick={() => unpaidInvoice && payInvoice(unpaidInvoice.id, unpaidInvoice.status)}
-              >
-                {payingId === unpaidInvoice?.id ? 'Preparing secure checkout...' : '💳 Pay Now'}
-              </PrimaryButton>
+          {/* Payment action area — manual flow only */}
+          {hasBalance ? (
+            <div>
+              <div className="flex gap-2.5">
+                <div className="flex-1">
+                  <PrimaryButton
+                    fullWidth size="md"
+                    onClick={() => setExpandedId(expandedId === unpaidInvoice!.id ? null : unpaidInvoice!.id)}
+                  >
+                    {expandedId === unpaidInvoice?.id ? '✕ Close Payment Info' : '💳 How to Pay'}
+                  </PrimaryButton>
+                </div>
+                <div className="flex-1">
+                  <PrimaryButton
+                    fullWidth size="md" variant="secondary"
+                    onClick={() => navigate('/dashboard/commercial/support')}
+                  >
+                    📞 Contact Support
+                  </PrimaryButton>
+                </div>
+              </div>
+              {expandedId === unpaidInvoice?.id && (
+                <PaymentInfoBanner invoiceId={unpaidInvoice!.id} amount={unpaidInvoice!.amount} />
+              )}
             </div>
-            <div className="flex-1">
-              <PrimaryButton fullWidth size="md" variant="secondary" onClick={() => showToast('AutoPay coming soon')}>
-                🔄 AutoPay
-              </PrimaryButton>
+          ) : (
+            <div style={{
+              padding: '12px 14px', borderRadius: 14, textAlign: 'center',
+              background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)',
+            }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>✓ All invoices paid</p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+                No outstanding balance.
+              </p>
             </div>
-          </div>
+          )}
         </GlassCard>
 
         {/* ── 3. Invoice history ── */}
@@ -325,9 +331,11 @@ export default function CommercialInvoices() {
         ) : (
           <div className="flex flex-col gap-3 mb-5">
             {invoices.map(inv => {
-              const badge  = STATUS_BADGE[inv.status]
-              const isPaid = inv.status === 'paid'
+              const badge     = STATUS_BADGE[inv.status]
+              const isPaid    = inv.status === 'paid'
               const displayId = inv.invoice_number ?? inv.id.slice(0, 12).toUpperCase()
+              const isExpanded = expandedId === inv.id
+
               return (
                 <GlassCard key={inv.id} padding="md">
                   <div className="flex items-start justify-between mb-2">
@@ -356,27 +364,33 @@ export default function CommercialInvoices() {
 
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <PrimaryButton fullWidth size="sm" variant="secondary" onClick={() => showToast(`Viewing ${displayId}…`)}>
+                      <PrimaryButton fullWidth size="sm" variant="secondary"
+                        onClick={() => showToast(`Viewing ${displayId}…`)}>
                         📋 Details
                       </PrimaryButton>
                     </div>
                     <div className="flex-1">
-                      <PrimaryButton fullWidth size="sm" variant="secondary" onClick={() => showToast(`Downloading ${displayId}…`)}>
+                      <PrimaryButton fullWidth size="sm" variant="secondary"
+                        onClick={() => showToast(`Downloading ${displayId}…`)}>
                         ⬇ Download
                       </PrimaryButton>
                     </div>
                     {!isPaid && (
                       <div className="flex-1">
                         <PrimaryButton
-                          fullWidth size="sm"
-                          disabled={!!payingId}
-                          onClick={() => payInvoice(inv.id, inv.status)}
+                          fullWidth size="sm" variant="secondary"
+                          onClick={() => setExpandedId(isExpanded ? null : inv.id)}
                         >
-                          {payingId === inv.id ? 'Preparing...' : '💳 Pay'}
+                          {isExpanded ? '✕ Close' : '💳 Pay Info'}
                         </PrimaryButton>
                       </div>
                     )}
                   </div>
+
+                  {/* Expandable payment info panel — no Stripe, manual instructions only */}
+                  {isExpanded && !isPaid && (
+                    <PaymentInfoBanner invoiceId={inv.id} amount={inv.amount} />
+                  )}
                 </GlassCard>
               )
             })}
@@ -413,6 +427,28 @@ export default function CommercialInvoices() {
             </GlassCard>
           </>
         )}
+
+        {/* ── 5. Payment process info footer ── */}
+        <div style={{
+          margin: '12px 0 8px', padding: '14px 16px', borderRadius: 16,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+        }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+            ℹ How Billing Works
+          </p>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6 }}>
+            Invoices are issued after each service period. Payments are arranged directly with your account manager and recorded manually by our billing team. Once payment is received, your invoice status will update to Paid.
+          </p>
+          <button
+            onClick={() => navigate('/dashboard/commercial/support')}
+            style={{
+              marginTop: 10, fontSize: 11, fontWeight: 700, color: '#00c8ff',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            }}
+          >
+            Contact billing support →
+          </button>
+        </div>
 
         <div style={{ height: 8 }} />
       </div>

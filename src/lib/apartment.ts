@@ -55,21 +55,6 @@ export interface PropertyWithStats extends Property {
   app_onboarded_count: number
 }
 
-// ── Slug helpers ──────────────────────────────────────────────────────────────
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
-function generateInviteCode(): string {
-  return Math.random().toString(36).substring(2, 10).toUpperCase()
-}
-
 // ── Property operations ───────────────────────────────────────────────────────
 
 export async function createProperty(data: {
@@ -83,56 +68,33 @@ export async function createProperty(data: {
   zip: string
   units?: number
 }): Promise<{ property: Property; invite: PropertyInvite }> {
-  const { data: prop, error: propErr } = await supabase
-    .from('properties')
-    .insert({
-      property_name: data.property_name,
-      manager_name:  data.manager_name,
-      manager_email: data.manager_email,
-      phone:         data.phone ?? null,
-      address:       data.address,
-      city:          data.city,
-      state:         data.state,
-      zip:           data.zip,
-      units:         data.units ?? null,
-      status:        'active',
-    })
-    .select()
-    .single()
+  // SECURITY DEFINER RPC — bypasses RLS so anonymous property managers can register
+  const { data: result, error } = await supabase.rpc('create_property_public', {
+    p_property_name: data.property_name,
+    p_manager_name:  data.manager_name,
+    p_manager_email: data.manager_email,
+    p_phone:         data.phone ?? null,
+    p_address:       data.address,
+    p_city:          data.city,
+    p_state:         data.state,
+    p_zip:           data.zip,
+    p_units:         data.units ?? null,
+  })
+
+  if (error) throw error
+
+  const rpcResult = result as { property_id: string; invite_id: string; slug: string; invite_code: string }
+
+  // Fetch the full records so the caller gets typed objects
+  const [{ data: property, error: propErr }, { data: invite, error: invErr }] = await Promise.all([
+    supabase.from('properties').select('*').eq('id', rpcResult.property_id).single(),
+    supabase.from('property_invites').select('*').eq('id', rpcResult.invite_id).single(),
+  ])
 
   if (propErr) throw propErr
+  if (invErr)  throw invErr
 
-  // Generate a unique slug and invite code for the property
-  const baseSlug = slugify(data.property_name)
-  let slug = baseSlug
-  let attempt = 0
-  let invite: PropertyInvite | null = null
-
-  while (!invite) {
-    const candidateSlug = attempt === 0 ? slug : `${baseSlug}-${attempt}`
-    const { data: inv, error: invErr } = await supabase
-      .from('property_invites')
-      .insert({
-        property_id:  prop.id,
-        invite_code:  generateInviteCode(),
-        landing_page: candidateSlug,
-        active:       true,
-      })
-      .select()
-      .single()
-
-    if (!invErr && inv) {
-      invite = inv
-    } else if (invErr?.code === '23505') {
-      // unique constraint violation — try next suffix
-      attempt++
-      if (attempt > 50) throw new Error('Could not generate a unique slug after 50 attempts.')
-    } else if (invErr) {
-      throw invErr
-    }
-  }
-
-  return { property: prop, invite }
+  return { property: property as Property, invite: invite as PropertyInvite }
 }
 
 export async function getAdminProperties(): Promise<PropertyWithStats[]> {
@@ -194,7 +156,9 @@ export async function getPropertyBySlug(
   if (error || !inv) return null
 
   const property = (inv as unknown as { properties: Property }).properties
-  const invite   = { ...inv, properties: undefined } as unknown as PropertyInvite
+  if (!property) return null  // property inactive or RLS blocked join
+
+  const invite = { ...inv, properties: undefined } as unknown as PropertyInvite
 
   return { property, invite }
 }
@@ -208,30 +172,32 @@ export async function createPreRegistration(data: {
   phone?: string
   unit_number?: string
 }): Promise<ResidentPreRegistration> {
-  const { data: row, error } = await supabase
-    .from('resident_pre_registrations')
-    .insert({
-      property_id:    data.property_id,
-      resident_name:  data.resident_name,
-      email:          data.email,
-      phone:          data.phone ?? null,
-      unit_number:    data.unit_number ?? null,
-    })
-    .select()
-    .single()
+  // SECURITY DEFINER RPC — anon INSERT on resident_pre_registrations is blocked
+  // by Supabase's PostgREST/RLS layer despite a permissive policy; RPC bypasses it.
+  const { data: result, error } = await supabase.rpc('create_pre_registration_public', {
+    p_property_id:   data.property_id,
+    p_resident_name: data.resident_name,
+    p_email:         data.email,
+    p_phone:         data.phone ?? null,
+    p_unit_number:   data.unit_number ?? null,
+  })
 
   if (error) throw error
-  return row
+
+  // RPC returns the full row as JSON — no separate SELECT needed (anon can't SELECT)
+  return result as ResidentPreRegistration
 }
 
 export async function linkUserToPreRegistration(
   preRegId: string,
   userId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('resident_pre_registrations')
-    .update({ user_id: userId, account_created: true })
-    .eq('id', preRegId)
+  // SECURITY DEFINER RPC — when called right after signUp(), the pre-reg row
+  // still has user_id = NULL so the UPDATE policy (user_id = auth.uid()) won't match.
+  const { error } = await supabase.rpc('link_pre_registration_to_user', {
+    p_pre_reg_id: preRegId,
+    p_user_id:    userId,
+  })
 
   if (error) throw error
 }

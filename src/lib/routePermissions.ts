@@ -65,6 +65,7 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   '/dashboard/admin/regions':                        ['admin', 'regional_admin', 'city_manager', 'municipal_relations_manager'],
   '/dashboard/admin/forecasting':                    ['admin'],
   '/dashboard/admin/launch-roadmap':                 ['admin'],
+  '/dashboard/admin/apartment':                      ['admin'],
 
   // ── Billing — admins manage org subscriptions ─────────────────────────────
   '/admin/billing':                                  ['admin'],

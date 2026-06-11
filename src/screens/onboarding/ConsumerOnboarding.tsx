@@ -30,6 +30,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { logout } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
+import { getResidentPreRegistration, markConsumerOnboardingCompleted } from '../../lib/apartment'
 import { celebrate, playPop } from '../../lib/celebrate'
 import { AvatarBurst, SparkleLayer, RotatingMessage } from '../../components/Celebration'
 import { GlassCard } from '../../components/ui/GlassCard'
@@ -156,9 +157,48 @@ export default function ConsumerOnboarding() {
   const [showExit, setShowExit]           = useState(false)
   const [error, setError]                 = useState<string | null>(null)
   const [hydrated, setHydrated]           = useState(false)
+  // Apartment enrollment preload — if the user came through /join/:slug, prefill
+  // their info from resident_pre_registrations so they don't re-enter it.
+  // Also gates video/terms check: if they haven't finished the enrollment flow,
+  // show a banner rather than a blank wizard.
+  const [preRegChecked, setPreRegChecked]           = useState(false)
+  const [preRegNeedsVideo, setPreRegNeedsVideo]     = useState(false)
+  const [preRegPropertySlug, setPreRegPropertySlug] = useState<string | null>(null)
 
   const onboardingKey = user ? `${ONBOARDING_KEY_PREFIX}${user.id}` : null
   const lastLoggedStep = useRef<number | null>(null)
+
+  // ── Apartment pre-registration preload ────────────────────────────────────
+  // If this consumer came through the /join/:slug flow, pull their saved info
+  // so the wizard doesn't ask for things they already provided.
+  useEffect(() => {
+    if (!user) return
+    getResidentPreRegistration(user.id)
+      .then(preReg => {
+        if (!preReg) { setPreRegChecked(true); return }
+        // Gate: if they haven't finished video + terms, flag it
+        if (!preReg.video_completed || !preReg.terms_accepted) {
+          setPreRegNeedsVideo(true)
+          setPreRegPropertySlug(preReg.property?.city ?? null)
+          setPreRegChecked(true)
+          return
+        }
+        // Preload fields that were collected in the enrollment flow
+        setForm(prev => ({
+          ...prev,
+          full_name:      prev.full_name || preReg.resident_name,
+          phone:          prev.phone || (preReg.phone ?? ''),
+          // address is the property address; unit_number goes into apartment_unit
+          address:        prev.address || (preReg.property?.address ?? ''),
+          apartment_unit: prev.apartment_unit || (preReg.unit_number ?? ''),
+          city:           prev.city || (preReg.property?.city ?? ''),
+          state:          prev.state || (preReg.property?.state ?? ''),
+          zip_code:       prev.zip_code || (preReg.property?.zip ?? ''),
+        }))
+        setPreRegChecked(true)
+      })
+      .catch(() => setPreRegChecked(true)) // non-fatal
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Already-completed users skip the wizard entirely ─────────────────────
 
@@ -255,6 +295,67 @@ export default function ConsumerOnboarding() {
       keys.forEach((k) => localStorage.removeItem(k))
     } catch { /* non-fatal */ }
     return <Navigate to="/driver/compliance" replace />
+  }
+
+  // ── Apartment enrollment gate ─────────────────────────────────────────────
+  // If the resident came through /join/:slug but hasn't finished the video +
+  // terms steps, show a prompt to complete enrollment rather than the wizard.
+  if (preRegChecked && preRegNeedsVideo) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(180deg,#060e24 0%,#040a1a 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          textAlign: 'center',
+          color: '#fff',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        <span style={{ fontSize: 56, marginBottom: 20 }}>🎬</span>
+        <h2 style={{ fontSize: 24, fontWeight: 900, marginBottom: 12 }}>Complete Your Enrollment First</h2>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', maxWidth: 380, lineHeight: 1.65, marginBottom: 28 }}>
+          You need to watch the orientation video and accept the terms before
+          setting up your app account. Please return to your enrollment link to finish.
+        </p>
+        {preRegPropertySlug && (
+          <a
+            href={`/join/${preRegPropertySlug}`}
+            style={{
+              background: 'linear-gradient(135deg,#00c8ff,#0057e7)',
+              color: '#fff',
+              padding: '13px 28px',
+              borderRadius: 99,
+              fontWeight: 800,
+              fontSize: 14,
+              textDecoration: 'none',
+              display: 'inline-block',
+              marginBottom: 16,
+            }}
+          >
+            Continue Enrollment →
+          </a>
+        )}
+        <button
+          onClick={async () => { await logout() }}
+          style={{
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'rgba(255,255,255,0.5)',
+            borderRadius: 99,
+            padding: '10px 22px',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
+    )
   }
 
   function goNext() {
@@ -423,6 +524,14 @@ export default function ConsumerOnboarding() {
     if (rows.length > 0) {
       const { error: insErr } = await supabase.from('consumer_favorites').insert(rows)
       if (insErr) throw wrap('consumer_favorites.insert', insErr)
+    }
+
+    // 4. Mark consumer_app_onboarding_completed on any apartment pre-registration
+    // record tied to this user. Non-fatal if it fails (admin-reporting only).
+    try {
+      await markConsumerOnboardingCompleted(user.id)
+    } catch (e) {
+      console.warn('[onboarding] markConsumerOnboardingCompleted failed (non-fatal):', e)
     }
 
     // Wipe the draft now that it's been committed to Supabase.

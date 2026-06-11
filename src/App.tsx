@@ -259,6 +259,15 @@ const FeaturesPage             = lazy(() => import('./screens/marketing/Features
 const MarketingPricingPage     = lazy(() => import('./screens/marketing/MarketingPricingPage'))
 const AboutPage                = lazy(() => import('./screens/marketing/AboutPage'))
 const ContactPage              = lazy(() => import('./screens/marketing/ContactPage'))
+// Phase AP.1 — Public acquisition pages + apartment enrollment flow
+const PublicHome               = lazy(() => import('./screens/marketing/PublicHome'))
+const ConsumerLandingPage      = lazy(() => import('./screens/marketing/ConsumerLandingPage'))
+const CommercialLandingPage    = lazy(() => import('./screens/marketing/CommercialLandingPage'))
+const FundraiserLandingPage    = lazy(() => import('./screens/marketing/FundraiserLandingPage'))
+const DownloadPage             = lazy(() => import('./screens/marketing/DownloadPage'))
+const PropertyManagerJoin      = lazy(() => import('./screens/apartment/PropertyManagerJoin'))
+const ResidentEnrollment       = lazy(() => import('./screens/apartment/ResidentEnrollment'))
+const AdminApartmentManagement = lazy(() => import('./screens/admin/AdminApartmentManagement'))
 
 // ─ Legal ──────────────────────────────────────────────────────────────────────
 const TermsPage                = lazy(() => import('./screens/TermsPage'))
@@ -345,10 +354,9 @@ function HomeRedirect() {
     )
   }
 
-  // Unauthenticated visitors land on the public marketing site. They can
-  // navigate to /real-login or /signup from there. Authenticated users
-  // continue through the role-based dashboard redirects below.
-  if (!user) return <Navigate to="/marketing" replace />
+  // Unauthenticated visitors see the public recycling enterprise home page.
+  // Authenticated users continue through the role-based dashboard redirects below.
+  if (!user) return <PublicHome />
 
   const normalized = normalizeRole(role)
 
@@ -613,6 +621,9 @@ function App() {
 
               {/* Public marketing site — no auth required */}
               <Route path="/marketing" element={<MarketingHome />} />
+              {/* Phase AP.1 — public home rendered by HomeRedirect for unauth users */}
+              {/* /home is also a direct alias for unauthenticated entry */}
+              <Route path="/home" element={<PublicHome />} />
               <Route path="/features"  element={<FeaturesPage />} />
               <Route path="/pricing"   element={<MarketingPricingPage />} />
               <Route path="/about"     element={<AboutPage />} />
@@ -699,12 +710,20 @@ function App() {
               {/* Phase G.7 — /fundraiser-admin was a mock; redirect to the live per-campaign dashboard */}
               <Route path="/fundraiser-admin"   element={<Navigate to="/live-fundraiser-dashboard" replace />} />
 
+              {/* Phase AP.1 — Public acquisition landing pages */}
+              <Route path="/consumer"   element={<ConsumerLandingPage />} />
+              <Route path="/commercial" element={<CommercialLandingPage />} />
+              <Route path="/fundraiser" element={<FundraiserLandingPage />} />
+              <Route path="/download"   element={<DownloadPage />} />
+              {/* Phase AP.1 — Apartment enrollment flow (public, no auth required) */}
+              <Route path="/join"       element={<PropertyManagerJoin />} />
+              <Route path="/join/:slug" element={<ResidentEnrollment />} />
+              {/* Phase AP.1 — Admin apartment acquisition management */}
+              <Route path="/dashboard/admin/apartment" element={<ProtectedRoute requireApproved><AdminApartmentManagement /></ProtectedRoute>} />
               {/* Legacy demo shortcuts → redirect to canonical dashboard routes */}
-              <Route path="/consumer"   element={<Navigate to="/dashboard/consumer"   replace />} />
               <Route path="/driver"     element={<Navigate to="/dashboard/driver"     replace />} />
               <Route path="/warehouse"  element={<Navigate to="/dashboard/warehouse"  replace />} />
               <Route path="/partner"    element={<Navigate to="/dashboard/partner"    replace />} />
-              <Route path="/fundraiser" element={<Navigate to="/dashboard/fundraiser" replace />} />
               <Route path="/admin"      element={<Navigate to="/dashboard/admin"      replace />} />
 
               {/* ── Live mode routes (Supabase-backed, guarded by RequireAuth) ── */}

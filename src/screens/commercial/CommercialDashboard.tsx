@@ -62,14 +62,14 @@ const SUSTAINABILITY = [
   { label: 'Contamination Rate',value: '—',  unit: '%',    color: '#fbbf24' },
 ]
 
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS: { icon: string; label: string; path: string; comingSoon?: boolean }[] = [
   { icon: '🚛', label: 'Request\nPickup',      path: '/dashboard/commercial/pickup'                 },
   { icon: '🚨', label: 'Emergency\nOverflow',  path: '/dashboard/commercial/pickup?type=emergency'  },
   { icon: '🗑️', label: 'Manage\nContainers',  path: '/dashboard/commercial/bins'                   },
   { icon: '📊', label: 'View\nReports',        path: '/dashboard/commercial/reports'                },
   { icon: '🌿', label: 'My\nImpact',           path: '/commercial/impact'                           },
   { icon: '🧾', label: 'Pay\nInvoice',          path: '/dashboard/commercial/invoices'               },
-  { icon: '📞', label: 'Contact\nDispatch',     path: ''                                             },
+  { icon: '📞', label: 'Contact\nDispatch',     path: '',   comingSoon: true                         },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -114,10 +114,11 @@ export default function CommercialDashboard() {
   const { user }   = useAuthStore()
   const { upsertNotification } = useNotificationStore()
 
-  const [showNotif,      setShowNotif]      = useState(false)
-  const [activePickups,  setActivePickups]  = useState<PickupItem[]>([])
-  const [currentInvoice, setCurrentInvoice] = useState<InvoiceItem | null>(null)
-  const [syncStatus,     setSyncStatus]     = useState<'connecting' | 'active' | 'offline'>('connecting')
+  const [showNotif,        setShowNotif]        = useState(false)
+  const [activePickups,    setActivePickups]    = useState<PickupItem[]>([])
+  const [currentInvoice,   setCurrentInvoice]   = useState<InvoiceItem | null>(null)
+  const [syncStatus,       setSyncStatus]       = useState<'connecting' | 'active' | 'offline'>('connecting')
+  const [comingSoonBanner, setComingSoonBanner] = useState(false)
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -215,16 +216,31 @@ export default function CommercialDashboard() {
 
         {/* ── 2. Quick Actions ── */}
         <SectionLabel>Quick Actions</SectionLabel>
+        {comingSoonBanner && (
+          <div style={{
+            marginBottom: 10, padding: '8px 14px', borderRadius: 12, fontSize: 11,
+            background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)',
+            color: '#fbbf24', textAlign: 'center',
+          }}>
+            📞 Dispatch messaging is coming soon.
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-2.5 mb-5">
           {QUICK_ACTIONS.map(a => (
             <button
               key={a.label}
-              onClick={() => a.path && navigate(a.path)}
-              className="rounded-2xl py-4 flex flex-col items-center gap-2 transition-all hover:brightness-110 active:scale-95"
+              title={a.comingSoon ? 'Coming soon' : undefined}
+              onClick={() => {
+                if (a.comingSoon) { setComingSoonBanner(true); setTimeout(() => setComingSoonBanner(false), 3000); return }
+                if (a.path) navigate(a.path)
+              }}
+              className="rounded-2xl py-4 flex flex-col items-center gap-2 transition-all active:scale-95"
               style={{
                 background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.09)',
-                cursor: a.path ? 'pointer' : 'default',
+                cursor: a.comingSoon ? 'not-allowed' : 'pointer',
+                opacity: a.comingSoon ? 0.45 : 1,
+                position: 'relative',
               }}
             >
               <span style={{ fontSize: 22 }}>{a.icon}</span>
@@ -234,6 +250,16 @@ export default function CommercialDashboard() {
               }}>
                 {a.label}
               </span>
+              {a.comingSoon && (
+                <span style={{
+                  position: 'absolute', top: 5, right: 5,
+                  fontSize: 7, fontWeight: 800, color: '#fbbf24',
+                  background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)',
+                  borderRadius: 6, padding: '1px 4px', letterSpacing: '0.05em',
+                }}>
+                  SOON
+                </span>
+              )}
             </button>
           ))}
         </div>

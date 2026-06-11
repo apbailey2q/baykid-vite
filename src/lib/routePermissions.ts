@@ -4,8 +4,8 @@ import type { Role } from '../types'
 // Every dashboard path maps to the roles that may enter it.
 // 'admin' appears in every list — admins have full access everywhere.
 //
-// DEFAULT POLICY: deny. Any /dashboard/* path NOT listed here is blocked
-// for all roles (returns false). Add new routes explicitly.
+// DEFAULT POLICY: deny. Any path NOT listed here (not just /dashboard/*) is
+// blocked for all roles (canAccessRoute returns false). Add new routes explicitly.
 
 // Phase G.9 — shared role groups so the 10 commercial sub-roles and 5
 // fundraiser sub-roles can be added to the relevant permissions without
@@ -115,6 +115,15 @@ export const ROUTE_PERMISSIONS: Record<string, Role[]> = {
   // ── Consumer bag detail + inspection ─────────────────────────────────────
   // Dynamic routes /bag/:bagId and /bag/:bagId/inspect. The /inspect suffix
   // also triggers a special-case check in canAccessRoute() for warehouse roles.
+  //
+  // Driver access: 1099 drivers scan and inspect consumer bags during pickup
+  // workflows — they need read access to /bag/:bagId to complete inspections.
+  // RLS on the qr_bags table limits what they can actually read (assigned-only);
+  // this permission grants UI access, not data access beyond RLS.
+  //
+  // Future hardening: if per-assignment bag guards are needed, add a
+  // server-side check in BagDetailScreen verifying the bag belongs to an
+  // active pickup assigned to the requesting driver before rendering.
   '/bag':                                            ['admin', 'consumer', 'driver', ...WAREHOUSE_ROLES],
 
   // ── Driver ─────────────────────────────────────────────────────────────────

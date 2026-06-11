@@ -269,6 +269,7 @@ const PropertyManagerJoin      = lazy(() => import('./screens/apartment/Property
 const ResidentEnrollment       = lazy(() => import('./screens/apartment/ResidentEnrollment'))
 const AdminApartmentManagement = lazy(() => import('./screens/admin/AdminApartmentManagement'))
 const ApartmentFlyer           = lazy(() => import('./screens/admin/ApartmentFlyer'))
+const AdminVideoManager        = lazy(() => import('./screens/admin/AdminVideoManager'))
 
 // ─ Legal ──────────────────────────────────────────────────────────────────────
 const TermsPage                = lazy(() => import('./screens/TermsPage'))
@@ -723,6 +724,8 @@ function App() {
               <Route path="/dashboard/admin/apartment" element={<ProtectedRoute requireApproved><AdminApartmentManagement /></ProtectedRoute>} />
               {/* Phase AP.3C — Printable resident invite flyer (admin-only via prefix match) */}
               <Route path="/dashboard/admin/apartment/flyer/:slug" element={<ProtectedRoute requireApproved><ApartmentFlyer /></ProtectedRoute>} />
+              {/* Phase AP.3D — Onboarding video manager (admin-only via prefix match) */}
+              <Route path="/dashboard/admin/apartment/video" element={<ProtectedRoute requireApproved><AdminVideoManager /></ProtectedRoute>} />
               {/* Legacy demo shortcuts → redirect to canonical dashboard routes */}
               <Route path="/driver"     element={<Navigate to="/dashboard/driver"     replace />} />
               <Route path="/warehouse"  element={<Navigate to="/dashboard/warehouse"  replace />} />

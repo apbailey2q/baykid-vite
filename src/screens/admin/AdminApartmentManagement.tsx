@@ -270,20 +270,37 @@ export default function AdminApartmentManagement() {
               Full resident conversion funnel — from property link to active app user
             </p>
           </div>
-          <Link
-            to="/join"
-            style={{
-              background: 'linear-gradient(135deg,#00c8ff,#0057e7)',
-              color: '#fff',
-              padding: '10px 22px',
-              borderRadius: 99,
-              fontWeight: 700,
-              fontSize: 13,
-              textDecoration: 'none',
-            }}
-          >
-            + Register Property
-          </Link>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Link
+              to="/dashboard/admin/apartment/video"
+              style={{
+                background: 'rgba(168,85,247,0.12)',
+                border: '1px solid rgba(168,85,247,0.35)',
+                color: '#c084fc',
+                padding: '10px 18px',
+                borderRadius: 99,
+                fontWeight: 700,
+                fontSize: 13,
+                textDecoration: 'none',
+              }}
+            >
+              🎬 Onboarding Video
+            </Link>
+            <Link
+              to="/join"
+              style={{
+                background: 'linear-gradient(135deg,#00c8ff,#0057e7)',
+                color: '#fff',
+                padding: '10px 22px',
+                borderRadius: 99,
+                fontWeight: 700,
+                fontSize: 13,
+                textDecoration: 'none',
+              }}
+            >
+              + Register Property
+            </Link>
+          </div>
         </div>
 
         {/* Summary cards — 10 KPIs */}

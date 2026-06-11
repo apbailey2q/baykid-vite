@@ -27,6 +27,7 @@ import {
   type ResidentPreRegistration,
 } from '../../lib/apartment'
 import { APPLE_APP_STORE_URL, GOOGLE_PLAY_URL } from '../../lib/appConfig'
+import { getActiveOnboardingVideo, type OnboardingVideo } from '../../lib/onboardingVideo'
 
 const INPUT: React.CSSProperties = {
   width: '100%',
@@ -323,9 +324,18 @@ function Step3Video({
   onNext: () => void
 }) {
   const [videoWatched, setVideoWatched] = useState(false)
-  const [started, setStarted]           = useState(false)
-  const [saving, setSaving]             = useState(false)
-  const videoRef                        = useRef<HTMLVideoElement | null>(null)
+  const [started,      setStarted]      = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [videoRecord,  setVideoRecord]  = useState<OnboardingVideo | null | undefined>(undefined) // undefined = loading
+  const videoRef    = useRef<HTMLVideoElement | null>(null)
+  // Track the furthest point the user has reached; prevents forward-scrubbing
+  const maxReached  = useRef(0)
+
+  useEffect(() => {
+    getActiveOnboardingVideo('consumer')
+      .then(v => setVideoRecord(v))
+      .catch(() => setVideoRecord(null))
+  }, [])
 
   async function handleVideoEnd() {
     setVideoWatched(true)
@@ -346,6 +356,83 @@ function Step3Video({
     }
   }
 
+  function handleTimeUpdate(e: React.SyntheticEvent<HTMLVideoElement>) {
+    const vid = e.currentTarget
+    if (vid.currentTime > maxReached.current) {
+      maxReached.current = vid.currentTime
+    }
+  }
+
+  function handleSeeking(e: React.SyntheticEvent<HTMLVideoElement>) {
+    if (videoWatched) return
+    const vid = e.currentTarget
+    // Allow rewinding but not scrubbing forward past what has been played
+    if (vid.currentTime > maxReached.current + 2) {
+      vid.currentTime = maxReached.current
+    }
+  }
+
+  // Loading state
+  if (videoRecord === undefined) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Watch the Orientation</h2>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid rgba(0,200,255,0.2)', borderTopColor: '#00c8ff', animation: 'spin 0.8s linear infinite' }} />
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
+
+  // No active video configured
+  if (videoRecord === null) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Watch the Orientation</h2>
+        <div
+          style={{
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: 14,
+            padding: '28px 24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 36 }}>🎬</span>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#fbbf24', margin: 0 }}>
+            Onboarding video is not configured yet.
+          </p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+            Please contact support at{' '}
+            <a href="mailto:support@cbrecycling.org" style={{ color: '#00c8ff' }}>
+              support@cbrecycling.org
+            </a>
+          </p>
+        </div>
+        <button
+          disabled
+          style={{
+            background: 'rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.3)',
+            border: 'none',
+            borderRadius: 99,
+            padding: '14px',
+            fontWeight: 800,
+            fontSize: 15,
+            cursor: 'not-allowed',
+          }}
+        >
+          Watch the video to continue
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Watch the Orientation</h2>
@@ -354,7 +441,19 @@ function Step3Video({
         recycling program works. It takes about 2 minutes.
       </p>
 
-      {/* Video player placeholder — replace src with real video URL when available */}
+      {/* Video title + description */}
+      <div style={{ marginBottom: -8 }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', margin: '0 0 2px' }}>
+          {videoRecord.title}
+        </p>
+        {videoRecord.description && (
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', margin: 0 }}>
+            {videoRecord.description}
+          </p>
+        )}
+      </div>
+
+      {/* Video player */}
       <div
         style={{
           borderRadius: 16,
@@ -362,52 +461,20 @@ function Step3Video({
           background: '#000',
           border: '1px solid rgba(0,200,255,0.2)',
           aspectRatio: '16/9',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
           position: 'relative',
         }}
       >
         <video
           ref={videoRef}
+          src={videoRecord.video_url}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           controls
           controlsList="nodownload"
           onPlay={handlePlay}
           onEnded={handleVideoEnd}
-          // Prevent users from skipping past unplayed content on the scrubber
-          onSeeking={e => {
-            const vid = e.currentTarget
-            if (!videoWatched && vid.currentTime > vid.duration * 0.95) {
-              vid.currentTime = 0
-            }
-          }}
-        >
-          {/* Replace this src with the real orientation video URL */}
-          <source src="" type="video/mp4" />
-          Your browser does not support video playback.
-        </video>
-        {/* Placeholder overlay when no real video src yet */}
-        {!started && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-              background: 'rgba(4,10,26,0.92)',
-            }}
-          >
-            <span style={{ fontSize: 48 }}>🎬</span>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', textAlign: 'center', maxWidth: 280 }}>
-              Orientation video will play here. Press the play button above.
-            </p>
-          </div>
-        )}
+          onTimeUpdate={handleTimeUpdate}
+          onSeeking={handleSeeking}
+        />
       </div>
 
       {!videoWatched && (
@@ -442,7 +509,7 @@ function Step3Video({
           transition: 'all 0.3s',
         }}
       >
-        {saving ? 'Saving...' : videoWatched ? 'I\'ve Watched the Video →' : 'Watch the video to continue'}
+        {saving ? 'Saving...' : videoWatched ? "I've Watched the Video →" : 'Watch the video to continue'}
       </button>
     </div>
   )

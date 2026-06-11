@@ -77,8 +77,7 @@ export default function RealLoginPage() {
     if (!storeUser || authLoading) return null
     if (!BYPASS_APPROVAL && approvalStatus !== 'approved') return '/pending-approval'
     const realRole = normalizeRole(storeRole)
-    const targetRole = realRole === 'admin' ? selectedRole : realRole
-    const path = getRoleDashboardPath({ ...storeProfile, role: targetRole })
+    const path = getRoleDashboardPath({ ...storeProfile, role: realRole })
     return path && path !== '/real-login' ? path : null
   })()
 
@@ -227,15 +226,13 @@ export default function RealLoginPage() {
         return
       }
 
-      const isAdmin = databaseRole === 'admin'
-      const targetRole: AccessRole = isAdmin ? selectedRole : databaseRole
-      const dashboardPath = getRoleDashboardPath({ ...profile, role: targetRole })
+      const dashboardPath = getRoleDashboardPath({ ...profile, role: databaseRole })
 
       console.log('Redirect destination:', dashboardPath)
-      console.log('[9] target dashboard', { targetRole, dashboardPath })
+      console.log('[9] target dashboard', { databaseRole, dashboardPath })
 
       if (!dashboardPath || dashboardPath === '/real-login') {
-        setError(`No dashboard route found for role: ${targetRole}`)
+        setError(`No dashboard route found for role: ${databaseRole}`)
         return
       }
 

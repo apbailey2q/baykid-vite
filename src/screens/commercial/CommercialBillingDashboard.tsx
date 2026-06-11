@@ -507,21 +507,18 @@ export default function CommercialBillingDashboard() {
           </div>
         )}
 
-        {/* ── Stripe note ── */}
+        {/* ── Billing info note ── */}
         <GlassCard padding="md">
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>🔐</span>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>📋</span>
             <div>
               <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>
-                Secure Payments via Stripe
+                How Billing Works
               </p>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                Payments are processed securely through Stripe. Your card details are never stored on our servers.
-                {!acct.stripe_customer_id && (
-                  <span style={{ color: 'rgba(255,165,0,0.8)' }}>
-                    {' '}Stripe customer not yet linked — payment will be set up on first invoice.
-                  </span>
-                )}
+                Invoices are generated after each service period and due within 30 days.
+                Payments are arranged directly with your account manager and recorded by our billing team.
+                Once received, your invoice status updates to Paid.
               </p>
             </div>
           </div>

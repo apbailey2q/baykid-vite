@@ -413,6 +413,8 @@ function ServiceWorkerManager() {
 
     function onMessage(event: MessageEvent) {
       if (event.data?.type === 'navigate' && typeof event.data.target_route === 'string') {
+        // Never redirect away from the login page — user may be trying to sign out or switch accounts
+        if (window.location.pathname === '/real-login') return
         navigate(event.data.target_route)
       }
     }

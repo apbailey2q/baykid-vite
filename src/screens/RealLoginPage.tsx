@@ -310,16 +310,21 @@ export default function RealLoginPage() {
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
               Currently signed in as
             </p>
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 12, wordBreak: 'break-all' }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 2, wordBreak: 'break-all' }}>
               {storeUser.email}
             </p>
-            <div style={{ display: 'flex', gap: 8 }}>
+            {storeRole && (
+              <p style={{ fontSize: 11, color: 'rgba(0,200,255,0.7)', textTransform: 'capitalize', marginBottom: 12 }}>
+                Role: {storeRole}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {existingSessionPath && (
                 <button
                   type="button"
                   onClick={() => navigate(existingSessionPath)}
                   style={{
-                    flex: 1, padding: '9px 12px', borderRadius: 12, fontSize: 12,
+                    flex: 1, minWidth: 100, padding: '9px 12px', borderRadius: 12, fontSize: 12,
                     fontWeight: 700, cursor: 'pointer',
                     background: 'rgba(0,200,255,0.12)', border: '1px solid rgba(0,200,255,0.35)',
                     color: '#00c8ff',
@@ -333,7 +338,7 @@ export default function RealLoginPage() {
                 onClick={() => { void handleSignOut() }}
                 disabled={signingOut}
                 style={{
-                  flex: 1, padding: '9px 12px', borderRadius: 12, fontSize: 12,
+                  flex: 1, minWidth: 100, padding: '9px 12px', borderRadius: 12, fontSize: 12,
                   fontWeight: 700, cursor: signingOut ? 'default' : 'pointer',
                   background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.3)',
                   color: '#FF1744', opacity: signingOut ? 0.6 : 1,
@@ -342,6 +347,9 @@ export default function RealLoginPage() {
                 {signingOut ? 'Signing out…' : '🔒 Sign Out'}
               </button>
             </div>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 10, marginBottom: 0, textAlign: 'center' }}>
+              — or sign in with a different account below —
+            </p>
           </div>
         )}
 

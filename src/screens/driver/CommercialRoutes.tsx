@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Component } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { logout } from '../../lib/auth'
 import { useAuthStore } from '../../store/authStore'
 import { logMode } from '../../lib/mode'
 import { GlassCard } from '../../components/ui/GlassCard'
@@ -517,6 +518,7 @@ export default function CommercialRoutes() {
 
   const [pageState, setPageState]             = useState<'loading' | 'no_user' | 'error' | 'ready'>('loading')
   const [loadError, setLoadError]             = useState<string | null>(null)
+  const [signingOut, setSigningOut]           = useState(false)
   const [stops, setStops]                     = useState<RouteStop[]>([])
   const [expandedId, setExpandedId]           = useState<string | null>(null)
   const [working, setWorking]                 = useState<string | null>(null)
@@ -1066,6 +1068,34 @@ export default function CommercialRoutes() {
             </p>
           )}
           <PrimaryButton fullWidth onClick={load}>Retry</PrimaryButton>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={() => navigate('/real-login')}
+              style={{
+                flex: 1, padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.28)', color: '#00c8ff',
+              }}
+            >
+              🏠 Login Page
+            </button>
+            <button
+              type="button"
+              disabled={signingOut}
+              onClick={async () => {
+                setSigningOut(true)
+                try { await logout() } finally { setSigningOut(false) }
+              }}
+              style={{
+                flex: 1, padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+                cursor: signingOut ? 'default' : 'pointer',
+                background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.28)', color: '#FF1744',
+                opacity: signingOut ? 0.6 : 1,
+              }}
+            >
+              {signingOut ? 'Signing out…' : '🔒 Sign Out'}
+            </button>
+          </div>
         </GlassCard>
       </div>
     )
@@ -1381,7 +1411,7 @@ export default function CommercialRoutes() {
         {stops.length === 0 ? (
           <EmptyState
             icon="🚛"
-            title="No stops assigned"
+            title="No assigned commercial routes yet"
             description="Your commercial route stops will appear here once dispatch assigns them."
             action={{ label: 'Refresh', onClick: load }}
           />

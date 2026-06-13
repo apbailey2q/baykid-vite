@@ -91,6 +91,71 @@ export default function ConsumerLandingPage() {
         </div>
       </section>
 
+      {/* Customer Demo */}
+      <section
+        style={{
+          maxWidth: 760,
+          margin: '0 auto 60px',
+          padding: '40px 32px',
+          background: 'rgba(0,200,255,0.04)',
+          border: '1px solid rgba(0,200,255,0.18)',
+          borderRadius: 24,
+          textAlign: 'center',
+        }}
+      >
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            color: '#5eead4',
+            textTransform: 'uppercase',
+            marginBottom: 12,
+          }}
+        >
+          Customer Demo
+        </p>
+        <h2
+          style={{
+            fontSize: 'clamp(22px, 3.5vw, 28px)',
+            fontWeight: 800,
+            lineHeight: 1.2,
+            marginBottom: 16,
+          }}
+        >
+          See How Cyan&rsquo;s Brooklynn Recycling Works
+        </h2>
+        <p
+          style={{
+            fontSize: 14,
+            color: 'rgba(255,255,255,0.65)',
+            lineHeight: 1.65,
+            maxWidth: 560,
+            margin: '0 auto 28px',
+          }}
+        >
+          Watch how customers sign up, prepare their recycling bag, scan the QR code,
+          request pickup, and track their bag from pickup through warehouse arrival.
+        </p>
+        <a
+          href="https://app.heygen.com/videos/cyan-s-brooklynn-recycling-customer-app-demo-0e7e450245bf483c9eed95fe679579e3"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-block',
+            background: 'linear-gradient(135deg,#00c8ff,#0057e7)',
+            color: '#fff',
+            padding: '14px 32px',
+            borderRadius: 99,
+            fontWeight: 800,
+            fontSize: 15,
+            textDecoration: 'none',
+          }}
+        >
+          ▶ Watch Customer Demo
+        </a>
+      </section>
+
       {/* How it works */}
       <section style={{ maxWidth: 900, margin: '0 auto 80px', padding: '0 24px' }}>
         <h2 style={{ textAlign: 'center', fontSize: 26, fontWeight: 800, marginBottom: 40 }}>How It Works</h2>

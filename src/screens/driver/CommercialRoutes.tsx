@@ -516,6 +516,7 @@ export default function CommercialRoutes() {
   const offlineSync   = useOfflineSync()
 
   const [pageState, setPageState]             = useState<'loading' | 'no_user' | 'error' | 'ready'>('loading')
+  const [loadError, setLoadError]             = useState<string | null>(null)
   const [stops, setStops]                     = useState<RouteStop[]>([])
   const [expandedId, setExpandedId]           = useState<string | null>(null)
   const [working, setWorking]                 = useState<string | null>(null)
@@ -557,7 +558,12 @@ export default function CommercialRoutes() {
       .order('stop_order', { ascending: true, nullsFirst: false })
       .order('sequence',   { ascending: true })
 
-    if (error) { setPageState('error'); return }
+    if (error) {
+      console.error('[CommercialRoutes] load error:', error.code, error.message, error.details, error.hint)
+      setLoadError(`${error.code ?? 'unknown'}: ${error.message ?? 'query failed'}`)
+      setPageState('error')
+      return
+    }
 
     const flattened = (data ?? [])
       .map(raw => flattenStop(raw as unknown as RawStop))
@@ -1051,7 +1057,14 @@ export default function CommercialRoutes() {
         <GlassCard padding="lg" className="w-full max-w-sm text-center">
           <p style={{ fontSize: 28, marginBottom: 12 }}>⚠️</p>
           <p style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Failed to load route</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 20 }}>Check your connection and try again.</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: loadError ? 8 : 20 }}>
+            Check your connection and try again.
+          </p>
+          {loadError && (
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginBottom: 20, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              {loadError}
+            </p>
+          )}
           <PrimaryButton fullWidth onClick={load}>Retry</PrimaryButton>
         </GlassCard>
       </div>
